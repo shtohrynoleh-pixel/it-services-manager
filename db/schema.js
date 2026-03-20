@@ -230,15 +230,49 @@ function initDB() {
     CREATE TABLE IF NOT EXISTS agreements (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       company_id INTEGER NOT NULL,
-      service_id INTEGER NOT NULL,
+      service_id INTEGER,
+      title TEXT,
       custom_price REAL,
       billing_cycle TEXT DEFAULT 'monthly',
       start_date TEXT,
       end_date TEXT,
+      auto_renew INTEGER DEFAULT 1,
+      sla_response TEXT,
+      sla_resolution TEXT,
+      scope TEXT,
+      exclusions TEXT,
+      terms TEXT,
+      signed_by TEXT,
+      signed_date TEXT,
+      attachment TEXT,
+      attachment_name TEXT,
       is_active INTEGER DEFAULT 1,
       notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
       FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE
+    );
+
+    -- RDP / Remote access connections
+    CREATE TABLE IF NOT EXISTS rdp_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT DEFAULT 'rdp',
+      hostname TEXT,
+      port INTEGER DEFAULT 3389,
+      username TEXT,
+      password_enc TEXT,
+      domain TEXT,
+      gateway TEXT,
+      os TEXT,
+      purpose TEXT,
+      assigned_to TEXT,
+      last_connected TEXT,
+      is_active INTEGER DEFAULT 1,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
     );
 
     -- Invoices
@@ -716,6 +750,21 @@ function initDB() {
   if (hasDepts.c === 0) {
     const di = db.prepare('INSERT INTO departments (name, description, sort_order) VALUES (?,?,?)');
     [['Executive','Leadership and ownership',1],['Operations','Dispatch, logistics, and daily operations',2],['Driving','CDL drivers and fleet operators',3],['Maintenance','Truck and equipment maintenance',4],['Accounting','Finance, billing, and payroll',5],['Safety','Safety compliance and training',6],['HR','Hiring, onboarding, and employee management',7],['Administration','Office support and front desk',8],['IT','Technology and systems',9],['Warehouse','Loading, unloading, and yard operations',10]].forEach(d => di.run(...d));
+  }
+
+  // Add agreement columns if missing
+  try { db.prepare('SELECT title FROM agreements LIMIT 1').get(); } catch(e) {
+    try { db.exec('ALTER TABLE agreements ADD COLUMN title TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE agreements ADD COLUMN auto_renew INTEGER DEFAULT 1'); } catch(e2) {}
+    try { db.exec('ALTER TABLE agreements ADD COLUMN sla_response TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE agreements ADD COLUMN sla_resolution TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE agreements ADD COLUMN scope TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE agreements ADD COLUMN exclusions TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE agreements ADD COLUMN terms TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE agreements ADD COLUMN signed_by TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE agreements ADD COLUMN signed_date TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE agreements ADD COLUMN attachment TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE agreements ADD COLUMN attachment_name TEXT'); } catch(e2) {}
   }
 
   // Add flow_nodes columns if missing

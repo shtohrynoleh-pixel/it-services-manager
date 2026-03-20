@@ -554,6 +554,75 @@ module.exports = function(db) {
     res.redirect(req.body.redirect || '/admin/companies/' + req.params.cid + '/files');
   });
 
+  // === RDP CONNECTIONS (must be before generic /:id/:table) ===
+  router.get('/companies/:cid/rdp', (req, res) => {
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.cid);
+    if (!company) return res.redirect('/admin/companies');
+    const connections = safeAll('SELECT * FROM rdp_connections WHERE company_id = ? ORDER BY name', [company.id]);
+    res.render(V('rdp'), { user: req.session.user, company, connections, settings: getSettings(), page: 'companies' });
+  });
+
+  router.post('/companies/:cid/rdp', (req, res) => {
+    const { name, type, hostname, port, username, password_enc, domain, gateway, os, purpose, assigned_to, notes } = req.body;
+    try {
+      db.prepare('INSERT INTO rdp_connections (company_id, name, type, hostname, port, username, password_enc, domain, gateway, os, purpose, assigned_to, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+        req.params.cid, name, type || 'rdp', hostname, parseInt(port) || 3389, username, password_enc, domain, gateway, os, purpose, assigned_to, notes
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/rdp');
+  });
+
+  router.post('/companies/:cid/rdp/:rid/edit', (req, res) => {
+    const { name, type, hostname, port, username, password_enc, domain, gateway, os, purpose, assigned_to, is_active, notes } = req.body;
+    try {
+      db.prepare('UPDATE rdp_connections SET name=?, type=?, hostname=?, port=?, username=?, password_enc=?, domain=?, gateway=?, os=?, purpose=?, assigned_to=?, is_active=?, notes=? WHERE id=? AND company_id=?').run(
+        name, type || 'rdp', hostname, parseInt(port) || 3389, username, password_enc, domain, gateway, os, purpose, assigned_to, is_active ? 1 : 0, notes, req.params.rid, req.params.cid
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/rdp');
+  });
+
+  router.post('/companies/:cid/rdp/:rid/delete', (req, res) => {
+    try { db.prepare('DELETE FROM rdp_connections WHERE id = ? AND company_id = ?').run(req.params.rid, req.params.cid); } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/rdp');
+  });
+
+  // === AGREEMENT DETAIL + ATTACHMENT ===
+  router.get('/companies/:cid/agreements/:aid', (req, res) => {
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.cid);
+    if (!company) return res.redirect('/admin/companies');
+    const agreement = safeGet('SELECT a.*, s.name as service_name, s.base_price, s.description as service_desc FROM agreements a LEFT JOIN services s ON a.service_id = s.id WHERE a.id = ? AND a.company_id = ?', [req.params.aid, req.params.cid]);
+    if (!agreement) return res.redirect('/admin/companies/' + req.params.cid + '?tab=agreements');
+    res.render(V('agreement-detail'), { user: req.session.user, company, agreement, settings: getSettings(), page: 'companies' });
+  });
+
+  router.post('/companies/:cid/agreements/:aid/edit', (req, res) => {
+    const { title, custom_price, billing_cycle, start_date, end_date, auto_renew, sla_response, sla_resolution, scope, exclusions, terms, signed_by, signed_date, is_active, notes } = req.body;
+    try {
+      db.prepare('UPDATE agreements SET title=?, custom_price=?, billing_cycle=?, start_date=?, end_date=?, auto_renew=?, sla_response=?, sla_resolution=?, scope=?, exclusions=?, terms=?, signed_by=?, signed_date=?, is_active=?, notes=? WHERE id=? AND company_id=?').run(
+        title || null, parseFloat(custom_price) || null, billing_cycle, start_date || null, end_date || null, auto_renew ? 1 : 0, sla_response || null, sla_resolution || null, scope || null, exclusions || null, terms || null, signed_by || null, signed_date || null, is_active ? 1 : 0, notes || null, req.params.aid, req.params.cid
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/agreements/' + req.params.aid);
+  });
+
+  router.post('/companies/:cid/agreements/:aid/upload', fileUpload.single('file'), (req, res) => {
+    if (!req.file) return res.redirect('/admin/companies/' + req.params.cid + '/agreements/' + req.params.aid);
+    try {
+      db.prepare('UPDATE agreements SET attachment = ?, attachment_name = ? WHERE id = ? AND company_id = ?').run(
+        req.file.filename, req.file.originalname, req.params.aid, req.params.cid
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/agreements/' + req.params.aid);
+  });
+
+  router.get('/companies/:cid/agreements/:aid/download', (req, res) => {
+    const agr = safeGet('SELECT attachment, attachment_name FROM agreements WHERE id = ? AND company_id = ?', [req.params.aid, req.params.cid]);
+    if (!agr || !agr.attachment) return res.status(404).send('No attachment');
+    const filePath = require('path').resolve(__dirname, '..', 'uploads', agr.attachment);
+    res.download(filePath, agr.attachment_name);
+  });
+
   // === INVENTORY LOCATIONS (must be before generic /:id/:table) ===
   router.post('/companies/:cid/locations', (req, res) => {
     const { name, type, address, parent_id, notes } = req.body;
