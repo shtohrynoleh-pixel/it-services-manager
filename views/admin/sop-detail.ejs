@@ -1,0 +1,263 @@
+<%- include('../partials/head') %>
+<style>
+.sop-step{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid #f1f5f9;align-items:flex-start;}
+.sop-step:last-child{border:none;}
+.sop-num{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;}
+.sop-step-body{flex:1;min-width:0;}
+.sop-step-title{font-weight:700;font-size:13px;margin-bottom:3px;}
+.sop-step-desc{font-size:12px;color:#475569;line-height:1.6;}
+.sop-step-who{font-size:11px;color:var(--primary);font-weight:600;margin-top:4px;}
+.sop-step-warn{font-size:11px;color:var(--danger);font-weight:600;margin-top:4px;padding:4px 8px;background:var(--danger-light);border-radius:6px;}
+.sop-field{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;}
+.sop-field-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:6px;}
+.sop-field-value{font-size:13px;line-height:1.6;white-space:pre-wrap;}
+</style>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/sops" style="opacity:0.4;text-decoration:none;">📋</a> → <%= sop.title %></h2></div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge <%= sop.status === 'published' ? 'paid' : sop.status === 'review' ? 'sent' : 'draft' %>"><%= sop.status %></span>
+        <% if (sop.is_template) { %><span class="badge prospect">Template</span><% } %>
+        <%- include('../partials/notif-bell') %>
+      </div>
+    </div>
+    <div class="content">
+      <!-- Tabs -->
+      <div class="tabs">
+        <% ['overview','purpose','scope','procedures','safety','references','revisions','approval','compliance'].forEach(t => { %>
+          <a class="tab <%= tab === t ? 'active' : '' %>" href="/admin/sops/<%= sop.id %>?tab=<%= t %>"><%= t.charAt(0).toUpperCase() + t.slice(1) %></a>
+        <% }) %>
+      </div>
+
+      <% if (tab === 'overview') { %>
+        <!-- SOP Header info -->
+        <div class="card">
+          <h3>📋 SOP Information</h3>
+          <form method="POST" action="/admin/sops/<%= sop.id %>/edit">
+            <input type="hidden" name="redirect_tab" value="overview">
+            <div class="form-row">
+              <div class="form-group"><label>Title *</label><input type="text" name="title" value="<%= sop.title %>" required></div>
+              <div class="form-group"><label>SOP Number</label><input type="text" name="sop_number" value="<%= sop.sop_number || '' %>"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Version</label><input type="text" name="version" value="<%= sop.version || '1.0' %>"></div>
+              <div class="form-group"><label>Status</label><select name="status"><% ['draft','review','published','archived'].forEach(s => { %><option value="<%= s %>" <%= sop.status === s ? 'selected' : '' %>><%= s.charAt(0).toUpperCase() + s.slice(1) %></option><% }) %></select></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Category</label><select name="category"><% ['HR-IT','Security','Backup','Server','IT Operations','Networking','Communication','Safety','Other'].forEach(c => { %><option <%= sop.category === c ? 'selected' : '' %>><%= c %></option><% }) %></select></div>
+              <div class="form-group"><label>Company</label><select name="company_id"><option value="">— Template —</option><% companies.forEach(c => { %><option value="<%= c.id %>" <%= sop.company_id === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %></select></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Department</label><select name="department"><option value="">— Any —</option><% depts.forEach(d => { %><option <%= sop.department === d.name ? 'selected' : '' %>><%= d.name %></option><% }) %></select></div>
+              <div class="form-group"><label>Target Role</label><select name="target_role"><option value="">— Any —</option><% roles.forEach(r => { %><option <%= sop.target_role === r.name ? 'selected' : '' %>><%= r.name %></option><% }) %></select></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Owner</label><input type="text" name="owner" value="<%= sop.owner || '' %>"></div>
+              <div class="form-group"><label>Next Review Date</label><input type="date" name="review_date" value="<%= sop.review_date || '' %>"></div>
+            </div>
+            <div class="form-group"><label>Description</label><textarea name="description" rows="2"><%= sop.description || '' %></textarea></div>
+            <!-- hidden fields for other tabs' data -->
+            <% ['purpose','scope_applies','scope_excludes','materials','equipment','definitions','safety_warnings','compliance_reqs','exceptions','prepared_by','prepared_date','reviewed_by','reviewed_date','approved_by','approved_date'].forEach(f => { %>
+              <input type="hidden" name="<%= f %>" value="<%= sop[f] || '' %>">
+            <% }) %>
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+          </form>
+        </div>
+        <!-- Clone -->
+        <div class="card">
+          <h3>📦 Clone to Company</h3>
+          <form method="POST" action="/admin/sops/<%= sop.id %>/clone" style="display:flex;gap:8px;align-items:flex-end;">
+            <div class="form-group" style="flex:1;margin:0;"><select name="company_id"><option value="">— As template —</option><% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+            <button type="submit" class="btn btn-sm btn-primary">Clone</button>
+          </form>
+        </div>
+        <div style="margin-top:16px;"><form method="POST" action="/admin/sops/<%= sop.id %>/delete" onsubmit="return confirm('Delete this SOP and all data?')"><button type="submit" class="btn btn-sm btn-danger">🗑️ Delete SOP</button></form></div>
+
+      <% } else if (tab === 'purpose') { %>
+        <div class="card">
+          <h3>🎯 Purpose & Scope</h3>
+          <form method="POST" action="/admin/sops/<%= sop.id %>/edit">
+            <input type="hidden" name="redirect_tab" value="purpose">
+            <% Object.keys(sop).filter(k => k !== 'purpose' && k !== 'scope_applies' && k !== 'scope_excludes' && k !== 'materials' && k !== 'equipment' && k !== 'definitions' && typeof sop[k] !== 'object').forEach(f => { %><input type="hidden" name="<%= f %>" value="<%= sop[f] || '' %>"><% }) %>
+            <div class="form-group"><label>Purpose — Why does this SOP exist?</label><textarea name="purpose" rows="4" placeholder="The purpose of this SOP is to..."><%= sop.purpose || '' %></textarea></div>
+            <div class="form-group"><label>Materials / Documents Needed</label><textarea name="materials" rows="3" placeholder="List materials needed (one per line)"><%= sop.materials || '' %></textarea></div>
+            <div class="form-group"><label>Equipment / Software Needed</label><textarea name="equipment" rows="3" placeholder="List equipment needed (one per line)"><%= sop.equipment || '' %></textarea></div>
+            <div class="form-group"><label>Definitions — Key terms</label><textarea name="definitions" rows="3" placeholder="Term: Definition (one per line)"><%= sop.definitions || '' %></textarea></div>
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+          </form>
+        </div>
+
+      <% } else if (tab === 'scope') { %>
+        <div class="card">
+          <h3>🌐 Scope</h3>
+          <form method="POST" action="/admin/sops/<%= sop.id %>/edit">
+            <input type="hidden" name="redirect_tab" value="scope">
+            <% Object.keys(sop).filter(k => k !== 'scope_applies' && k !== 'scope_excludes' && typeof sop[k] !== 'object').forEach(f => { %><input type="hidden" name="<%= f %>" value="<%= sop[f] || '' %>"><% }) %>
+            <div class="form-group"><label>This SOP Applies To</label><textarea name="scope_applies" rows="3" placeholder="Who and what does this cover?"><%= sop.scope_applies || '' %></textarea></div>
+            <div class="form-group"><label>This SOP Does NOT Apply To</label><textarea name="scope_excludes" rows="3" placeholder="What is excluded?"><%= sop.scope_excludes || '' %></textarea></div>
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+          </form>
+        </div>
+
+      <% } else if (tab === 'procedures') { %>
+        <div class="card">
+          <h3>⚙️ Procedure Steps (<%= steps.length %>)</h3>
+          <% if (steps.length === 0) { %>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">No steps yet — add the first step below.</div>
+          <% } else { %>
+            <% steps.forEach(st => { %>
+              <div class="sop-step">
+                <div class="sop-num"><%= st.step_number %></div>
+                <div class="sop-step-body">
+                  <div class="sop-step-title"><%= st.title %></div>
+                  <% if (st.description) { %><div class="sop-step-desc"><%= st.description %></div><% } %>
+                  <% if (st.responsible) { %><div class="sop-step-who">👤 <%= st.responsible %></div><% } %>
+                  <% if (st.warning) { %><div class="sop-step-warn">⚠️ <%= st.warning %></div><% } %>
+                </div>
+                <form method="POST" action="/admin/sops/<%= sop.id %>/steps/<%= st.id %>/delete" style="flex-shrink:0;"><button type="submit" class="btn-ghost" onclick="return confirm('Delete step?')">🗑️</button></form>
+              </div>
+            <% }) %>
+          <% } %>
+          <details style="margin-top:12px;">
+            <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">+ Add Step</summary>
+            <form method="POST" action="/admin/sops/<%= sop.id %>/steps" style="margin-top:8px;">
+              <div class="form-group"><label>Step Title *</label><input type="text" name="title" required placeholder="What is done in this step"></div>
+              <div class="form-group"><label>Detailed Instructions</label><textarea name="description" rows="3" placeholder="Write so a new employee can follow..."></textarea></div>
+              <div class="form-row">
+                <div class="form-group"><label>Responsible</label><input type="text" name="responsible" placeholder="Who performs this (IT, HR, Manager...)"></div>
+                <div class="form-group"><label>Safety Warning (optional)</label><input type="text" name="warning" placeholder="Any safety note for this step"></div>
+              </div>
+              <button type="submit" class="btn btn-sm btn-primary">Add Step</button>
+            </form>
+          </details>
+        </div>
+
+      <% } else if (tab === 'safety') { %>
+        <div class="card">
+          <h3>⚠️ Safety & Compliance</h3>
+          <form method="POST" action="/admin/sops/<%= sop.id %>/edit">
+            <input type="hidden" name="redirect_tab" value="safety">
+            <% Object.keys(sop).filter(k => k !== 'safety_warnings' && k !== 'compliance_reqs' && k !== 'exceptions' && typeof sop[k] !== 'object').forEach(f => { %><input type="hidden" name="<%= f %>" value="<%= sop[f] || '' %>"><% }) %>
+            <div class="form-group"><label>Safety Warnings</label><textarea name="safety_warnings" rows="4" placeholder="One warning per line. E.g.: Never share personal data via unencrypted email"><%= sop.safety_warnings || '' %></textarea></div>
+            <div class="form-group"><label>Compliance Requirements</label><textarea name="compliance_reqs" rows="3" placeholder="Regulatory or compliance requirements..."><%= sop.compliance_reqs || '' %></textarea></div>
+            <div class="form-group"><label>Exceptions — What happens when things don't go to plan?</label><textarea name="exceptions" rows="4" placeholder="Scenario: How to handle (one per line)"><%= sop.exceptions || '' %></textarea></div>
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+          </form>
+        </div>
+
+      <% } else if (tab === 'references') { %>
+        <div class="card">
+          <h3>🔗 References & Related Documents</h3>
+          <% if (refs.length > 0) { %>
+            <% refs.forEach(r => { %>
+              <div class="item-card" style="cursor:default;">
+                <div class="ic-main"><div class="ic-name"><%= r.title %></div><div class="ic-sub"><%= r.link || 'No link' %></div></div>
+                <form method="POST" action="/admin/sops/<%= sop.id %>/references/<%= r.id %>/delete" style="display:inline"><button class="btn-ghost" onclick="return confirm('Remove?')">🗑️</button></form>
+              </div>
+            <% }) %>
+          <% } %>
+          <details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">+ Add Reference</summary>
+            <form method="POST" action="/admin/sops/<%= sop.id %>/references" style="margin-top:8px;">
+              <div class="form-row">
+                <div class="form-group"><label>Title *</label><input type="text" name="title" required placeholder="e.g. Data Privacy Policy"></div>
+                <div class="form-group"><label>Link (optional)</label><input type="text" name="link" placeholder="https://..."></div>
+              </div>
+              <button type="submit" class="btn btn-sm btn-primary">Add</button>
+            </form>
+          </details>
+        </div>
+
+      <% } else if (tab === 'revisions') { %>
+        <div class="card">
+          <h3>🕐 Revision History</h3>
+          <% if (revisions.length > 0) { %>
+            <table class="tbl">
+              <thead><tr><th>Date</th><th>Version</th><th>By</th><th>Changes</th><th></th></tr></thead>
+              <tbody>
+              <% revisions.forEach(r => { %>
+                <tr>
+                  <td><%= r.date || '—' %></td>
+                  <td><%= r.version || '—' %></td>
+                  <td><%= r.changed_by || '—' %></td>
+                  <td><%= r.description || '—' %></td>
+                  <td><form method="POST" action="/admin/sops/<%= sop.id %>/revisions/<%= r.id %>/delete" style="display:inline"><button class="btn-ghost" onclick="return confirm('Delete?')">🗑️</button></form></td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table>
+          <% } else { %>
+            <div style="font-size:12px;color:var(--muted);">No revisions recorded yet.</div>
+          <% } %>
+          <details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">+ Add Revision</summary>
+            <form method="POST" action="/admin/sops/<%= sop.id %>/revisions" style="margin-top:8px;">
+              <div class="form-row">
+                <div class="form-group"><label>Date</label><input type="date" name="date" value="<%= new Date().toISOString().slice(0,10) %>"></div>
+                <div class="form-group"><label>Version</label><input type="text" name="version" placeholder="e.g. 2.0"></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label>Changed By</label><input type="text" name="changed_by" placeholder="Name"></div>
+                <div class="form-group"><label>What Changed</label><input type="text" name="description" placeholder="e.g. Updated step 3, added safety warning"></div>
+              </div>
+              <button type="submit" class="btn btn-sm btn-primary">Add Revision</button>
+            </form>
+          </details>
+        </div>
+
+      <% } else if (tab === 'approval') { %>
+        <div class="card">
+          <h3>✅ Approval</h3>
+          <form method="POST" action="/admin/sops/<%= sop.id %>/edit">
+            <input type="hidden" name="redirect_tab" value="approval">
+            <% Object.keys(sop).filter(k => !['prepared_by','prepared_date','reviewed_by','reviewed_date','approved_by','approved_date'].includes(k) && typeof sop[k] !== 'object').forEach(f => { %><input type="hidden" name="<%= f %>" value="<%= sop[f] || '' %>"><% }) %>
+            <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">PREPARED BY</div>
+            <div class="form-row">
+              <div class="form-group"><label>Name</label><input type="text" name="prepared_by" value="<%= sop.prepared_by || '' %>"></div>
+              <div class="form-group"><label>Date</label><input type="date" name="prepared_date" value="<%= sop.prepared_date || '' %>"></div>
+            </div>
+            <div style="font-size:12px;font-weight:700;color:var(--muted);margin:12px 0 8px;">REVIEWED BY</div>
+            <div class="form-row">
+              <div class="form-group"><label>Name</label><input type="text" name="reviewed_by" value="<%= sop.reviewed_by || '' %>"></div>
+              <div class="form-group"><label>Date</label><input type="date" name="reviewed_date" value="<%= sop.reviewed_date || '' %>"></div>
+            </div>
+            <div style="font-size:12px;font-weight:700;color:var(--muted);margin:12px 0 8px;">APPROVED BY</div>
+            <div class="form-row">
+              <div class="form-group"><label>Name</label><input type="text" name="approved_by" value="<%= sop.approved_by || '' %>"></div>
+              <div class="form-group"><label>Date</label><input type="date" name="approved_date" value="<%= sop.approved_date || '' %>"></div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Save Approval</button>
+          </form>
+        </div>
+
+      <% } else if (tab === 'compliance') { %>
+        <div class="card">
+          <h3>📊 Compliance Tracking</h3>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Track who has read and acknowledged this SOP.</p>
+          <% if (acks.length > 0) { %>
+            <table class="tbl">
+              <thead><tr><th>Name</th><th>Acknowledged</th></tr></thead>
+              <tbody>
+              <% acks.forEach(a => { %>
+                <tr><td><strong><%= a.user_name %></strong></td><td><%= a.acknowledged_at || '—' %></td></tr>
+              <% }) %>
+              </tbody>
+            </table>
+          <% } else { %>
+            <div style="font-size:12px;color:var(--muted);">No acknowledgments yet.</div>
+          <% } %>
+          <details style="margin-top:12px;"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">+ Record Acknowledgment</summary>
+            <form method="POST" action="/admin/sops/<%= sop.id %>/acknowledge" style="margin-top:8px;">
+              <div class="form-row">
+                <div class="form-group"><label>User Name *</label><input type="text" name="user_name" required placeholder="Who read this SOP?"></div>
+                <div class="form-group"><label>Company</label><select name="company_id"><option value="">—</option><% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+              </div>
+              <button type="submit" class="btn btn-sm btn-primary">Record</button>
+            </form>
+          </details>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

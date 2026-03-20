@@ -1,0 +1,103 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>📋 Standard Operating Procedures</h2></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="btn btn-primary btn-sm" onclick="document.getElementById('addModal').classList.add('open')">+ New SOP</button><%- include('../partials/notif-bell') %></div>
+    </div>
+    <div class="content">
+      <!-- Filters -->
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <select onchange="applyFilter()" id="fCo" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">All companies</option>
+          <% companies.forEach(c => { %><option value="<%= c.id %>" <%= filterCo == c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        </select>
+        <select onchange="applyFilter()" id="fDept" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">All departments</option>
+          <% depts.forEach(d => { %><option value="<%= d.name %>" <%= filterDept === d.name ? 'selected' : '' %>><%= d.name %></option><% }) %>
+        </select>
+        <select onchange="applyFilter()" id="fRole" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">All roles</option>
+          <% roles.forEach(r => { %><option value="<%= r.name %>" <%= filterRole === r.name ? 'selected' : '' %>><%= r.name %></option><% }) %>
+        </select>
+        <select onchange="applyFilter()" id="fCat" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">All categories</option>
+          <% categories.forEach(c => { %><option value="<%= c %>" <%= filterCat === c ? 'selected' : '' %>><%= c %></option><% }) %>
+        </select>
+      </div>
+      <script>function applyFilter(){var u='/admin/sops?';var co=document.getElementById('fCo').value;var dp=document.getElementById('fDept').value;var rl=document.getElementById('fRole').value;var ct=document.getElementById('fCat').value;if(co)u+='company='+co+'&';if(dp)u+='dept='+encodeURIComponent(dp)+'&';if(rl)u+='role='+encodeURIComponent(rl)+'&';if(ct)u+='category='+encodeURIComponent(ct)+'&';location.href=u;}</script>
+
+      <% const templates = sops.filter(s => s.is_template); const custom = sops.filter(s => !s.is_template); %>
+
+      <% if (templates.length > 0) { %>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">📦 Templates (<%= templates.length %>) — clone to a company</div>
+      <% templates.forEach(s => { %>
+        <a href="/admin/sops/<%= s.id %>" class="item-card" style="text-decoration:none;color:inherit;border-left:3px solid var(--primary);">
+          <div class="ic-main">
+            <div class="ic-name"><%= s.title %><% if (s.sop_number) { %> <span style="font-size:10px;color:var(--muted);">(<%= s.sop_number %>)</span><% } %></div>
+            <div class="ic-sub">
+              <span class="badge active"><%= s.category || '—' %></span>
+              <% if (s.department) { %><span class="badge prospect"><%= s.department %></span><% } %>
+              <% if (s.target_role) { %><span class="badge" style="background:#e0e7ff;color:#4338ca;"><%= s.target_role %></span><% } %>
+              <span class="badge prospect">Template</span>
+            </div>
+          </div>
+        </a>
+      <% }) %>
+      <% } %>
+
+      <% if (custom.length > 0) { %>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:16px 0 8px;">📄 Company SOPs (<%= custom.length %>)</div>
+      <% custom.forEach(s => { %>
+        <a href="/admin/sops/<%= s.id %>" class="item-card" style="text-decoration:none;color:inherit;">
+          <div class="ic-main">
+            <div class="ic-name"><%= s.title %><% if (s.sop_number) { %> <span style="font-size:10px;color:var(--muted);">(<%= s.sop_number %>)</span><% } %></div>
+            <div class="ic-sub">
+              <%= s.company_name || 'No company' %> ·
+              <span class="badge active"><%= s.category || '—' %></span>
+              <% if (s.department) { %><span class="badge prospect"><%= s.department %></span><% } %>
+              <% if (s.target_role) { %><span class="badge" style="background:#e0e7ff;color:#4338ca;"><%= s.target_role %></span><% } %>
+              <span class="badge <%= s.status === 'published' ? 'paid' : s.status === 'review' ? 'sent' : 'draft' %>"><%= s.status %></span>
+              · v<%= s.version || '1.0' %>
+            </div>
+          </div>
+        </a>
+      <% }) %>
+      <% } %>
+
+      <% if (sops.length === 0) { %>
+        <div class="empty"><span class="e-icon">📋</span><div class="e-text">No SOPs found</div></div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Add SOP Modal -->
+<div class="modal-bg" id="addModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <h3>New SOP</h3>
+    <form method="POST" action="/admin/sops">
+      <div class="form-row">
+        <div class="form-group"><label>Title *</label><input type="text" name="title" required placeholder="e.g. Password Reset Procedure"></div>
+        <div class="form-group"><label>SOP Number</label><input type="text" name="sop_number" placeholder="e.g. IT-SOP-001"></div>
+      </div>
+      <div class="form-group"><label>Purpose</label><textarea name="purpose" placeholder="The purpose of this SOP is to..." rows="2"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Category</label><select name="category"><option>HR-IT</option><option>Security</option><option>Backup</option><option>Server</option><option>IT Operations</option><option>Networking</option><option>Communication</option><option>Safety</option><option>Other</option></select></div>
+        <div class="form-group"><label>Company</label><select name="company_id"><option value="">— Template (no company) —</option><% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Department</label><select name="department"><option value="">— Any —</option><% depts.forEach(d => { %><option><%= d.name %></option><% }) %></select></div>
+        <div class="form-group"><label>Target Role</label><select name="target_role"><option value="">— Any —</option><% roles.forEach(r => { %><option><%= r.name %></option><% }) %></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Owner</label><input type="text" name="owner" placeholder="Person responsible"></div>
+        <div class="form-group"><label>Status</label><select name="status"><option value="draft">Draft</option><option value="review">Under Review</option><option value="published">Published</option></select></div>
+      </div>
+      <div class="form-group"><label>Description</label><textarea name="description" placeholder="Brief description of this SOP..." rows="2"></textarea></div>
+      <div class="form-actions"><button type="submit" class="btn btn-primary">Create SOP</button><button type="button" class="btn" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button></div>
+    </form>
+  </div>
+</div>
+<%- include('../partials/foot') %>

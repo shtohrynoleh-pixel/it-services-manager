@@ -1,0 +1,92 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>🔑 Password Vault</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('addModal').classList.add('open')">+ Add Entry</button>
+        <input type="text" id="searchVault" placeholder="Search passwords..." oninput="filterVault()" style="flex:1;min-width:150px;max-width:300px;padding:6px 12px;font-size:12px;">
+        <select onchange="location.href='/admin/vault?company='+this.value+'&category=<%= filterCat %>'" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">All Companies</option>
+          <% companies.forEach(c => { %><option value="<%= c.id %>" <%= filterCo == c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        </select>
+        <select onchange="location.href='/admin/vault?company=<%= filterCo %>&category='+this.value" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">All Categories</option>
+          <% categories.forEach(c => { %><option value="<%= c.category %>" <%= filterCat === c.category ? 'selected' : '' %>><%= c.category %></option><% }) %>
+        </select>
+      </div>
+
+      <% if (entries.length === 0) { %>
+        <div class="empty"><span class="e-icon">🔑</span><div class="e-text">No passwords stored yet</div></div>
+      <% } else { %>
+        <div style="overflow-x:auto;">
+        <table class="tbl" id="vaultTable">
+          <thead><tr><th>Title</th><th>Username</th><th>Password</th><th>URL</th><th>Category</th><th>Company</th><th>Sharing</th><th></th></tr></thead>
+          <tbody>
+          <% entries.forEach(e => { %>
+            <tr data-search="<%= [e.title,e.username,e.url,e.category,e.company_name,e.share_dept,e.shared_with].filter(Boolean).join(' ').toLowerCase() %>">
+              <td><strong><%= e.title %></strong><% if (e.notes) { %><div style="font-size:10px;color:var(--muted);"><%= e.notes.substring(0,40) %></div><% } %></td>
+              <td><code style="font-size:12px;"><%= e.username || '—' %></code></td>
+              <td>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <code class="pw-hidden" id="pw-<%= e.id %>" style="font-size:12px;background:#f1f5f9;padding:2px 8px;border-radius:4px;">••••••••</code>
+                  <button onclick="togglePw(<%= e.id %>, '<%= (e.password_enc||'').replace(/'/g,"\\'") %>')" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px;" title="Show/Hide">👁️</button>
+                  <button onclick="copyPw('<%= (e.password_enc||'').replace(/'/g,"\\'") %>')" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px;" title="Copy">📋</button>
+                </div>
+              </td>
+              <td><% if (e.url) { %><a href="<%= e.url %>" target="_blank" style="font-size:11px;"><%= e.url.substring(0,30) %></a><% } else { %>—<% } %></td>
+              <td><span class="badge draft"><%= e.category %></span></td>
+              <td><%= e.company_name || 'Global' %></td>
+              <td><%= e.share_type === 'department' ? '🏛️ ' + (e.share_dept||'') : e.share_type === 'shared' ? '👥 Shared' : '🔒 Private' %></td>
+              <td style="white-space:nowrap;">
+                <button class="btn-ghost" onclick="editEntry(<%= e.id %>)" title="Edit">✏️</button>
+                <form method="POST" action="/admin/vault/<%= e.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Delete this entry?')">🗑️</button></form>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+        </div>
+      <% } %>
+
+      <!-- Add modal -->
+      <div class="modal-bg" id="addModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal">
+          <h3>Add Password Entry</h3>
+          <form method="POST" action="/admin/vault">
+            <div class="form-row"><div class="form-group"><label>Title *</label><input type="text" name="title" required placeholder="e.g. Company WiFi, Admin Panel..."></div><div class="form-group"><label>Category</label><select name="category"><option>General</option><option>Email</option><option>Server</option><option>WiFi</option><option>Software</option><option>Cloud</option><option>VPN</option><option>Social Media</option><option>Banking</option><option>Other</option></select></div></div>
+            <div class="form-row"><div class="form-group"><label>Username</label><input type="text" name="username" placeholder="admin@company.com"></div><div class="form-group"><label>Password</label><input type="text" name="password_val" placeholder="Enter password"></div></div>
+            <div class="form-group"><label>URL</label><input type="text" name="url" placeholder="https://..."></div>
+            <div class="form-row"><div class="form-group"><label>Company</label><select name="company_id"><option value="">— Global —</option><% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div><div class="form-group"><label>Sharing</label><select name="share_type" onchange="document.getElementById('shareExtra').style.display=this.value!=='private'?'':'none'"><option value="private">Private (admin only)</option><option value="department">Department</option><option value="shared">Specific users</option></select></div></div>
+            <div id="shareExtra" style="display:none;">
+              <div class="form-row"><div class="form-group"><label>Department</label><input type="text" name="share_dept" placeholder="e.g. Operations, IT"></div><div class="form-group"><label>Shared With (names)</label><input type="text" name="shared_with" placeholder="John, Jane"></div></div>
+            </div>
+            <div class="form-group"><label>Notes</label><textarea name="notes" placeholder="Optional notes..."></textarea></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button></div>
+          </form>
+        </div>
+      </div>
+
+      <script>
+      function filterVault(){
+        var q = document.getElementById('searchVault').value.toLowerCase();
+        document.querySelectorAll('#vaultTable tbody tr').forEach(function(r){
+          r.style.display = !q || r.dataset.search.indexOf(q) >= 0 ? '' : 'none';
+        });
+      }
+      function togglePw(id, pw){
+        var el = document.getElementById('pw-'+id);
+        if(el.textContent === '••••••••'){ el.textContent = pw; } else { el.textContent = '••••••••'; }
+      }
+      function copyPw(pw){
+        navigator.clipboard.writeText(pw).then(function(){ alert('Copied!'); });
+      }
+      </script>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

@@ -1,0 +1,33 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>👤 Roles</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Define job roles that can be assigned to users across all companies. <a href="/admin/departments">Manage Departments →</a></p>
+      <div class="card">
+        <h3>Current Roles (<%= roles.length %>)</h3>
+        <% roles.forEach(r => { %>
+          <div class="item-card" style="cursor:default;">
+            <div class="ic-main"><div class="ic-name"><%= r.name %></div><div class="ic-sub"><%= r.description || '' %></div></div>
+            <form method="POST" action="/admin/roles/<%= r.id %>/delete" style="display:inline" onsubmit="return confirm('Delete?')"><button class="btn-ghost">🗑️</button></form>
+          </div>
+        <% }) %>
+      </div>
+      <div class="card">
+        <h3>+ Add Role</h3>
+        <form method="POST" action="/admin/roles">
+          <div class="form-row">
+            <div class="form-group"><label>Role Name *</label><input type="text" name="name" required placeholder="e.g. Fleet Manager"></div>
+            <div class="form-group"><label>Description</label><input type="text" name="description" placeholder="What this role does"></div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">Add Role</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

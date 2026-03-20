@@ -1,0 +1,123 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>📅 Service Schedule</h2></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="btn btn-primary btn-sm" onclick="document.getElementById('addModal').classList.add('open')">+ Add Schedule</button><%- include('../partials/notif-bell') %></div>
+    </div>
+    <div class="content">
+      <div class="metrics">
+        <div class="metric hi"><div class="m-label">Total Scheduled</div><div class="m-val pri"><%= schedules.length %></div></div>
+        <div class="metric <%= overdue.length > 0 ? 'bad' : 'ok' %>"><div class="m-label">Overdue</div><div class="m-val <%= overdue.length > 0 ? 'red' : 'green' %>"><%= overdue.length %></div></div>
+        <div class="metric"><div class="m-label">Due This Week</div><div class="m-val"><%= upcoming.length %></div></div>
+        <div class="metric"><div class="m-label">Active</div><div class="m-val"><%= schedules.filter(s => s.is_active).length %></div></div>
+      </div>
+
+      <!-- Filter by company -->
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+        <select onchange="location.href='/admin/schedule?company='+this.value" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">All companies</option>
+          <% companies.forEach(c => { %><option value="<%= c.id %>" <%= filterCompany == c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        </select>
+      </div>
+
+      <% if (overdue.length > 0) { %>
+      <div class="card" style="border-color:var(--danger);">
+        <h3 style="color:var(--danger);">🚨 Overdue (<%= overdue.length %>)</h3>
+        <% overdue.forEach(s => { %>
+          <div class="item-card" style="cursor:default;border-color:var(--danger);background:var(--danger-light);">
+            <div class="ic-main">
+              <div class="ic-name"><%= s.title %></div>
+              <div class="ic-sub"><strong><%= s.company_name || '—' %></strong> · <%= s.frequency %> · Due: <strong style="color:var(--danger);"><%= s.next_due %></strong><% if (s.assigned_to) { %> · 👤 <%= s.assigned_to %><% } %></div>
+            </div>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <form method="POST" action="/admin/schedule/<%= s.id %>/complete" style="display:inline"><button type="submit" class="btn btn-sm btn-primary">✅ Done</button></form>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+      <% } %>
+
+      <% if (schedules.length === 0) { %>
+        <div class="empty"><span class="e-icon">📅</span><div class="e-text">No scheduled services yet</div><button class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('open')">+ Add First Schedule</button></div>
+      <% } else { %>
+        <% const active = schedules.filter(s => s.is_active && !overdue.includes(s)); %>
+        <% if (active.length > 0) { %>
+        <div class="card">
+          <h3>📅 Active Schedules (<%= active.length %>)</h3>
+          <% active.forEach(s => {
+            const isDueSoon = s.next_due && s.next_due <= new Date(Date.now()+7*86400000).toISOString().slice(0,10);
+          %>
+            <div class="item-card" style="cursor:default;<%= isDueSoon ? 'border-color:var(--accent);' : '' %>">
+              <div class="ic-main">
+                <div class="ic-name"><%= s.title %><% if (s.service_name) { %> <span style="font-size:10px;color:var(--muted);">(<%= s.service_name %>)</span><% } %></div>
+                <div class="ic-sub">
+                  <strong><%= s.company_name || '—' %></strong> ·
+                  <span class="badge active"><%= s.frequency %></span>
+                  <% if (s.day_of_week) { %> · <%= s.day_of_week %><% } %>
+                  <% if (s.time_slot) { %> · <%= s.time_slot %><% } %>
+                  <% if (s.assigned_to) { %> · 👤 <%= s.assigned_to %><% } %>
+                </div>
+                <div class="ic-sub" style="margin-top:4px;">
+                  Next: <strong style="color:<%= isDueSoon ? 'var(--accent)' : 'var(--text)' %>"><%= s.next_due || 'Not set' %></strong>
+                  <% if (s.last_completed) { %> · Last done: <%= s.last_completed %><% } %>
+                </div>
+                <% if (s.description) { %><div style="font-size:11px;color:#475569;margin-top:4px;"><%= s.description %></div><% } %>
+              </div>
+              <div style="display:flex;gap:4px;flex-shrink:0;flex-direction:column;">
+                <form method="POST" action="/admin/schedule/<%= s.id %>/complete" style="display:inline"><button type="submit" class="btn btn-sm btn-primary">✅ Done</button></form>
+                <a href="/admin/schedule/<%= s.id %>/edit" class="btn btn-sm">✏️ Edit</a>
+                <form method="POST" action="/admin/schedule/<%= s.id %>/delete" style="display:inline" onsubmit="return confirm('Delete?')"><button type="submit" class="btn btn-sm btn-danger">🗑️</button></form>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+        <% } %>
+
+        <% const inactive = schedules.filter(s => !s.is_active); %>
+        <% if (inactive.length > 0) { %>
+        <div class="card">
+          <h3 style="opacity:0.5;">⏸ Paused (<%= inactive.length %>)</h3>
+          <% inactive.forEach(s => { %>
+            <div class="item-card" style="cursor:default;opacity:0.5;">
+              <div class="ic-main"><div class="ic-name"><%= s.title %></div><div class="ic-sub"><%= s.company_name || '—' %> · <%= s.frequency %></div></div>
+              <a href="/admin/schedule/<%= s.id %>/edit" class="btn btn-sm">✏️</a>
+            </div>
+          <% }) %>
+        </div>
+        <% } %>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Add Schedule Modal -->
+<div class="modal-bg" id="addModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <h3>Add Scheduled Service</h3>
+    <form method="POST" action="/admin/schedule">
+      <div class="form-group"><label>Title *</label><input type="text" name="title" required placeholder="e.g. Monthly server maintenance, Weekly backup check"></div>
+      <div class="form-group"><label>Description</label><textarea name="description" placeholder="What needs to be done during this visit/task..."></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Company *</label><select name="company_id" required><option value="">Select company</option><% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+        <div class="form-group"><label>Related Service</label><select name="service_id"><option value="">— None —</option><% services.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Frequency</label><select name="frequency"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="biweekly">Every 2 Weeks</option><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select></div>
+        <div class="form-group"><label>Assigned To</label><select name="assigned_to"><option value="">— Unassigned —</option><% allPeople.forEach(p => { %><option value="<%= p.name %>"><%= p.name %></option><% }) %></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Day of Week (for weekly)</label><select name="day_of_week"><option value="">—</option><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option></select></div>
+        <div class="form-group"><label>Time Slot</label><input type="text" name="time_slot" placeholder="e.g. 9:00 AM, Morning, After hours"></div>
+      </div>
+      <div class="form-group"><label>Next Due Date</label><input type="date" name="next_due" value="<%= new Date().toISOString().slice(0,10) %>"></div>
+      <div class="form-group"><label>Notes</label><textarea name="notes" placeholder="Special instructions, access details..."></textarea></div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Create Schedule</button>
+        <button type="button" class="btn" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+<%- include('../partials/foot') %>

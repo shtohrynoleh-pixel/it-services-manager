@@ -1,0 +1,76 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>🔔 Alerts</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <%
+        const open = alerts.filter(a => !a.resolved_at);
+        const resolved = alerts.filter(a => a.resolved_at);
+      %>
+      <div class="metrics">
+        <div class="metric <%= open.length > 0 ? 'bad' : 'ok' %>"><div class="m-label">Open Alerts</div><div class="m-val <%= open.length > 0 ? 'red' : 'green' %>"><%= open.length %></div></div>
+        <div class="metric"><div class="m-label">Resolved</div><div class="m-val"><%= resolved.length %></div></div>
+        <div class="metric"><div class="m-label">Total</div><div class="m-val"><%= alerts.length %></div></div>
+      </div>
+
+      <div style="display:flex;gap:6px;margin-bottom:16px;">
+        <a href="/admin/alerts?filter=open" class="btn btn-sm <%= filter === 'open' ? 'btn-primary' : '' %>">Open (<%= open.length %>)</a>
+        <a href="/admin/alerts?filter=all" class="btn btn-sm <%= filter === 'all' ? 'btn-primary' : '' %>">All</a>
+        <a href="/admin/alerts?filter=resolved" class="btn btn-sm <%= filter === 'resolved' ? 'btn-primary' : '' %>">Resolved</a>
+      </div>
+
+      <div style="margin-bottom:16px;padding:10px 14px;background:#f8fafc;border:1px solid var(--border);border-radius:8px;font-size:11px;color:var(--muted);line-height:1.7;">
+        <strong>Webhook URL:</strong> <code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;">POST /api/webhook/alert</code><br>
+        Body: <code>{"title":"Server down","description":"Details...","severity":"critical","source":"google-alert"}</code>
+      </div>
+
+      <% if (alerts.length === 0) { %>
+        <div class="empty"><span class="e-icon">🔔</span><div class="e-text">No alerts<%= filter === 'open' ? ' open' : '' %></div></div>
+      <% } else { %>
+        <% alerts.forEach(a => {
+          const isOpen = !a.resolved_at;
+          const sevColor = a.severity === 'critical' ? 'var(--danger)' : a.severity === 'warning' ? 'var(--accent)' : 'var(--primary)';
+          const sevBg = a.severity === 'critical' ? 'var(--danger-light)' : a.severity === 'warning' ? 'var(--accent-light)' : 'var(--primary-light)';
+        %>
+          <div class="item-card" style="cursor:default;align-items:flex-start;<%= isOpen ? 'border-left:3px solid ' + sevColor + ';' : 'opacity:0.6;' %>">
+            <div style="margin-right:12px;margin-top:4px;">
+              <% if (isOpen) { %>
+                <div style="width:12px;height:12px;border-radius:50%;background:<%= sevColor %>;box-shadow:0 0 6px <%= sevColor %>;"></div>
+              <% } else { %>
+                <span style="font-size:16px;">✅</span>
+              <% } %>
+            </div>
+            <div class="ic-main" style="flex:1;min-width:0;">
+              <div class="ic-name" style="<%= !isOpen ? 'text-decoration:line-through;' : '' %>"><%= a.title %></div>
+              <div class="ic-sub">
+                <span style="display:inline-block;padding:1px 8px;border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase;background:<%= sevBg %>;color:<%= sevColor %>;"><%= a.severity %></span>
+                · <span class="badge <%= isOpen ? 'overdue' : 'paid' %>"><%= isOpen ? 'Open' : 'Resolved' %></span>
+                · Source: <%= a.source || 'monitor' %>
+                <% if (a.monitor_name) { %> · 📡 <%= a.monitor_name %> (<%= a.monitor_target || '' %>)<% } %>
+                <% if (a.company_name) { %> · 🏢 <%= a.company_name %><% } %>
+                · <%= a.created_at || '' %>
+              </div>
+              <% if (a.description) { %><div style="font-size:11px;color:#475569;margin-top:4px;"><%= a.description %></div><% } %>
+              <% if (a.resolved_at) { %>
+                <div style="font-size:10px;color:var(--success);margin-top:4px;">✅ Resolved by <%= a.resolved_by || '?' %> at <%= a.resolved_at %><% if (a.resolution) { %> — <%= a.resolution %><% } %></div>
+              <% } %>
+            </div>
+            <% if (isOpen) { %>
+              <div style="flex-shrink:0;">
+                <form method="POST" action="/admin/alerts/<%= a.id %>/resolve" style="display:flex;flex-direction:column;gap:4px;">
+                  <input type="text" name="resolution" placeholder="Resolution note..." style="padding:4px 8px;font-size:10px;border:1px solid var(--border);border-radius:6px;width:140px;">
+                  <button type="submit" class="btn btn-sm btn-primary">✅ Resolve</button>
+                </form>
+              </div>
+            <% } %>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

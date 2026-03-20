@@ -1,0 +1,38 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/tasks" style="opacity:0.4;text-decoration:none;">✅</a> → Edit Task</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div class="card">
+        <h3>Edit Task</h3>
+        <form method="POST" action="/admin/tasks/<%= task.id %>/edit">
+          <div class="form-group"><label>Title *</label><input type="text" name="title" value="<%= task.title %>" required></div>
+          <div class="form-group"><label>Description</label><textarea name="description" rows="4"><%= task.description || '' %></textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label>Company</label><select name="company_id"><option value="">— None —</option><% companies.forEach(c => { %><option value="<%= c.id %>" <%= task.company_id === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %></select></div>
+            <div class="form-group"><label>Priority</label><select name="priority"><% ['low','medium','high','urgent'].forEach(p => { %><option value="<%= p %>" <%= task.priority === p ? 'selected' : '' %>><%= p.charAt(0).toUpperCase() + p.slice(1) %></option><% }) %></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Due Date</label><input type="date" name="due_date" value="<%= task.due_date || '' %>"></div>
+            <div class="form-group"><label>Assigned To</label><select name="assigned_to"><option value="">— Unassigned —</option><% (allPeople || []).forEach(p => { %><option value="<%= p.name %>" <%= task.assigned_to === p.name ? 'selected' : '' %>><%= p.name %></option><% }) %></select></div>
+          </div>
+          <div class="form-group"><label>Status</label><select name="status"><% ['todo','in-progress','done'].forEach(s => { %><option value="<%= s %>" <%= task.status === s ? 'selected' : '' %>><%= s %></option><% }) %></select></div>
+          <div style="margin-top:8px;font-size:11px;color:var(--muted);">
+            Created: <%= task.created_at || '—' %>
+            <% if (task.created_by) { %> · By: <strong><%= task.created_by %></strong><% } %>
+            <% if (task.company_name) { %> · Company: <strong><%= task.company_name %></strong><% } %>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="/admin/tasks" class="btn">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

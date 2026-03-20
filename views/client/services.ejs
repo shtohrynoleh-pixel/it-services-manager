@@ -1,0 +1,29 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>⚙️ Available Services</h2></div>
+    </div>
+    <div class="content">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:20px;">Services offered by <%= settings.business_name || 'our IT team' %>. Contact us to add any of these to your plan.</p>
+      <% if (services.length === 0) { %>
+        <div class="empty"><span class="e-icon">⚙️</span><div class="e-text">No services listed yet</div></div>
+      <% } else { %>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
+        <% services.forEach(s => { %>
+          <div class="card" style="margin:0;">
+            <h3 style="font-size:14px;"><%= s.name %></h3>
+            <div style="font-size:12px;color:#475569;margin-bottom:12px;line-height:1.6;"><%= s.description || 'Contact us for details.' %></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--border);">
+              <span class="badge active"><%= s.category %></span>
+              <strong style="font-size:16px;color:var(--primary);">$<%= (s.base_price||0).toFixed(2) %><span style="font-size:11px;color:var(--muted);font-weight:400;"> / <%= s.price_type %></span></strong>
+            </div>
+          </div>
+        <% }) %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

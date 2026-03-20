@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><%= settings.business_name || 'IT Services' %> — Our Services</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a;min-height:100vh;}
+.hero{background:linear-gradient(135deg,#155e75,#0891b2,#22d3ee);color:#fff;padding:60px 24px;text-align:center;}
+.hero h1{font-size:32px;font-weight:900;margin-bottom:8px;}
+.hero p{font-size:16px;opacity:0.85;max-width:600px;margin:0 auto;}
+.container{max-width:900px;margin:0 auto;padding:30px 24px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
+.svc-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:24px;transition:all 0.2s;}
+.svc-card:hover{border-color:#0891b2;box-shadow:0 4px 20px rgba(8,145,178,0.1);transform:translateY(-2px);}
+.svc-card h3{font-size:16px;font-weight:800;margin-bottom:8px;color:#155e75;}
+.svc-card p{font-size:13px;color:#64748b;line-height:1.6;margin-bottom:14px;}
+.svc-card .price{font-size:22px;font-weight:900;color:#0891b2;}
+.svc-card .price span{font-size:12px;color:#64748b;font-weight:400;}
+.svc-card .cat{display:inline-block;padding:3px 10px;border-radius:6px;font-size:10px;font-weight:700;text-transform:uppercase;background:#cffafe;color:#155e75;margin-bottom:12px;}
+.footer{text-align:center;padding:30px;font-size:12px;color:#94a3b8;}
+.login-link{display:inline-block;margin-top:20px;padding:10px 24px;background:#0891b2;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;transition:all 0.15s;}
+.login-link:hover{background:#155e75;transform:translateY(-1px);}
+@media(max-width:500px){.hero{padding:40px 20px;}.hero h1{font-size:24px;}.grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+  <div class="hero">
+    <div style="font-size:48px;margin-bottom:12px;">🖥️</div>
+    <h1><%= settings.business_name || 'IT Services' %></h1>
+    <p>Professional IT services for trucking companies and small businesses</p>
+    <% if (settings.business_email || settings.business_phone) { %>
+      <div style="margin-top:12px;font-size:13px;opacity:0.8;">
+        <% if (settings.business_email) { %><%= settings.business_email %><% } %>
+        <% if (settings.business_email && settings.business_phone) { %> · <% } %>
+        <% if (settings.business_phone) { %><%= settings.business_phone %><% } %>
+      </div>
+    <% } %>
+  </div>
+  <div class="container">
+    <% if (services.length === 0) { %>
+      <div style="text-align:center;padding:40px;color:#94a3b8;">
+        <div style="font-size:40px;margin-bottom:12px;">⚙️</div>
+        <div style="font-size:16px;font-weight:600;">Services coming soon</div>
+      </div>
+    <% } else { %>
+      <div class="grid">
+        <% services.forEach(s => { %>
+          <div class="svc-card">
+            <div class="cat"><%= s.category || 'Service' %></div>
+            <h3><%= s.name %></h3>
+            <p><%= s.description || 'Contact us for details about this service.' %></p>
+            <div class="price">$<%= (s.base_price||0).toFixed(2) %> <span>/ <%= s.price_type %></span></div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+    <div style="text-align:center;margin-top:30px;">
+      <a href="/login" class="login-link">🔐 Client Portal Login</a>
+    </div>
+  </div>
+  <div class="footer">&copy; <%= new Date().getFullYear() %> <%= settings.business_name || 'IT Services' %>. All rights reserved.</div>
+</body>
+</html>

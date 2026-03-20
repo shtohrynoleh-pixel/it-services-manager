@@ -1,0 +1,121 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/policies" style="opacity:0.4;text-decoration:none;">🛡️</a> → <%= policy.title %></h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <% var tab = (typeof query !== 'undefined' && query && query.tab) ? query.tab : 'content'; %>
+      <div class="tabs">
+        <a class="tab active" href="#" onclick="showTab('content')">Content</a>
+        <a class="tab" href="#" onclick="showTab('compliance')">Compliance (<%= acks.length %>)</a>
+        <a class="tab" href="#" onclick="showTab('settings')">Settings</a>
+      </div>
+
+      <!-- Content tab -->
+      <div id="tab-content">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
+            <div>
+              <h3 style="margin-bottom:4px;"><%= policy.title %></h3>
+              <div style="font-size:12px;color:var(--muted);"><%= policy.category %> · v<%= policy.version %> · <span class="badge <%= policy.status === 'published' ? 'active' : 'draft' %>"><%= policy.status %></span> · <%= policy.company_name || 'Template (all companies)' %></div>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <form method="POST" action="/admin/policies/<%= policy.id %>/clone" style="display:inline;">
+                <select name="company_id" style="padding:4px 8px;font-size:11px;border:1px solid var(--border);border-radius:6px;">
+                  <option value="">Clone as template</option>
+                  <% companies.forEach(c => { %><option value="<%= c.id %>">Clone to <%= c.name %></option><% }) %>
+                </select>
+                <button type="submit" class="btn btn-sm">📋 Clone</button>
+              </form>
+            </div>
+          </div>
+          <% if (policy.description) { %><p style="font-size:13px;color:var(--muted);margin-bottom:16px;"><%= policy.description %></p><% } %>
+          <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:20px;white-space:pre-wrap;font-size:13px;line-height:1.8;font-family:inherit;"><%= policy.content || 'No content yet.' %></div>
+        </div>
+      </div>
+
+      <!-- Compliance tab -->
+      <div id="tab-compliance" style="display:none;">
+        <div class="card">
+          <h3>✅ Acknowledgments (<%= acks.length %>)</h3>
+
+          <% if (policy.requires_ack && companyUsers.length > 0) { %>
+            <% var ackedNames = new Set(acks.map(a => a.user_name)); var pending = companyUsers.filter(u => !ackedNames.has(u.name)); %>
+            <div class="metrics" style="margin-bottom:14px;">
+              <div class="metric ok"><div class="m-label">Acknowledged</div><div class="m-val green"><%= acks.length %></div></div>
+              <div class="metric <%= pending.length > 0 ? 'bad' : '' %>"><div class="m-label">Pending</div><div class="m-val <%= pending.length > 0 ? 'red' : '' %>"><%= pending.length %></div></div>
+              <div class="metric hi"><div class="m-label">Compliance</div><div class="m-val pri"><%= companyUsers.length > 0 ? Math.round(acks.length / companyUsers.length * 100) : 0 %>%</div></div>
+            </div>
+
+            <% if (pending.length > 0) { %>
+              <div style="margin-bottom:16px;padding:12px;background:#fee2e2;border-radius:8px;">
+                <div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:6px;">Pending Acknowledgment:</div>
+                <div style="font-size:12px;color:#991b1b;"><%= pending.map(u => u.name).join(', ') %></div>
+              </div>
+            <% } %>
+          <% } %>
+
+          <% if (acks.length > 0) { %>
+            <table class="tbl">
+              <thead><tr><th>Name</th><th>Company</th><th>Date</th></tr></thead>
+              <tbody>
+              <% acks.forEach(a => { %>
+                <tr><td><strong><%= a.user_name %></strong></td><td><%= a.company_name || '—' %></td><td><%= a.acknowledged_at ? a.acknowledged_at.split('T')[0] : '—' %></td></tr>
+              <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+
+          <details style="margin-top:16px;"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">+ Record Acknowledgment</summary>
+            <form method="POST" action="/admin/policies/<%= policy.id %>/acknowledge" style="margin-top:8px;display:flex;gap:8px;align-items:flex-end;">
+              <div class="form-group" style="flex:1;margin-bottom:0;">
+                <label>Employee Name</label>
+                <% if (companyUsers.length > 0) { %>
+                  <select name="user_name" required><option value="">— Select —</option><% companyUsers.forEach(u => { %><option><%= u.name %></option><% }) %></select>
+                <% } else { %>
+                  <input type="text" name="user_name" required placeholder="Employee name">
+                <% } %>
+              </div>
+              <input type="hidden" name="company_id" value="<%= policy.company_id || '' %>">
+              <button type="submit" class="btn btn-sm btn-primary">Record</button>
+            </form>
+          </details>
+        </div>
+      </div>
+
+      <!-- Settings tab -->
+      <div id="tab-settings" style="display:none;">
+        <div class="card">
+          <h3>Edit Policy</h3>
+          <form method="POST" action="/admin/policies/<%= policy.id %>/edit">
+            <div class="form-row"><div class="form-group"><label>Title</label><input type="text" name="title" value="<%= policy.title %>" required></div><div class="form-group"><label>Category</label><select name="category"><% ['General','Security','Devices','Network','Data','Email','Remote Work','Compliance'].forEach(c => { %><option <%= policy.category === c ? 'selected' : '' %>><%= c %></option><% }) %></select></div></div>
+            <div class="form-group"><label>Company</label><select name="company_id"><option value="">— Template (all companies) —</option><% companies.forEach(c => { %><option value="<%= c.id %>" <%= policy.company_id === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %></select></div>
+            <div class="form-group"><label>Description</label><input type="text" name="description" value="<%= policy.description || '' %>"></div>
+            <div class="form-group"><label>Content</label><textarea name="content" rows="15"><%= policy.content || '' %></textarea></div>
+            <div class="form-row"><div class="form-group"><label>Status</label><select name="status"><option value="draft" <%= policy.status === 'draft' ? 'selected' : '' %>>Draft</option><option value="published" <%= policy.status === 'published' ? 'selected' : '' %>>Published</option><option value="archived" <%= policy.status === 'archived' ? 'selected' : '' %>>Archived</option></select></div><div class="form-group"><label>Review Date</label><input type="date" name="review_date" value="<%= policy.review_date || '' %>"></div></div>
+            <div class="form-check"><input type="checkbox" name="requires_ack" value="1" <%= policy.requires_ack ? 'checked' : '' %>> Require acknowledgment</div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+          </form>
+        </div>
+        <div style="margin-top:12px;">
+          <form method="POST" action="/admin/policies/<%= policy.id %>/delete" onsubmit="return confirm('Delete this policy and all acknowledgments?')">
+            <button type="submit" class="btn btn-danger btn-sm">🗑️ Delete Policy</button>
+          </form>
+        </div>
+      </div>
+
+      <script>
+      function showTab(name) {
+        document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
+        document.getElementById('tab-' + name).style.display = '';
+        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+        event.target.classList.add('active');
+      }
+      </script>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

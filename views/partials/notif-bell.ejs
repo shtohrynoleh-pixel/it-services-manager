@@ -1,0 +1,40 @@
+<% if (typeof notifications !== 'undefined' && notifications) { %>
+<div class="notif-wrap">
+  <button class="notif-btn" onclick="document.getElementById('notifDrop').classList.toggle('open')" title="Notifications">
+    🔔
+    <% if (notifications.count > 0) { %><span class="notif-badge"><%= notifications.count %></span><% } %>
+  </button>
+  <div class="notif-drop" id="notifDrop">
+    <% if (notifications.count === 0) { %>
+      <div class="notif-empty">✅ All caught up! No open tasks.</div>
+    <% } else { %>
+      <% if (notifications.clientTasks.length > 0) { %>
+        <h4>📥 Client Requests (<%= notifications.clientTasks.length %>)</h4>
+        <% notifications.clientTasks.slice(0,5).forEach(t => { %>
+          <a href="/admin/tasks" class="notif-item" style="text-decoration:none;color:inherit;">
+            <span class="ni-icon"><%= t.priority === 'urgent' ? '🔴' : t.priority === 'high' ? '🟠' : '🔵' %></span>
+            <div class="ni-text">
+              <div class="ni-title"><%= t.title %></div>
+              <div class="ni-sub"><%= t.company_name || '' %> · <%= t.priority %><% if (t.assigned_to) { %> · 👤 <%= t.assigned_to %><% } %></div>
+            </div>
+          </a>
+        <% }) %>
+      <% } %>
+      <% if (notifications.myTasks.length > 0) { %>
+        <h4>✅ Open Tasks (<%= notifications.myTasks.length %>)</h4>
+        <% notifications.myTasks.slice(0,5).forEach(t => { %>
+          <a href="/admin/tasks" class="notif-item" style="text-decoration:none;color:inherit;">
+            <span class="ni-icon"><%= t.priority === 'urgent' ? '🔴' : t.priority === 'high' ? '🟠' : t.status === 'in-progress' ? '🔄' : '⏳' %></span>
+            <div class="ni-text">
+              <div class="ni-title"><%= t.title %></div>
+              <div class="ni-sub"><%= t.company_name || 'No company' %><% if (t.assigned_to) { %> · 👤 <%= t.assigned_to %><% } %> · <%= t.status %></div>
+            </div>
+          </a>
+        <% }) %>
+      <% } %>
+      <div style="padding:8px 16px;border-top:1px solid var(--border);"><a href="/admin/tasks" style="font-size:11px;font-weight:700;">View all tasks →</a></div>
+    <% } %>
+  </div>
+</div>
+<script>document.addEventListener('click',function(e){var d=document.getElementById('notifDrop');if(d&&!e.target.closest('.notif-wrap'))d.classList.remove('open');});</script>
+<% } %>

@@ -1,0 +1,83 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>📡 Equipment Monitoring</h2></div>
+      <div style="display:flex;align-items:center;gap:8px;"><form method="POST" action="/admin/monitoring/check-all" style="display:inline"><button type="submit" class="btn btn-sm" title="Check all monitors now">🔄 Check All</button></form><button class="btn btn-primary btn-sm" onclick="document.getElementById('addModal').classList.add('open')">+ Add Monitor</button><%- include('../partials/notif-bell') %></div>
+    </div>
+    <div class="content">
+      <%
+        const up = monitors.filter(m => m.last_status === 'up').length;
+        const down = monitors.filter(m => m.last_status === 'down').length;
+        const unknown = monitors.filter(m => m.last_status === 'unknown').length;
+      %>
+      <div class="metrics">
+        <div class="metric ok"><div class="m-label">Online</div><div class="m-val green"><%= up %></div></div>
+        <div class="metric <%= down > 0 ? 'bad' : '' %>"><div class="m-label">Offline</div><div class="m-val <%= down > 0 ? 'red' : '' %>"><%= down %></div></div>
+        <div class="metric"><div class="m-label">Unknown</div><div class="m-val"><%= unknown %></div></div>
+        <div class="metric"><div class="m-label">Total Monitors</div><div class="m-val"><%= monitors.length %></div></div>
+      </div>
+
+      <% if (monitors.length === 0) { %>
+        <div class="empty"><span class="e-icon">📡</span><div class="e-text">No monitors set up yet</div><button class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('open')">+ Add First Monitor</button></div>
+      <% } else { %>
+        <% monitors.forEach(m => {
+          const statusColor = m.last_status === 'up' ? 'var(--success)' : m.last_status === 'down' ? 'var(--danger)' : '#94a3b8';
+          const statusBg = m.last_status === 'up' ? 'var(--success-light)' : m.last_status === 'down' ? 'var(--danger-light)' : '#f1f5f9';
+        %>
+          <div class="item-card" style="cursor:default;align-items:flex-start;">
+            <div style="margin-right:12px;margin-top:4px;">
+              <div style="width:14px;height:14px;border-radius:50%;background:<%= statusColor %>;box-shadow:0 0 8px <%= statusColor %>;"></div>
+            </div>
+            <div class="ic-main">
+              <div class="ic-name"><%= m.name %></div>
+              <div class="ic-sub">
+                <strong><%= m.company_name || 'No company' %></strong> ·
+                <%= m.type %> · <%= m.target || '—' %> ·
+                Check: <%= m.check_type %>
+                <% if (m.last_check) { %> · Last: <%= m.last_check %><% } %>
+                <% if (m.last_response_ms && m.last_status === 'up') { %> · <%= m.last_response_ms %>ms<% } %>
+              </div>
+              <div style="margin-top:6px;display:flex;gap:8px;align-items:center;">
+                <div style="flex:1;max-width:200px;height:6px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
+                  <div style="height:100%;width:<%= (m.uptime_pct||0) %>%;background:<%= (m.uptime_pct||0) >= 99 ? 'var(--success)' : (m.uptime_pct||0) >= 90 ? 'var(--accent)' : 'var(--danger)' %>;border-radius:4px;"></div>
+                </div>
+                <span style="font-size:11px;font-weight:700;color:<%= (m.uptime_pct||0) >= 99 ? 'var(--success)' : (m.uptime_pct||0) >= 90 ? 'var(--accent)' : 'var(--danger)' %>"><%= (m.uptime_pct||0).toFixed(1) %>% uptime</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:4px;flex-shrink:0;align-items:center;">
+              <form method="POST" action="/admin/monitoring/<%= m.id %>/check" style="display:inline"><button type="submit" class="btn btn-sm" title="Run check now">🔄 Check</button></form>
+              <a href="/admin/monitoring/<%= m.id %>/history" class="btn btn-sm" title="View history">📊</a>
+              <form method="POST" action="/admin/monitoring/<%= m.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this monitor?')"><button type="submit" class="btn-ghost">🗑️</button></form>
+            </div>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="addModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <h3>Add Equipment Monitor</h3>
+    <form method="POST" action="/admin/monitoring">
+      <div class="form-row">
+        <div class="form-group"><label>Name *</label><input type="text" name="name" required placeholder="e.g. Main Server, Office Router"></div>
+        <div class="form-group"><label>Company</label><select name="company_id"><option value="">— Select —</option><% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Type</label><select name="type"><option value="server">Server</option><option value="router">Router</option><option value="switch">Switch</option><option value="firewall">Firewall</option><option value="printer">Printer</option><option value="ups">UPS</option><option value="website">Website</option><option value="service">Service/App</option><option value="other">Other</option></select></div>
+        <div class="form-group"><label>Target (IP/URL)</label><input type="text" name="target" placeholder="192.168.1.1 or https://example.com"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Check Type</label><select name="check_type"><option value="ping">Ping</option><option value="http">HTTP</option><option value="https">HTTPS</option><option value="port">Port Check</option></select></div>
+        <div class="form-group"><label>Check Interval (min)</label><input type="number" name="interval_min" value="5" min="1"></div>
+      </div>
+      <div class="form-group"><label>Alert Email</label><input type="email" name="alert_email" placeholder="Notify when down"></div>
+      <div class="form-group"><label>Notes</label><textarea name="notes" placeholder="Location, purpose, etc."></textarea></div>
+      <div class="form-actions"><button type="submit" class="btn btn-primary">Add Monitor</button><button type="button" class="btn" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button></div>
+    </form>
+  </div>
+</div>
+<%- include('../partials/foot') %>

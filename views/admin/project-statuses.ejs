@@ -1,0 +1,48 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <h2><a href="/admin/projects" style="opacity:0.4;text-decoration:none;">📁</a> → Project Statuses</h2>
+      </div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Define custom statuses for your projects. These appear in the project status dropdown.</p>
+
+      <div class="card">
+        <h3>Current Statuses</h3>
+        <% if (statuses.length === 0) { %>
+          <div class="empty"><div class="e-text">No statuses defined</div></div>
+        <% } else { %>
+          <% statuses.forEach(s => { %>
+            <div class="item-card" style="cursor:default;">
+              <div style="display:flex;align-items:center;gap:10px;flex:1;">
+                <div style="width:16px;height:16px;border-radius:4px;background:<%= s.color %>;flex-shrink:0;"></div>
+                <strong><%= s.name %></strong>
+                <span style="font-size:10px;color:var(--muted);">#<%= s.sort_order %></span>
+              </div>
+              <form method="POST" action="/admin/project-statuses/<%= s.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this status?')">
+                <button type="submit" class="btn-ghost">🗑️</button>
+              </form>
+            </div>
+          <% }) %>
+        <% } %>
+      </div>
+
+      <div class="card">
+        <h3>Add New Status</h3>
+        <form method="POST" action="/admin/project-statuses">
+          <div class="form-row">
+            <div class="form-group"><label>Status Name *</label><input type="text" name="name" required placeholder="e.g. Waiting for Client, QA Testing"></div>
+            <div class="form-group"><label>Color</label><input type="color" name="color" value="#0891b2" style="height:40px;padding:4px;"></div>
+          </div>
+          <button type="submit" class="btn btn-primary">Add Status</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

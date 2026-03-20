@@ -1,0 +1,79 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>" style="opacity:0.4;text-decoration:none;">🏢</a> → 📧 Email Security — <%= company.name %></h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <% if (providers.length > 0) { %>
+        <% providers.forEach(ep => { %>
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+              <div>
+                <h3><%= ep.provider %></h3>
+                <div style="font-size:12px;color:var(--muted);"><%= ep.domain || '—' %> <% if (ep.admin_url) { %>· <a href="<%= ep.admin_url %>" target="_blank">Admin Panel</a><% } %></div>
+              </div>
+              <form method="POST" action="/admin/companies/<%= company.id %>/email-providers/<%= ep.id %>/delete" style="display:inline" onsubmit="return confirm('Delete?')"><button type="submit" class="btn btn-sm btn-danger">🗑️</button></form>
+            </div>
+
+            <div class="metrics" style="margin-top:14px;">
+              <div class="metric <%= ep.mfa_enabled ? 'ok' : 'bad' %>"><div class="m-label">MFA</div><div class="m-val"><%= ep.mfa_enabled ? '✅' : '❌' %></div></div>
+              <div class="metric <%= ep.spf_configured ? 'ok' : 'bad' %>"><div class="m-label">SPF</div><div class="m-val"><%= ep.spf_configured ? '✅' : '❌' %></div></div>
+              <div class="metric <%= ep.dkim_configured ? 'ok' : 'bad' %>"><div class="m-label">DKIM</div><div class="m-val"><%= ep.dkim_configured ? '✅' : '❌' %></div></div>
+              <div class="metric <%= ep.dmarc_configured ? 'ok' : 'bad' %>"><div class="m-label">DMARC</div><div class="m-val"><%= ep.dmarc_configured ? '✅' : '❌' %></div></div>
+            </div>
+
+            <div class="card-row"><span class="label">Backup Codes Stored</span><span class="value"><%= ep.backup_codes_stored ? '✅ Yes' : '❌ No' %></span></div>
+            <div class="card-row"><span class="label">Password Policy</span><span class="value"><%= ep.password_policy || '—' %></span></div>
+            <div class="card-row"><span class="label">Email Retention</span><span class="value"><%= ep.retention_days ? ep.retention_days + ' days' : '—' %></span></div>
+            <div class="card-row"><span class="label">Last Audit</span><span class="value"><%= ep.last_audit_date || 'Never' %></span></div>
+            <% if (ep.notes) { %><div class="card-row"><span class="label">Notes</span><span class="value"><%= ep.notes %></span></div><% } %>
+
+            <details style="margin-top:12px;"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">✏️ Edit</summary>
+              <form method="POST" action="/admin/companies/<%= company.id %>/email-providers/<%= ep.id %>/edit" style="margin-top:10px;">
+                <div class="form-row"><div class="form-group"><label>Provider</label><input type="text" name="provider" value="<%= ep.provider %>"></div><div class="form-group"><label>Domain</label><input type="text" name="domain" value="<%= ep.domain || '' %>"></div></div>
+                <div class="form-group"><label>Admin URL</label><input type="text" name="admin_url" value="<%= ep.admin_url || '' %>"></div>
+                <div style="display:flex;flex-wrap:wrap;gap:16px;margin:12px 0;">
+                  <div class="form-check"><input type="checkbox" name="mfa_enabled" value="1" <%= ep.mfa_enabled ? 'checked' : '' %>> MFA Enabled</div>
+                  <div class="form-check"><input type="checkbox" name="spf_configured" value="1" <%= ep.spf_configured ? 'checked' : '' %>> SPF</div>
+                  <div class="form-check"><input type="checkbox" name="dkim_configured" value="1" <%= ep.dkim_configured ? 'checked' : '' %>> DKIM</div>
+                  <div class="form-check"><input type="checkbox" name="dmarc_configured" value="1" <%= ep.dmarc_configured ? 'checked' : '' %>> DMARC</div>
+                  <div class="form-check"><input type="checkbox" name="backup_codes_stored" value="1" <%= ep.backup_codes_stored ? 'checked' : '' %>> Backup Codes Stored</div>
+                </div>
+                <div class="form-row"><div class="form-group"><label>Password Policy</label><input type="text" name="password_policy" value="<%= ep.password_policy || '' %>" placeholder="e.g. 12 chars, rotated 90 days"></div><div class="form-group"><label>Retention (days)</label><input type="number" name="retention_days" value="<%= ep.retention_days || 0 %>"></div></div>
+                <div class="form-row"><div class="form-group"><label>Last Audit Date</label><input type="date" name="last_audit_date" value="<%= ep.last_audit_date || '' %>"></div><div class="form-group"><label>Notes</label><input type="text" name="notes" value="<%= ep.notes || '' %>"></div></div>
+                <button type="submit" class="btn btn-sm btn-primary">Save</button>
+              </form>
+            </details>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <div class="empty"><span class="e-icon">📧</span><div class="e-text">No email providers configured</div></div>
+      <% } %>
+
+      <!-- Add provider -->
+      <div class="card">
+        <h3>+ Add Email Provider</h3>
+        <form method="POST" action="/admin/companies/<%= company.id %>/email-providers">
+          <div class="form-row"><div class="form-group"><label>Provider *</label><select name="provider"><option>Microsoft 365</option><option>Google Workspace</option><option>GoDaddy</option><option>Zoho</option><option>Rackspace</option><option>Self-hosted</option><option>Other</option></select></div><div class="form-group"><label>Domain</label><input type="text" name="domain" placeholder="company.com"></div></div>
+          <div class="form-group"><label>Admin Panel URL</label><input type="text" name="admin_url" placeholder="https://admin.microsoft.com"></div>
+          <div style="display:flex;flex-wrap:wrap;gap:16px;margin:12px 0;">
+            <div class="form-check"><input type="checkbox" name="mfa_enabled" value="1"> MFA Enabled</div>
+            <div class="form-check"><input type="checkbox" name="spf_configured" value="1"> SPF Configured</div>
+            <div class="form-check"><input type="checkbox" name="dkim_configured" value="1"> DKIM Configured</div>
+            <div class="form-check"><input type="checkbox" name="dmarc_configured" value="1"> DMARC Configured</div>
+            <div class="form-check"><input type="checkbox" name="backup_codes_stored" value="1"> Backup Codes Stored</div>
+          </div>
+          <div class="form-row"><div class="form-group"><label>Password Policy</label><input type="text" name="password_policy" placeholder="e.g. Min 12 chars, changed every 90 days"></div><div class="form-group"><label>Email Retention (days)</label><input type="number" name="retention_days" value="0"></div></div>
+          <div class="form-group"><label>Notes</label><textarea name="notes" placeholder="Admin credentials location, special config notes..."></textarea></div>
+          <button type="submit" class="btn btn-primary btn-sm">Add Provider</button>
+        </form>
+      </div>
+
+      <div style="margin-top:12px;"><a href="/admin/companies/<%= company.id %>" class="btn btn-sm">← Back to <%= company.name %></a></div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

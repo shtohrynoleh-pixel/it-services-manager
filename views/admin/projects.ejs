@@ -1,0 +1,62 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>📁 Projects</h2></div>
+      <div class="topbar-actions"><a href="/admin/project-statuses" class="btn btn-sm">⚙️ Statuses</a><button class="btn btn-primary btn-sm" onclick="document.getElementById('addModal').classList.add('open')">+ New Project</button><%- include('../partials/notif-bell') %></div>
+    </div>
+    <div class="content">
+      <% if (projects.length === 0) { %>
+        <div class="empty"><span class="e-icon">📁</span><div class="e-text">No projects yet</div><button class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('open')">+ Create First Project</button></div>
+      <% } else { %>
+        <% projects.forEach(p => {
+          const pct = p.taskTotal > 0 ? Math.round(p.taskDone / p.taskTotal * 100) : 0;
+        %>
+          <a href="/admin/projects/<%= p.id %>" class="item-card" style="text-decoration:none;color:inherit;">
+            <div class="ic-main">
+              <div class="ic-name"><%= p.name %></div>
+              <div class="ic-sub">
+                <% if (p.company_name) { %><strong><%= p.company_name %></strong> · <% } %>
+                <% if (p.due_date) { %>Due: <%= p.due_date %> · <% } %>
+                Tasks: <%= p.taskDone %>/<%= p.taskTotal %>
+                <% if (p.budget > 0) { %> · Budget: $<%= p.budget.toFixed(2) %><% } %>
+              </div>
+              <% if (p.taskTotal > 0) { %>
+              <div style="margin-top:6px;height:6px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
+                <div style="height:100%;width:<%= pct %>%;background:<%= pct >= 100 ? 'var(--success)' : 'var(--primary)' %>;border-radius:4px;transition:width 0.3s;"></div>
+              </div>
+              <% } %>
+            </div>
+            <% const pStatus = (statuses||[]).find(s => s.name === p.status); const pColor = pStatus ? pStatus.color : '#64748b'; %>
+            <div class="ic-right"><span style="display:inline-block;padding:2px 10px;border-radius:6px;font-size:10px;font-weight:700;background:<%= pColor %>20;color:<%= pColor %>;"><%= p.status %></span></div>
+          </a>
+        <% }) %>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="addModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <h3>New Project</h3>
+    <form method="POST" action="/admin/projects">
+      <div class="form-group"><label>Project Name *</label><input type="text" name="name" required placeholder="e.g. Server Migration — Acme Trucking"></div>
+      <div class="form-group"><label>Description</label><textarea name="description" placeholder="Project scope, goals, deliverables..."></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Company</label><select name="company_id"><option value="">— Internal Project —</option><% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+        <div class="form-group"><label>Status</label><select name="status"><% (statuses || []).forEach(s => { %><option value="<%= s.name %>"><%= s.name %></option><% }) %></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Start Date</label><input type="date" name="start_date"></div>
+        <div class="form-group"><label>Due Date</label><input type="date" name="due_date"></div>
+      </div>
+      <div class="form-group"><label>Budget ($)</label><input type="number" name="budget" step="0.01" placeholder="0.00"></div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Create Project</button>
+        <button type="button" class="btn" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+<%- include('../partials/foot') %>

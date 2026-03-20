@@ -1,0 +1,94 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>✅ Tasks</h2></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="btn btn-primary btn-sm" onclick="document.getElementById('addModal').classList.add('open')">+ Add Task</button><%- include('../partials/notif-bell') %></div>
+    </div>
+    <div class="content">
+      <!-- Status filter pills -->
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+        <a href="/admin/tasks?filter=open" class="btn btn-sm <%= filter === 'open' ? 'btn-primary' : '' %>">Open (<%= tasks.filter(t=>t.status!=='done').length %>)</a>
+        <a href="/admin/tasks?filter=all" class="btn btn-sm <%= filter === 'all' ? 'btn-primary' : '' %>">All</a>
+        <a href="/admin/tasks?filter=done" class="btn btn-sm <%= filter === 'done' ? 'btn-primary' : '' %>">Done</a>
+      </div>
+
+      <!-- Advanced filters -->
+      <details style="margin-bottom:16px;">
+        <summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--primary);margin-bottom:8px;">🔍 Filter & Group</summary>
+        <form method="GET" action="/admin/tasks" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:8px;">
+          <input type="hidden" name="filter" value="<%= filter %>">
+          <div class="form-row">
+            <div class="form-group"><label>Company</label><select name="company"><option value="">All companies</option><% companies.forEach(c => { %><option value="<%= c.id %>" <%= filterCompany == c.id ? 'selected' : '' %>><%= c.name %></option><% }) %></select></div>
+            <div class="form-group"><label>Priority</label><select name="priority"><option value="">All priorities</option><% ['urgent','high','medium','low'].forEach(p => { %><option value="<%= p %>" <%= filterPriority === p ? 'selected' : '' %>><%= p.charAt(0).toUpperCase() + p.slice(1) %></option><% }) %></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Assigned To</label><select name="assigned"><option value="">Anyone</option><% allPeople.forEach(p => { %><option value="<%= p.name %>" <%= filterAssigned === p.name ? 'selected' : '' %>><%= p.name %></option><% }) %></select></div>
+            <div class="form-group" style="display:flex;align-items:flex-end;"><button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>&nbsp;<a href="/admin/tasks?filter=<%= filter %>" class="btn btn-sm">Clear</a></div>
+          </div>
+        </form>
+      </details>
+
+      <% if (tasks.length === 0) { %>
+        <div class="empty"><span class="e-icon">✅</span><div class="e-text">No tasks<%= filter === 'open' ? ' open' : '' %></div></div>
+      <% } else { %>
+        <% tasks.forEach(t => { %>
+          <div class="item-card" style="cursor:default;align-items:flex-start;">
+            <div style="margin-right:10px;margin-top:2px;">
+              <% if (t.status === 'done') { %>
+                <span style="color:var(--success);font-size:18px;">✅</span>
+              <% } else { %>
+                <form method="POST" action="/admin/tasks/<%= t.id %>/status" style="display:inline"><input type="hidden" name="status" value="done"><button type="submit" style="background:none;border:2px solid var(--border);width:22px;height:22px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;" title="Mark done">&nbsp;</button></form>
+              <% } %>
+            </div>
+            <div class="ic-main" style="flex:1;min-width:0;">
+              <div class="ic-name" style="<%= t.status === 'done' ? 'text-decoration:line-through;opacity:0.5;' : '' %>"><%= t.title %></div>
+              <div class="ic-sub">
+                <% if (t.company_name) { %><strong><%= t.company_name %></strong> · <% } %>
+                <% if (t.assigned_to) { %>👤 <%= t.assigned_to %> · <% } %>
+                <% if (t.due_date) { %>📅 <%= t.due_date %> · <% } %>
+                <% if (t.created_by === 'client') { %><span class="badge sent">Client Request</span> · <% } %>
+                <span class="badge <%= t.priority === 'urgent' ? 'overdue' : t.priority === 'high' ? 'sent' : t.priority === 'low' ? 'inactive' : 'active' %>"><%= t.priority %></span>
+                <span class="badge <%= t.status === 'done' ? 'paid' : t.status === 'in-progress' ? 'sent' : 'prospect' %>"><%= t.status %></span>
+              </div>
+              <% if (t.description) { %><div style="font-size:11px;color:#475569;margin-top:4px;white-space:pre-wrap;"><%= t.description %></div><% } %>
+            </div>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <% if (t.status !== 'done' && t.status !== 'in-progress') { %>
+                <form method="POST" action="/admin/tasks/<%= t.id %>/status" style="display:inline"><input type="hidden" name="status" value="in-progress"><button type="submit" class="btn btn-sm" title="Start">▶</button></form>
+              <% } %>
+              <a href="/admin/tasks/<%= t.id %>/edit" class="btn btn-sm" title="Edit">✏️</a>
+              <form method="POST" action="/admin/tasks/<%= t.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Delete task?')">🗑️</button></form>
+            </div>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Add Task Modal -->
+<div class="modal-bg" id="addModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <h3>Add Task</h3>
+    <form method="POST" action="/admin/tasks">
+      <div class="form-group"><label>Title *</label><input type="text" name="title" required placeholder="What needs to be done?"></div>
+      <div class="form-group"><label>Description</label><textarea name="description" placeholder="Details, context, instructions..."></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Company</label><select name="company_id"><option value="">— No company —</option><% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+        <div class="form-group"><label>Assigned To</label><select name="assigned_to"><option value="">— Unassigned —</option><% allPeople.forEach(p => { %><option value="<%= p.name %>"><%= p.name %></option><% }) %></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Priority</label><select name="priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
+        <div class="form-group"><label>Due Date</label><input type="date" name="due_date"></div>
+      </div>
+      <div class="form-group"><label>Status</label><select name="status"><option value="todo">To Do</option><option value="in-progress">In Progress</option></select></div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Create Task</button>
+        <button type="button" class="btn" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+<%- include('../partials/foot') %>

@@ -1,0 +1,45 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/schedule" style="opacity:0.4;text-decoration:none;">📅</a> → Edit Schedule</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div class="card">
+        <h3>Edit Scheduled Service</h3>
+        <form method="POST" action="/admin/schedule/<%= sched.id %>/edit">
+          <div class="form-group"><label>Title *</label><input type="text" name="title" value="<%= sched.title %>" required></div>
+          <div class="form-group"><label>Description</label><textarea name="description"><%= sched.description || '' %></textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label>Company</label><select name="company_id"><% companies.forEach(c => { %><option value="<%= c.id %>" <%= sched.company_id === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %></select></div>
+            <div class="form-group"><label>Related Service</label><select name="service_id"><option value="">— None —</option><% services.forEach(s => { %><option value="<%= s.id %>" <%= sched.service_id === s.id ? 'selected' : '' %>><%= s.name %></option><% }) %></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Frequency</label><select name="frequency"><% ['daily','weekly','biweekly','monthly','quarterly','yearly'].forEach(f => { %><option value="<%= f %>" <%= sched.frequency === f ? 'selected' : '' %>><%= f.charAt(0).toUpperCase() + f.slice(1) %></option><% }) %></select></div>
+            <div class="form-group"><label>Assigned To</label><select name="assigned_to"><option value="">— Unassigned —</option><% allPeople.forEach(p => { %><option value="<%= p.name %>" <%= sched.assigned_to === p.name ? 'selected' : '' %>><%= p.name %></option><% }) %></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Day of Week</label><select name="day_of_week"><option value="">—</option><% ['Monday','Tuesday','Wednesday','Thursday','Friday'].forEach(d => { %><option <%= sched.day_of_week === d ? 'selected' : '' %>><%= d %></option><% }) %></select></div>
+            <div class="form-group"><label>Time Slot</label><input type="text" name="time_slot" value="<%= sched.time_slot || '' %>"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Next Due Date</label><input type="date" name="next_due" value="<%= sched.next_due || '' %>"></div>
+            <div class="form-group"><label>Day of Month (for monthly)</label><input type="number" name="day_of_month" value="<%= sched.day_of_month || 1 %>" min="1" max="28"></div>
+          </div>
+          <div class="form-check"><input type="checkbox" name="is_active" value="1" <%= sched.is_active ? 'checked' : '' %>> Active</div>
+          <div class="form-group"><label>Notes</label><textarea name="notes"><%= sched.notes || '' %></textarea></div>
+          <div style="font-size:11px;color:var(--muted);margin:8px 0;">
+            Last completed: <%= sched.last_completed || 'Never' %> · Created: <%= sched.created_at || '—' %>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="/admin/schedule" class="btn">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

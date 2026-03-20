@@ -1,0 +1,70 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>🔧 Settings</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div class="card">
+        <h3>🏢 Business Info</h3>
+        <form method="POST" action="/admin/settings">
+          <div class="form-group"><label>Business Name</label><input type="text" name="business_name" value="<%= settings.business_name || '' %>"></div>
+          <div class="form-row">
+            <div class="form-group"><label>Email</label><input type="email" name="business_email" value="<%= settings.business_email || '' %>"></div>
+            <div class="form-group"><label>Phone</label><input type="text" name="business_phone" value="<%= settings.business_phone || '' %>"></div>
+          </div>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </form>
+      </div>
+      <div class="card">
+        <h3>🔐 Change Admin Password</h3>
+        <form method="POST" action="/admin/settings/password">
+          <div class="form-group"><label>New Password</label><input type="password" name="new_password" required minlength="4" placeholder="Minimum 4 characters"></div>
+          <button type="submit" class="btn btn-primary">Update Password</button>
+        </form>
+      </div>
+      <% var h2fa = (typeof has2fa !== 'undefined') ? has2fa : false; %>
+      <div class="card">
+        <h3>🔐 Two-Factor Authentication</h3>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <div style="width:40px;height:40px;border-radius:10px;background:<%= h2fa ? '#d1fae5' : '#fee2e2' %>;display:flex;align-items:center;justify-content:center;font-size:20px;"><%= h2fa ? '✅' : '❌' %></div>
+          <div>
+            <div style="font-weight:700;font-size:14px;"><%= h2fa ? '2FA is Enabled' : '2FA is Disabled' %></div>
+            <div style="font-size:12px;color:var(--muted);"><%= h2fa ? 'Your account is secured with Google Authenticator' : 'Add an extra layer of security to your login' %></div>
+          </div>
+        </div>
+        <a href="/admin/settings/2fa-setup" class="btn btn-sm <%= h2fa ? '' : 'btn-primary' %>"><%= h2fa ? '⚙️ Manage 2FA' : '🔐 Set Up 2FA' %></a>
+      </div>
+      <div class="card">
+        <h3>🔔 Alert Configuration</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Configure email and SMS alerts for monitoring. Set credentials in the <code>.env</code> file on the server.</p>
+        <div class="card-row"><span class="label">Gmail</span><span class="value"><%= process.env.GMAIL_USER ? '✅ ' + process.env.GMAIL_USER : '❌ Not configured' %></span></div>
+        <div class="card-row"><span class="label">Twilio SMS</span><span class="value"><%= process.env.TWILIO_ACCOUNT_SID ? '✅ Configured' : '❌ Not configured' %></span></div>
+        <div class="card-row"><span class="label">Alert Emails</span><span class="value"><%= process.env.ALERT_EMAILS || '❌ None set' %></span></div>
+        <div class="card-row"><span class="label">Alert Phones</span><span class="value"><%= process.env.ALERT_PHONES || '❌ None set' %></span></div>
+        <div class="card-row"><span class="label">Webhook URL</span><span class="value" style="word-break:break-all;"><%= 'https://YOUR-DOMAIN/api/webhook/alert' %></span></div>
+        <div style="margin-top:10px;padding:10px 14px;background:#f8fafc;border-radius:8px;font-size:11px;color:#475569;line-height:1.7;">
+          <strong>Setup:</strong> Edit <code>.env</code> file on the server:<br>
+          <code>GMAIL_USER=you@gmail.com</code><br>
+          <code>GMAIL_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx</code> (from <a href="https://myaccount.google.com/apppasswords" target="_blank">Google App Passwords</a>)<br>
+          <code>ALERT_EMAILS=admin@example.com</code><br>
+          <code>TWILIO_ACCOUNT_SID=ACxxx</code>, <code>TWILIO_AUTH_TOKEN=xxx</code>, <code>TWILIO_FROM_NUMBER=+1xxx</code><br>
+          <code>ALERT_PHONES=+1234567890</code>
+        </div>
+        <form method="POST" action="/admin/integrations/test-email" style="margin-top:10px;">
+          <button type="submit" class="btn btn-sm btn-primary">🔔 Send Test Alert</button>
+        </form>
+      </div>
+      <div class="card">
+        <h3>ℹ️ System Info</h3>
+        <div class="card-row"><span class="label">Version</span><span class="value">1.0.0</span></div>
+        <div class="card-row"><span class="label">Database</span><span class="value">SQLite (local)</span></div>
+        <div class="card-row"><span class="label">Public Services URL</span><span class="value"><a href="/public/services" target="_blank">/public/services</a></span></div>
+        <div class="card-row"><span class="label">Monitoring Cron</span><span class="value">Every 60 seconds</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

@@ -1,0 +1,7 @@
+node_modules/
+db/app.db
+db/app.db-wal
+db/app.db-shm
+.env
+uploads/
+backups/

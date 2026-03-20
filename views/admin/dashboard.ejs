@@ -1,0 +1,72 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>📊 Dashboard</h2></div>
+      <div style="display:flex;align-items:center;gap:8px;"><%- include('../partials/notif-bell') %></div>
+    </div>
+    <div class="content">
+      <div class="metrics">
+        <a href="/admin/companies" class="metric hi" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Active Clients</div><div class="m-val pri"><%= activeCount %></div></a>
+        <a href="/admin/billing" class="metric ok" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Monthly Revenue</div><div class="m-val green">$<%= mrr.toFixed(2) %></div></a>
+        <a href="/admin/billing" class="metric <%= unpaid.length > 0 ? 'bad' : '' %>" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Unpaid Invoices</div><div class="m-val <%= unpaid.length > 0 ? 'red' : '' %>"><%= unpaid.length %></div></a>
+        <a href="/admin/tasks" class="metric <%= openTasks.length > 0 ? '' : 'ok' %>" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Open Tasks</div><div class="m-val"><%= openTasks.length %></div></a>
+      </div>
+
+      <% if (openTasks.length > 0) { %>
+      <div class="card">
+        <h3>✅ Open Tasks <a href="/admin/tasks" style="font-size:12px;margin-left:auto;">View all →</a></h3>
+        <% openTasks.slice(0, 5).forEach(t => { %>
+          <div class="item-card" style="cursor:default;">
+            <div class="ic-main">
+              <div class="ic-name"><%= t.title %></div>
+              <div class="ic-sub"><%= t.company_name || 'No company' %> · Due: <%= t.due_date || '—' %></div>
+            </div>
+            <div class="ic-right">
+              <span class="badge <%= t.priority === 'urgent' ? 'overdue' : t.priority === 'high' ? 'sent' : 'active' %>"><%= t.priority %></span>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+      <% } %>
+
+      <% if (activeProjects.length > 0) { %>
+      <div class="card">
+        <h3>📁 Active Projects <a href="/admin/projects" style="font-size:12px;margin-left:auto;">View all →</a></h3>
+        <% activeProjects.slice(0, 5).forEach(p => { %>
+          <a href="/admin/projects/<%= p.id %>" class="item-card" style="text-decoration:none;color:inherit;">
+            <div class="ic-main">
+              <div class="ic-name"><%= p.name %></div>
+              <div class="ic-sub"><%= p.company_name || 'Internal' %> · Due: <%= p.due_date || '—' %></div>
+            </div>
+            <div class="ic-right"><span class="badge <%= p.status === 'in-progress' ? 'sent' : 'prospect' %>"><%= p.status %></span></div>
+          </a>
+        <% }) %>
+      </div>
+      <% } %>
+
+      <% if (unpaid.length > 0) { %>
+      <div class="card">
+        <h3>⚠️ Unpaid Invoices ($<%= unpaidTotal.toFixed(2) %>)</h3>
+        <table class="tbl"><thead><tr><th>Company</th><th>Date</th><th>Amount</th><th></th></tr></thead><tbody>
+        <% unpaid.forEach(inv => { const co = companies.find(c => c.id === inv.company_id); %>
+          <tr><td><%= co ? co.name : '?' %></td><td><%= inv.date || '—' %></td><td style="color:var(--danger);font-weight:700;">$<%= (inv.total||0).toFixed(2) %></td>
+          <td><form method="POST" action="/admin/invoices/<%= inv.id %>/pay" style="display:inline"><button class="btn btn-sm btn-primary" type="submit">✓ Paid</button></form></td></tr>
+        <% }) %>
+        </tbody></table>
+      </div>
+      <% } %>
+
+      <div class="card">
+        <h3>🏢 Companies <a href="/admin/companies" style="font-size:12px;margin-left:auto;">View all →</a></h3>
+        <% if (companies.length === 0) { %>
+          <div class="empty"><span class="e-icon">🏢</span><div class="e-text">No companies yet</div><a href="/admin/companies" class="btn btn-primary btn-sm">+ Add Company</a></div>
+        <% } else { companies.slice(0, 6).forEach(c => { %>
+          <a href="/admin/companies/<%= c.id %>" class="item-card" style="text-decoration:none;color:inherit;"><div class="ic-main"><div class="ic-name"><%= c.name %></div></div><div class="ic-right"><span class="badge <%= c.status %>"><%= c.status %></span></div></a>
+        <% }) } %>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

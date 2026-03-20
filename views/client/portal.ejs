@@ -1,0 +1,159 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <% if (company.logo) { %><img src="<%= company.logo %>" style="width:28px;height:28px;border-radius:6px;object-fit:contain;"><% } %>
+        <h2><%= company.name %></h2>
+      </div>
+      <span class="badge <%= company.status %>"><%= company.status %></span>
+    </div>
+    <div class="content">
+
+      <% if (!tab || tab === 'dashboard') { %>
+        <!-- Company Overview -->
+        <div class="metrics">
+          <a href="/client?tab=users" class="metric hi" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Team Members</div><div class="m-val pri"><%= users.length %></div></a>
+          <a href="/client?tab=users" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Email Accounts</div><div class="m-val"><%= emailCount %></div></a>
+          <a href="/client?tab=users" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Phone Numbers</div><div class="m-val"><%= phoneCount %></div></a>
+          <a href="/client?tab=servers" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Servers</div><div class="m-val"><%= servers.length %></div></a>
+        </div>
+        <div class="metrics">
+          <a href="/client?tab=subscriptions" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Subscriptions</div><div class="m-val"><%= subs.length %></div></a>
+          <a href="/client?tab=users" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Software</div><div class="m-val"><%= software.length %></div></a>
+          <a href="/client?tab=inventory" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Equipment</div><div class="m-val"><%= inventory.length %></div></a>
+          <a href="/client?tab=invoices" class="metric <%= unpaid.length > 0 ? 'bad' : '' %>" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Unpaid Invoices</div><div class="m-val <%= unpaid.length > 0 ? 'red' : '' %>"><%= unpaid.length %></div></a>
+        </div>
+
+        <div class="card">
+          <h3>📋 Company Info</h3>
+          <div class="card-row"><span class="label">Address</span><span class="value"><%= [company.address,company.city,company.state,company.zip].filter(Boolean).join(', ') || '—' %></span></div>
+          <% if (contacts.length > 0) { const pc = contacts[0]; %>
+          <div class="card-row"><span class="label">Primary Contact</span><span class="value"><%= pc.name %> · <%= pc.email || '' %> · <%= pc.phone || '' %></span></div>
+          <% } %>
+        </div>
+
+        <% if (unpaid.length > 0) { %>
+        <div class="card">
+          <h3>⚠️ Unpaid Invoices</h3>
+          <% unpaid.forEach(inv => { %>
+            <div class="card-row"><span class="label"><%= inv.invoice_number || '' %> — <%= inv.date || '' %></span><span class="value" style="color:var(--danger);font-weight:700;">$<%= (inv.total||0).toFixed(2) %></span></div>
+          <% }) %>
+        </div>
+        <% } %>
+
+        <!-- Quick user list with emails/phones -->
+        <% if (users.length > 0) { %>
+        <div class="card">
+          <h3>👥 Team (<%= users.length %>)</h3>
+          <table class="tbl">
+            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Company Email</th></tr></thead>
+            <tbody>
+            <% users.slice(0, 10).forEach(u => { %>
+              <tr>
+                <td><strong><%= u.name %></strong><% if (u.department) { %> <span style="font-size:10px;color:var(--muted);">(<%= u.department %>)</span><% } %></td>
+                <td><%= u.email || '—' %></td>
+                <td><%= u.phone || '—' %></td>
+                <td><%= u.role || '—' %></td>
+                <td><%= u.email_account || '—' %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+          <% if (users.length > 10) { %><a href="/client?tab=users" style="font-size:12px;">View all <%= users.length %> →</a><% } %>
+        </div>
+        <% } %>
+
+      <% } else if (tab === 'tasks') { %>
+        <!-- Client can submit tasks -->
+        <div class="card">
+          <h3>📋 Submit a Request</h3>
+          <form method="POST" action="/client/tasks">
+            <div class="form-group"><label>What do you need? *</label><input type="text" name="title" required placeholder="e.g. Reset password for John, Add new email account..."></div>
+            <div class="form-group"><label>Details</label><textarea name="description" placeholder="Any additional details, urgency, specific instructions..."></textarea></div>
+            <div class="form-group"><label>Priority</label><select name="priority"><option value="low">Low — when you get a chance</option><option value="medium" selected>Medium — within a day or two</option><option value="high">High — need this today</option><option value="urgent">Urgent — business is impacted</option></select></div>
+            <button type="submit" class="btn btn-primary">Submit Request</button>
+          </form>
+        </div>
+
+        <% if (tasks.length > 0) { %>
+        <div class="card">
+          <h3>📝 Your Requests (<%= tasks.length %>)</h3>
+          <% tasks.forEach(t => { %>
+            <div class="item-card" style="cursor:default;align-items:flex-start;">
+              <div style="margin-right:10px;margin-top:4px;">
+                <% if (t.status === 'done') { %><span style="font-size:16px;">✅</span>
+                <% } else if (t.status === 'in-progress') { %><span style="font-size:16px;">🔄</span>
+                <% } else { %><span style="font-size:16px;">⏳</span><% } %>
+              </div>
+              <div class="ic-main">
+                <div class="ic-name" style="<%= t.status === 'done' ? 'text-decoration:line-through;opacity:0.5;' : '' %>"><%= t.title %></div>
+                <div class="ic-sub">
+                  <span class="badge <%= t.status === 'done' ? 'paid' : t.status === 'in-progress' ? 'sent' : 'prospect' %>"><%= t.status %></span>
+                  · <span class="badge <%= t.priority === 'urgent' ? 'overdue' : t.priority === 'high' ? 'sent' : 'active' %>"><%= t.priority %></span>
+                  · <%= t.created_at ? t.created_at.split('T')[0] : '' %>
+                </div>
+                <% if (t.description) { %><div style="font-size:11px;color:#475569;margin-top:4px;"><%= t.description %></div><% } %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+        <% } %>
+
+      <% } else { %>
+        <%
+          const dataMap = {
+            users: { title: '👥 Team Members', items: users, cols: ['Name','Email','Phone','Dept','Role','Company Email'], fields: ['name','email','phone','department','role','email_account'] },
+            servers: { title: '🖥️ Servers', items: servers, cols: ['Name','Type','IP','OS','Purpose'], fields: ['name','type','ip','os','purpose'] },
+            subscriptions: { title: '📦 Subscriptions', items: subs, cols: ['Name','Vendor','Seats','Billing','Renewal'], fields: ['name','vendor','seats','billing_cycle','renewal_date'] },
+            assets: { title: '🌐 Digital Assets', items: assets, cols: ['Name','Type','Provider','Expires'], fields: ['name','type','provider','expires_at'] },
+            inventory: { title: '🔧 Equipment', items: inventory, cols: ['Name','Type','Qty','Cost','Condition','Assigned To'], fields: ['name','type','quantity','cost','condition','assigned_to'] }
+          };
+          const cfg = dataMap[tab];
+        %>
+        <% if (tab === 'invoices') { %>
+          <h3 style="margin-bottom:16px;">💳 Invoices</h3>
+          <% if (invoices.length === 0) { %>
+            <div class="empty"><span class="e-icon">💳</span><div class="e-text">No invoices</div></div>
+          <% } else { %>
+            <div class="card" style="overflow-x:auto;">
+              <table class="tbl">
+                <thead><tr><th>#</th><th>Date</th><th>Amount</th><th>Status</th><th>Paid</th></tr></thead>
+                <tbody>
+                <% invoices.forEach(inv => { %>
+                  <tr>
+                    <td><%= inv.invoice_number || '—' %></td>
+                    <td><%= inv.date || '—' %></td>
+                    <td><strong>$<%= (inv.total||0).toFixed(2) %></strong></td>
+                    <td><span class="badge <%= inv.status %>"><%= inv.status %></span></td>
+                    <td><%= inv.paid_date || '—' %></td>
+                  </tr>
+                <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        <% } else if (cfg) { %>
+          <h3 style="margin-bottom:16px;"><%= cfg.title %></h3>
+          <% if (cfg.items.length === 0) { %>
+            <div class="empty"><span class="e-icon">📭</span><div class="e-text">No <%= tab %> recorded</div></div>
+          <% } else { %>
+            <div class="card" style="overflow-x:auto;">
+              <table class="tbl">
+                <thead><tr><% cfg.cols.forEach(c => { %><th><%= c %></th><% }) %></tr></thead>
+                <tbody>
+                <% cfg.items.forEach(it => { %>
+                  <tr><% cfg.fields.forEach(f => { %><td><% if (f === 'cost') { %><%= (it[f]||0) > 0 ? '$' + (it[f]||0).toFixed(2) : '—' %><% } else if (f === 'condition') { %><span class="badge <%= it[f]==='New'||it[f]==='Good'?'active':it[f]==='Needs Repair'?'overdue':it[f]==='Retired'?'inactive':'draft' %>"><%= it[f] || '—' %></span><% } else { %><%= it[f] || '—' %><% } %></td><% }) %></tr>
+                <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        <% } %>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

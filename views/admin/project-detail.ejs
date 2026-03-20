@@ -1,0 +1,106 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <h2><a href="/admin/projects" style="opacity:0.4;text-decoration:none;">📁</a> → <%= project.name %></h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;"><span class="badge <%= project.status === 'completed' ? 'paid' : project.status === 'in-progress' ? 'sent' : project.status === 'cancelled' ? 'inactive' : 'prospect' %>"><%= project.status %></span><%- include('../partials/notif-bell') %></div>
+    </div>
+    <div class="content">
+      <%
+        const done = tasks.filter(t => t.status === 'done').length;
+        const total = tasks.length;
+        const pct = total > 0 ? Math.round(done / total * 100) : 0;
+      %>
+
+      <!-- Project info -->
+      <div class="metrics">
+        <div class="metric hi"><div class="m-label">Progress</div><div class="m-val pri"><%= pct %>%</div></div>
+        <div class="metric"><div class="m-label">Tasks</div><div class="m-val"><%= done %>/<%= total %></div></div>
+        <div class="metric"><div class="m-label">Due Date</div><div class="m-val" style="font-size:16px;"><%= project.due_date || '—' %></div></div>
+        <% if (project.budget > 0) { %><div class="metric"><div class="m-label">Budget</div><div class="m-val">$<%= project.budget.toFixed(2) %></div></div><% } %>
+      </div>
+
+      <% if (total > 0) { %>
+      <div style="margin-bottom:20px;height:8px;background:#e2e8f0;border-radius:6px;overflow:hidden;">
+        <div style="height:100%;width:<%= pct %>%;background:<%= pct >= 100 ? 'var(--success)' : 'var(--primary)' %>;border-radius:6px;transition:width 0.3s;"></div>
+      </div>
+      <% } %>
+
+      <div class="card">
+        <h3>📋 Project Details</h3>
+        <div class="card-row"><span class="label">Company</span><span class="value"><%= project.company_name || 'Internal' %></span></div>
+        <div class="card-row"><span class="label">Status</span><span class="value"><span class="badge <%= project.status === 'completed' ? 'paid' : project.status === 'in-progress' ? 'sent' : 'prospect' %>"><%= project.status %></span></span></div>
+        <div class="card-row"><span class="label">Start</span><span class="value"><%= project.start_date || '—' %></span></div>
+        <div class="card-row"><span class="label">Due</span><span class="value"><%= project.due_date || '—' %></span></div>
+        <% if (project.description) { %><div class="card-row"><span class="label">Description</span><span class="value" style="white-space:pre-wrap;"><%= project.description %></span></div><% } %>
+        <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;">
+          <% (statuses || []).forEach(s => { if (s.name !== project.status) { %>
+            <form method="POST" action="/admin/projects/<%= project.id %>/update" style="display:inline"><input type="hidden" name="status" value="<%= s.name %>"><button type="submit" class="btn btn-sm" style="border-color:<%= s.color %>;color:<%= s.color %>;">→ <%= s.name %></button></form>
+          <% } }) %>
+          <form method="POST" action="/admin/projects/<%= project.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this project and all its tasks?')"><button type="submit" class="btn btn-sm btn-danger">🗑️ Delete</button></form>
+        </div>
+      </div>
+
+      <!-- Tasks -->
+      <div class="card">
+        <h3>✅ Tasks (<%= done %>/<%= total %>) <button class="btn btn-sm btn-primary" style="margin-left:auto;" onclick="document.getElementById('addTaskModal').classList.add('open')">+ Add Task</button></h3>
+        <% if (tasks.length === 0) { %>
+          <div class="empty"><span class="e-icon">✅</span><div class="e-text">No tasks yet</div></div>
+        <% } else { %>
+          <% tasks.forEach(t => { %>
+            <div class="item-card" style="cursor:default;align-items:flex-start;">
+              <div style="margin-right:10px;margin-top:2px;">
+                <% if (t.status === 'done') { %>
+                  <span style="color:var(--success);font-size:18px;">✅</span>
+                <% } else { %>
+                  <form method="POST" action="/admin/tasks/<%= t.id %>/status" style="display:inline">
+                    <input type="hidden" name="status" value="done">
+                    <input type="hidden" name="redirect" value="/admin/projects/<%= project.id %>">
+                    <button type="submit" style="background:none;border:2px solid var(--border);width:22px;height:22px;border-radius:6px;cursor:pointer;" title="Mark done">&nbsp;</button>
+                  </form>
+                <% } %>
+              </div>
+              <div class="ic-main">
+                <div class="ic-name" style="<%= t.status === 'done' ? 'text-decoration:line-through;opacity:0.5;' : '' %>"><%= t.title %></div>
+                <div class="ic-sub">
+                  <% if (t.assigned_to) { %>👤 <%= t.assigned_to %> · <% } %>
+                  <% if (t.due_date) { %>📅 <%= t.due_date %> · <% } %>
+                  <span class="badge <%= t.priority === 'urgent' ? 'overdue' : t.priority === 'high' ? 'sent' : t.priority === 'low' ? 'inactive' : 'active' %>"><%= t.priority %></span>
+                </div>
+                <% if (t.description) { %><div style="font-size:11px;color:#475569;margin-top:3px;"><%= t.description %></div><% } %>
+              </div>
+              <form method="POST" action="/admin/tasks/<%= t.id %>/delete" style="display:inline">
+                <input type="hidden" name="redirect" value="/admin/projects/<%= project.id %>">
+                <button type="submit" class="btn-ghost" onclick="return confirm('Delete?')">🗑️</button>
+              </form>
+            </div>
+          <% }) %>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="addTaskModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <h3>Add Task to Project</h3>
+    <form method="POST" action="/admin/projects/<%= project.id %>/tasks">
+      <div class="form-group"><label>Title *</label><input type="text" name="title" required placeholder="What needs to be done?"></div>
+      <div class="form-group"><label>Description</label><textarea name="description" placeholder="Details..."></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Priority</label><select name="priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
+        <div class="form-group"><label>Due Date</label><input type="date" name="due_date"></div>
+      </div>
+      <div class="form-group"><label>Assigned To</label><input type="text" name="assigned_to" placeholder="Person name"></div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Add Task</button>
+        <button type="button" class="btn" onclick="document.getElementById('addTaskModal').classList.remove('open')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+<%- include('../partials/foot') %>

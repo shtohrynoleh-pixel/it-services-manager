@@ -1,0 +1,61 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>👥 All Users</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div class="metrics">
+        <div class="metric hi"><div class="m-label">Total Users</div><div class="m-val pri"><%= allUsers.length %></div></div>
+        <div class="metric ok"><div class="m-label">Active</div><div class="m-val green"><%= activeCount %></div></div>
+        <div class="metric"><div class="m-label">Email Accounts</div><div class="m-val"><%= totalEmails %></div></div>
+        <div class="metric"><div class="m-label">Phone Numbers</div><div class="m-val"><%= totalPhones %></div></div>
+      </div>
+
+      <!-- Filters -->
+      <form method="GET" action="/admin/all-users" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+        <input type="text" name="q" value="<%= search %>" placeholder="🔍 Search name, email, phone..." style="flex:1;min-width:180px;padding:7px 12px;font-size:12px;">
+        <select name="company" style="padding:7px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">All companies</option>
+          <% companies.forEach(c => { %><option value="<%= c.id %>" <%= filterCompany == c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        </select>
+        <select name="dept" style="padding:7px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">All departments</option>
+          <% depts.forEach(d => { %><option value="<%= d %>" <%= filterDept === d ? 'selected' : '' %>><%= d %></option><% }) %>
+        </select>
+        <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+        <a href="/admin/all-users" class="btn btn-sm">Clear</a>
+      </form>
+
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Showing <%= users.length %> of <%= allUsers.length %> users</div>
+
+      <% if (users.length === 0) { %>
+        <div class="empty"><span class="e-icon">👥</span><div class="e-text">No users found</div></div>
+      <% } else { %>
+        <div style="overflow-x:auto;">
+        <table class="tbl">
+          <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th>Dept</th><th>Role</th><th>Company Email</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+          <% users.forEach(u => { %>
+            <tr>
+              <td><strong><%= u.name %></strong></td>
+              <td><% if (u.company_name) { %><a href="/admin/companies/<%= u.company_id %>?tab=users"><%= u.company_name %></a><% } else { %>—<% } %></td>
+              <td><%= u.email || '—' %></td>
+              <td><%= u.phone || '—' %></td>
+              <td><%= u.department || '—' %></td>
+              <td><%= u.role || '—' %></td>
+              <td><%= u.email_account || '—' %></td>
+              <td><span class="badge <%= u.is_active ? 'active' : 'inactive' %>"><%= u.is_active ? 'Active' : 'Inactive' %></span></td>
+              <td><a href="/admin/companies/<%= u.company_id %>/users/<%= u.id %>/edit" class="btn-ghost" title="Edit">✏️</a></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

@@ -1,0 +1,64 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>🔄 Process Flows</h2></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="btn btn-primary btn-sm" onclick="document.getElementById('addModal').classList.add('open')">+ New Flow</button><%- include('../partials/notif-bell') %></div>
+    </div>
+    <div class="content">
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <select onchange="location.href='/admin/flows?company='+this.value" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">All companies + templates</option>
+          <% companies.forEach(c => { %><option value="<%= c.id %>" <%= filterCo == c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        </select>
+      </div>
+      <% const templates = flows.filter(f => f.is_template); const custom = flows.filter(f => !f.is_template); %>
+      <% if (templates.length > 0) { %>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">📦 Templates (<%= templates.length %>)</div>
+      <% templates.forEach(f => { %>
+        <a href="/admin/flows/<%= f.id %>" class="item-card" style="text-decoration:none;color:inherit;border-left:3px solid var(--primary);">
+          <div class="ic-main">
+            <div class="ic-name"><%= f.title %></div>
+            <div class="ic-sub"><span class="badge active"><%= f.category || '—' %></span> · <span class="badge prospect">Template</span> · Trigger: <%= f.trigger_event || '—' %></div>
+          </div>
+        </a>
+      <% }) %>
+      <% } %>
+      <% if (custom.length > 0) { %>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin:16px 0 8px;">📄 Company Flows (<%= custom.length %>)</div>
+      <% custom.forEach(f => { %>
+        <a href="/admin/flows/<%= f.id %>" class="item-card" style="text-decoration:none;color:inherit;">
+          <div class="ic-main">
+            <div class="ic-name"><%= f.title %></div>
+            <div class="ic-sub"><%= f.company_name || 'No company' %> · <span class="badge active"><%= f.category || '—' %></span> · <span class="badge <%= f.status === 'published' ? 'paid' : 'draft' %>"><%= f.status %></span></div>
+          </div>
+        </a>
+      <% }) %>
+      <% } %>
+      <% if (flows.length === 0) { %>
+        <div class="empty"><span class="e-icon">🔄</span><div class="e-text">No process flows yet</div></div>
+      <% } %>
+    </div>
+  </div>
+</div>
+<div class="modal-bg" id="addModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <h3>New Process Flow</h3>
+    <form method="POST" action="/admin/flows">
+      <div class="form-group"><label>Title *</label><input type="text" name="title" required placeholder="e.g. Helpdesk Ticket Flow"></div>
+      <div class="form-group"><label>Description</label><textarea name="description" placeholder="What this process covers..."></textarea></div>
+      <div class="form-group"><label>Trigger Event</label><input type="text" name="trigger_event" placeholder="What starts this process? e.g. Employee reports an issue"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Category</label><select name="category"><option>IT Operations</option><option>HR-IT</option><option>Security</option><option>Incident</option><option>Change Management</option><option>Onboarding</option><option>Other</option></select></div>
+        <div class="form-group"><label>Company</label><select name="company_id"><option value="">— Template —</option><% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Owner</label><input type="text" name="owner"></div>
+        <div class="form-group"><label>Status</label><select name="status"><option value="draft">Draft</option><option value="published">Published</option></select></div>
+      </div>
+      <div class="form-actions"><button type="submit" class="btn btn-primary">Create Flow</button><button type="button" class="btn" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button></div>
+    </form>
+  </div>
+</div>
+<%- include('../partials/foot') %>

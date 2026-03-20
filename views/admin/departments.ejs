@@ -1,0 +1,33 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>🏛️ Departments</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Define departments for organizing users. <a href="/admin/roles">Manage Roles →</a></p>
+      <div class="card">
+        <h3>Current Departments (<%= depts.length %>)</h3>
+        <% depts.forEach(d => { %>
+          <div class="item-card" style="cursor:default;">
+            <div class="ic-main"><div class="ic-name"><%= d.name %></div><div class="ic-sub"><%= d.description || '' %></div></div>
+            <form method="POST" action="/admin/departments/<%= d.id %>/delete" style="display:inline" onsubmit="return confirm('Delete?')"><button class="btn-ghost">🗑️</button></form>
+          </div>
+        <% }) %>
+      </div>
+      <div class="card">
+        <h3>+ Add Department</h3>
+        <form method="POST" action="/admin/departments">
+          <div class="form-row">
+            <div class="form-group"><label>Name *</label><input type="text" name="name" required placeholder="e.g. Fleet Operations"></div>
+            <div class="form-group"><label>Description</label><input type="text" name="description" placeholder="What this department handles"></div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">Add Department</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

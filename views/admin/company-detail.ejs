@@ -1,0 +1,548 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <h2><a href="/admin/companies" style="opacity:0.4;text-decoration:none;">🏢</a> → <%= company.name %></h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;"><span class="badge <%= company.status %>"><%= company.status %></span><%- include('../partials/notif-bell') %></div>
+    </div>
+    <div class="content">
+      <!-- Tabs -->
+      <div class="tabs">
+        <% ['overview','contacts','users','servers','subscriptions','assets','inventory','agreements','invoices','tasks'].forEach(t => { %>
+          <a class="tab <%= tab === t ? 'active' : '' %>" href="/admin/companies/<%= company.id %>?tab=<%= t %>"><%= t.charAt(0).toUpperCase() + t.slice(1) %></a>
+        <% }) %>
+      </div>
+
+      <% if (tab === 'overview') { %>
+        <!-- Logo -->
+        <div class="card" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+          <% if (company.logo) { %>
+            <img src="<%= company.logo %>" alt="<%= company.name %>" style="width:80px;height:80px;object-fit:contain;border-radius:12px;border:1px solid var(--border);">
+          <% } else { %>
+            <div style="width:80px;height:80px;border-radius:12px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:900;color:var(--primary);flex-shrink:0;"><%= company.name.charAt(0).toUpperCase() %></div>
+          <% } %>
+          <div style="flex:1;min-width:200px;">
+            <h3 style="margin-bottom:4px;"><%= company.name %></h3>
+            <span class="badge <%= company.status %>"><%= company.status %></span>
+          </div>
+          <details style="width:100%;"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">🖼️ Change Logo</summary>
+            <form method="POST" action="/admin/companies/<%= company.id %>/logo" style="margin-top:8px;">
+              <div class="form-group"><label>Logo URL (paste image link)</label><input type="text" name="logo_url" value="<%= company.logo || '' %>" placeholder="https://example.com/logo.png"></div>
+              <button type="submit" class="btn btn-sm btn-primary">Save Logo</button>
+            </form>
+          </details>
+        </div>
+
+        <div class="metrics">
+          <%
+            var emailCount = users.filter(u => u.email_account).length;
+            var phoneCount = users.filter(u => u.phone).length;
+            var monthlySubCost = subs.reduce((s,x) => s + ((x.billing_cycle === 'Monthly' ? (x.cost_per_unit||0) * (x.seats||1) : 0)), 0);
+            var yearlySubCost = subs.reduce((s,x) => s + ((x.billing_cycle === 'Yearly' ? (x.cost_per_unit||0) * (x.seats||1) : 0)), 0);
+            var openTaskCount = tasks.filter(t => t.status !== 'done').length;
+          %>
+          <a href="/admin/companies/<%= company.id %>?tab=users" class="metric hi" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Users</div><div class="m-val pri"><%= users.length %></div></a>
+          <a href="/admin/companies/<%= company.id %>?tab=users" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Emails</div><div class="m-val"><%= emailCount %></div></a>
+          <a href="/admin/companies/<%= company.id %>?tab=users" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Phones</div><div class="m-val"><%= phoneCount %></div></a>
+          <a href="/admin/companies/<%= company.id %>?tab=servers" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Servers</div><div class="m-val"><%= servers.length %></div></a>
+        </div>
+        <div class="metrics">
+          <a href="/admin/companies/<%= company.id %>?tab=subscriptions" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Subscriptions</div><div class="m-val"><%= subs.length %></div></a>
+          <a href="/admin/companies/<%= company.id %>?tab=subscriptions" class="metric ok" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Monthly Sub Cost</div><div class="m-val green">$<%= monthlySubCost.toFixed(2) %></div></a>
+          <a href="/admin/companies/<%= company.id %>?tab=inventory" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Equipment</div><div class="m-val"><%= inventory.length %></div><div style="font-size:10px;color:var(--muted);margin-top:2px;">$<%= inventory.reduce((s,x) => s + ((x.cost||0) * (x.quantity||1)), 0).toFixed(2) %></div></a>
+          <a href="/admin/companies/<%= company.id %>?tab=tasks" class="metric <%= openTaskCount > 0 ? '' : 'ok' %>" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Open Tasks</div><div class="m-val"><%= openTaskCount %></div></a>
+        </div>
+        <div class="card">
+          <h3>📋 Company Info</h3>
+          <div class="card-row"><span class="label">Address</span><span class="value"><%= [company.address, company.city, company.state, company.zip].filter(Boolean).join(', ') || '—' %></span></div>
+          <div class="card-row"><span class="label">Created</span><span class="value"><%= company.created_at ? company.created_at.split('T')[0] : '—' %></span></div>
+          <div class="card-row"><span class="label">Notes</span><span class="value"><%= company.notes || '—' %></span></div>
+        </div>
+        <% if (contacts.length > 0) { %>
+        <div class="card">
+          <h3>📞 Primary Contact</h3>
+          <% const pc = contacts.find(c => c.is_primary) || contacts[0]; %>
+          <div class="card-row"><span class="label">Name</span><span class="value"><%= pc.name %></span></div>
+          <div class="card-row"><span class="label">Email</span><span class="value"><%= pc.email || '—' %></span></div>
+          <div class="card-row"><span class="label">Phone</span><span class="value"><%= pc.phone || '—' %></span></div>
+        </div>
+        <% } %>
+        <!-- Quick links -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+          <a href="/admin/companies/<%= company.id %>/email-security" class="btn btn-sm">📧 Email Security</a>
+          <a href="/admin/companies/<%= company.id %>/org-chart" class="btn btn-sm">🏛️ Org Chart</a>
+          <a href="/admin/policies?company=<%= company.id %>" class="btn btn-sm">🛡️ Security Policies</a>
+        </div>
+
+        <!-- Client portal users -->
+        <div class="card">
+          <h3>🔐 Client Portal Users</h3>
+          <% if (clientUsers.length === 0) { %>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">No client login accounts yet.</div>
+          <% } else { %>
+            <% clientUsers.forEach(cu => { %>
+              <div class="item-card" style="cursor:default;">
+                <div class="ic-main"><div class="ic-name"><%= cu.username %></div><div class="ic-sub"><%= cu.full_name || '' %> · <%= cu.email || '' %></div></div>
+                <form method="POST" action="/admin/companies/<%= company.id %>/client-users/<%= cu.id %>/delete" style="display:inline;"><button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this login?')">×</button></form>
+              </div>
+            <% }) %>
+          <% } %>
+          <details style="margin-top:12px;"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">+ Add Client Login</summary>
+            <form method="POST" action="/admin/companies/<%= company.id %>/client-users" style="margin-top:10px;">
+              <div class="form-row">
+                <div class="form-group"><label>Username</label><input type="text" name="username" required></div>
+                <div class="form-group"><label>Password</label><input type="text" name="password" required></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label>Full Name</label><input type="text" name="full_name"></div>
+                <div class="form-group"><label>Email</label><input type="email" name="email"></div>
+              </div>
+              <button type="submit" class="btn btn-primary btn-sm">Create Login</button>
+            </form>
+          </details>
+        </div>
+        <div style="margin-top:20px;"><form method="POST" action="/admin/companies/<%= company.id %>/delete" onsubmit="return confirm('DELETE this company and ALL its data? This cannot be undone.')"><button type="submit" class="btn btn-danger btn-sm">🗑️ Delete Company</button></form></div>
+
+      <% } else if (['contacts','users','servers','subscriptions','assets','inventory'].includes(tab)) { %>
+        <%
+          const tableMap = {
+            contacts: { cols: ['Name','Role','Email','Phone'], fields: ['name','role','email','phone'], dbTable: 'contacts', groupField: 'role' },
+            users: { cols: ['Name','Email','Phone','Dept','Role','Email Acct'], fields: ['name','email','phone','department','role','email_account'], dbTable: 'company_users', groupField: 'department' },
+            servers: { cols: ['Name','Type','IP','OS','Purpose','Active'], fields: ['name','type','ip','os','purpose','is_active'], dbTable: 'servers', groupField: 'type' },
+            subscriptions: { cols: ['Name','Vendor','Seats','Cost/Unit','Billing','Renewal'], fields: ['name','vendor','seats','cost_per_unit','billing_cycle','renewal_date'], dbTable: 'subscriptions', groupField: 'billing_cycle' },
+            assets: { cols: ['Name','Type','Provider','Expires'], fields: ['name','type','provider','expires_at'], dbTable: 'assets', groupField: 'type' },
+            inventory: { cols: ['Name','Type','Qty','Cost','Location','Condition','Assigned To'], fields: ['name','type','quantity','cost','location_name','condition','assigned_to'], dbTable: 'inventory', groupField: 'type', extraGroups: ['location_name','condition','assigned_to'] }
+          };
+          const cfg = tableMap[tab];
+          const allItems = { contacts, users, servers, subscriptions: subs, assets, inventory }[tab] || [];
+          // Cost summaries for subscriptions
+          var monthlyCost = 0, yearlyCost = 0;
+          if (tab === 'subscriptions') {
+            allItems.forEach(s => { var c = (s.cost_per_unit||0) * (s.seats||1); if (s.billing_cycle === 'Monthly') monthlyCost += c; else yearlyCost += c; });
+          }
+        %>
+        <% if (imported) { %>
+          <div style="background:#d1fae5;color:#065f46;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:12px;">Successfully imported <%= imported %> records.</div>
+        <% } %>
+        <% if (importError) { %>
+          <div style="background:#fee2e2;color:#991b1b;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:12px;">Import error: <%= importError %></div>
+        <% } %>
+
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('addItemModal').classList.add('open')">+ Add</button>
+          <input type="text" id="searchField" placeholder="🔍 Search <%= tab %>..." oninput="filterTable()" style="flex:1;min-width:150px;max-width:300px;padding:6px 12px;font-size:12px;">
+          <% if (cfg.groupField) { %>
+            <select id="groupByField" onchange="changeGroupBy()" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+              <option value="<%= cfg.groupField %>"><%= cfg.groupField.charAt(0).toUpperCase() + cfg.groupField.slice(1).replace('_',' ') %></option>
+              <% if (cfg.extraGroups) { cfg.extraGroups.forEach(eg => { %><option value="<%= eg %>"><%= eg.charAt(0).toUpperCase() + eg.slice(1).replace('_name','').replace('_',' ') %></option><% }) } %>
+            </select>
+            <select id="groupField" onchange="filterTable()" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+              <option value="">Filter: All</option>
+              <% var groupVals = [...new Set(allItems.map(x => x[cfg.groupField]).filter(Boolean))].sort(); %>
+              <% groupVals.forEach(g => { %><option value="<%= g %>"><%= g %></option><% }) %>
+            </select>
+          <% } %>
+          <div style="margin-left:auto;display:flex;gap:4px;">
+            <a href="/admin/companies/<%= company.id %>/<%= tab === 'users' ? 'users' : tab %>/csv-export" class="btn btn-sm" title="Export CSV">📥 Export</a>
+            <a href="/admin/companies/<%= company.id %>/<%= tab === 'users' ? 'users' : tab %>/csv-template" class="btn btn-sm" title="Download blank CSV template">📄 Template</a>
+            <button class="btn btn-sm" onclick="document.getElementById('csvImportModal').classList.add('open')" title="Import from CSV">📤 Import</button>
+          </div>
+        </div>
+
+        <% if (tab === 'subscriptions' && allItems.length > 0) { %>
+          <div class="metrics" style="margin-bottom:14px;">
+            <div class="metric ok"><div class="m-label">Monthly Cost</div><div class="m-val green">$<%= monthlyCost.toFixed(2) %></div></div>
+            <div class="metric"><div class="m-label">Yearly Cost</div><div class="m-val">$<%= yearlyCost.toFixed(2) %></div></div>
+            <div class="metric hi"><div class="m-label">Total Subs</div><div class="m-val pri"><%= allItems.length %></div></div>
+            <div class="metric"><div class="m-label">Total Seats</div><div class="m-val"><%= allItems.reduce((s,x) => s + (x.seats||0), 0) %></div></div>
+          </div>
+        <% } %>
+
+        <% if (tab === 'inventory' && allItems.length > 0) { %>
+          <%
+            var totalQty = allItems.reduce((s,x) => s + (x.quantity||1), 0);
+            var totalValue = allItems.reduce((s,x) => s + ((x.cost||0) * (x.quantity||1)), 0);
+            var goodCount = allItems.filter(x => x.condition === 'New' || x.condition === 'Good').length;
+            var repairCount = allItems.filter(x => x.condition === 'Needs Repair').length;
+            var assignedCount = allItems.filter(x => x.assigned_to).length;
+          %>
+          <div class="metrics" style="margin-bottom:14px;">
+            <div class="metric hi"><div class="m-label">Total Items</div><div class="m-val pri"><%= totalQty %></div></div>
+            <div class="metric ok"><div class="m-label">Total Value</div><div class="m-val green">$<%= totalValue.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) %></div></div>
+            <div class="metric"><div class="m-label">Good / New</div><div class="m-val"><%= goodCount %></div></div>
+            <div class="metric <%= repairCount > 0 ? 'bad' : '' %>"><div class="m-label">Needs Repair</div><div class="m-val <%= repairCount > 0 ? 'red' : '' %>"><%= repairCount %></div></div>
+          </div>
+          <div class="metrics" style="margin-bottom:14px;">
+            <div class="metric"><div class="m-label">Assigned</div><div class="m-val"><%= assignedCount %></div></div>
+            <div class="metric"><div class="m-label">Unassigned</div><div class="m-val"><%= allItems.length - assignedCount %></div></div>
+            <div class="metric"><div class="m-label">Locations</div><div class="m-val"><%= (locations||[]).length %></div></div>
+            <div class="metric"><div class="m-label">Retired</div><div class="m-val"><%= allItems.filter(x => x.condition === 'Retired').length %></div></div>
+          </div>
+
+          <!-- Value by Type breakdown -->
+          <div class="card" style="margin-bottom:14px;">
+            <h3>💰 Value by Type</h3>
+            <%
+              var typeGroups = {};
+              allItems.forEach(x => {
+                var t = x.type || 'Other';
+                if (!typeGroups[t]) typeGroups[t] = { count:0, qty:0, value:0 };
+                typeGroups[t].count++;
+                typeGroups[t].qty += (x.quantity||1);
+                typeGroups[t].value += (x.cost||0) * (x.quantity||1);
+              });
+            %>
+            <table class="tbl">
+              <thead><tr><th>Type</th><th>Items</th><th>Qty</th><th style="text-align:right;">Value</th></tr></thead>
+              <tbody>
+              <% Object.keys(typeGroups).sort().forEach(t => { var g = typeGroups[t]; %>
+                <tr><td><strong><%= t %></strong></td><td><%= g.count %></td><td><%= g.qty %></td><td style="text-align:right;font-weight:700;color:var(--success);">$<%= g.value.toFixed(2) %></td></tr>
+              <% }) %>
+              <tr style="border-top:2px solid var(--border);font-weight:800;"><td>Total</td><td><%= allItems.length %></td><td><%= totalQty %></td><td style="text-align:right;color:var(--primary);">$<%= totalValue.toFixed(2) %></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Locations panel -->
+          <% if ((locations||[]).length > 0) { %>
+          <div class="card" style="margin-bottom:14px;">
+            <h3>📍 By Location</h3>
+            <%
+              var locGroups = {};
+              allItems.forEach(x => {
+                var ln = x.location_name || 'No Location';
+                if (!locGroups[ln]) locGroups[ln] = { count:0, value:0 };
+                locGroups[ln].count++;
+                locGroups[ln].value += (x.cost||0) * (x.quantity||1);
+              });
+            %>
+            <table class="tbl">
+              <thead><tr><th>Location</th><th>Items</th><th style="text-align:right;">Value</th></tr></thead>
+              <tbody>
+              <% Object.keys(locGroups).sort().forEach(l => { var g = locGroups[l]; %>
+                <tr><td><%= l %></td><td><%= g.count %></td><td style="text-align:right;font-weight:600;">$<%= g.value.toFixed(2) %></td></tr>
+              <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <% } %>
+
+        <% } %>
+
+        <% if (tab === 'inventory') { %>
+          <!-- Manage Locations — always visible on inventory tab -->
+          <details class="card" style="margin-bottom:14px;" <%= (locations||[]).length === 0 ? 'open' : '' %>>
+            <summary style="cursor:pointer;font-weight:700;font-size:14px;">📍 Manage Locations (<%= (locations||[]).length %>)</summary>
+            <div style="margin-top:12px;">
+              <% if ((locations||[]).length === 0) { %>
+                <div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;margin-bottom:12px;">No locations yet. Add your first one below — offices, warehouses, data centers, etc.</div>
+              <% } else { %>
+                <% (locations||[]).forEach(loc => { %>
+                  <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+                    <div style="width:32px;height:32px;border-radius:8px;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;"><%= loc.type === 'Warehouse' ? '🏭' : loc.type === 'Data Center' ? '🖥️' : loc.type === 'Remote' ? '🌐' : loc.type === 'Storage' ? '📦' : '🏢' %></div>
+                    <div style="flex:1;">
+                      <strong><%= loc.name %></strong>
+                      <span style="font-size:11px;color:var(--muted);"> — <%= loc.type || 'Office' %></span>
+                      <% if (loc.address) { %><div style="font-size:11px;color:var(--muted);"><%= loc.address %></div><% } %>
+                      <% var locItemCount = allItems.filter(x => x.location_id === loc.id).length; %>
+                      <% if (locItemCount > 0) { %><div style="font-size:10px;color:var(--primary);font-weight:600;"><%= locItemCount %> item<%= locItemCount > 1 ? 's' : '' %></div><% } %>
+                    </div>
+                    <form method="POST" action="/admin/companies/<%= company.id %>/locations/<%= loc.id %>/delete" onsubmit="return confirm('Delete this location? Items will be set to No Location.')" style="display:inline;"><button type="submit" class="btn-ghost" title="Delete">🗑️</button></form>
+                  </div>
+                <% }) %>
+              <% } %>
+              <form method="POST" action="/admin/companies/<%= company.id %>/locations" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+                <div style="font-size:12px;font-weight:700;margin-bottom:8px;">+ Add New Location</div>
+                <div class="form-row">
+                  <div class="form-group"><label>Name *</label><input type="text" name="name" required placeholder="Main Office, Warehouse A..."></div>
+                  <div class="form-group"><label>Type</label><select name="type"><option>Office</option><option>Warehouse</option><option>Data Center</option><option>Remote</option><option>Storage</option><option>Other</option></select></div>
+                </div>
+                <div class="form-group"><label>Address</label><input type="text" name="address" placeholder="123 Main St, City, State"></div>
+                <button type="submit" class="btn btn-sm btn-primary">+ Add Location</button>
+              </form>
+            </div>
+          </details>
+        <% } %>
+
+        <% if (tab === 'users' && allItems.length > 0) { %>
+          <div style="margin-bottom:12px;"><a href="/admin/companies/<%= company.id %>/org-chart" class="btn btn-sm">🏛️ Org Chart</a></div>
+          <div class="metrics" style="margin-bottom:14px;">
+            <div class="metric hi"><div class="m-label">Total Users</div><div class="m-val pri"><%= allItems.length %></div></div>
+            <div class="metric ok"><div class="m-label">Active</div><div class="m-val green"><%= allItems.filter(x => x.is_active).length %></div></div>
+            <div class="metric"><div class="m-label">With Email</div><div class="m-val"><%= allItems.filter(x => x.email_account).length %></div></div>
+            <div class="metric"><div class="m-label">With Phone</div><div class="m-val"><%= allItems.filter(x => x.phone).length %></div></div>
+          </div>
+        <% } %>
+
+        <% if (allItems.length === 0) { %>
+          <div class="empty"><span class="e-icon">📭</span><div class="e-text">No <%= tab %> yet</div></div>
+        <% } else { %>
+          <div style="overflow-x:auto;">
+          <table class="tbl" id="dataTable">
+            <thead><tr><% cfg.cols.forEach(c => { %><th><%= c %></th><% }) %><th></th></tr></thead>
+            <tbody>
+            <% allItems.forEach(it => { %>
+              <tr data-search="<%= cfg.fields.map(f => (it[f]||'')).join(' ').toLowerCase() %><%= it.manufacturer ? ' ' + it.manufacturer.toLowerCase() : '' %><%= it.model ? ' ' + it.model.toLowerCase() : '' %>" data-group="<%= (it[cfg.groupField]||'').toLowerCase() %>" <% if (cfg.extraGroups) { cfg.extraGroups.forEach(eg => { %>data-<%= eg.replace('_','-') %>="<%= (it[eg]||'').toString().toLowerCase() %>" <% }) } %>>
+                <% cfg.fields.forEach((f, fi) => { %>
+                  <td>
+                    <% if (f === 'name' && tab === 'users') { %><a href="/admin/companies/<%= company.id %>/users/<%= it.id %>/profile" style="font-weight:700;"><%= it[f] || '—' %></a><% if (it.title) { %><div style="font-size:10px;color:var(--muted);"><%= it.title %></div><% } %>
+                    <% } else if (f === 'assigned_to' && it[f]) { %><% var assignedUser = users.find(u => u.name === it[f]); %><% if (assignedUser) { %><a href="/admin/companies/<%= company.id %>/users/<%= assignedUser.id %>/profile" style="font-weight:600;"><%= it[f] %></a><% } else { %><%= it[f] %><% } %>
+                    <% } else if (f === 'cost_per_unit' || f === 'cost') { %><%= (it[f]||0) > 0 ? '$' + (it[f]||0).toFixed(2) : '—' %>
+                    <% } else if (f === 'is_active') { %><span class="badge <%= it[f] ? 'active' : 'inactive' %>"><%= it[f] ? 'Active' : 'Inactive' %></span>
+                    <% } else if (f === 'condition') { %><span class="badge <%= it[f]==='New'||it[f]==='Good'?'active':it[f]==='Needs Repair'?'overdue':it[f]==='Retired'?'inactive':'draft' %>"><%= it[f] || '—' %></span>
+                    <% } else { %><%= it[f] || '—' %><% } %>
+                  </td>
+                <% }) %>
+                <td style="white-space:nowrap;">
+                  <% if (tab === 'users') { %><a href="/admin/companies/<%= company.id %>/users/<%= it.id %>/profile" class="btn-ghost" title="Profile">👤</a><% } %>
+                  <a href="/admin/companies/<%= company.id %>/<%= tab %>/<%= it.id %>/edit" class="btn-ghost" title="Edit">✏️</a><form method="POST" action="/admin/companies/<%= company.id %>/<%= cfg.dbTable %>/<%= it.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Delete?')">🗑️</button></form></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+          </div>
+          <script>
+          var currentGroupAttr = 'data-group';
+          function changeGroupBy(){
+            var sel = document.getElementById('groupByField');
+            if (!sel) return;
+            var field = sel.value;
+            currentGroupAttr = field === '<%= cfg.groupField %>' ? 'data-group' : 'data-' + field.replace('_','-');
+            // rebuild filter options
+            var vals = new Set();
+            document.querySelectorAll('#dataTable tbody tr').forEach(function(r){
+              var v = r.getAttribute(currentGroupAttr);
+              if (v) vals.add(v);
+            });
+            var gf = document.getElementById('groupField');
+            gf.innerHTML = '<option value="">Filter: All</option>';
+            Array.from(vals).sort().forEach(function(v){
+              var o = document.createElement('option');
+              o.value = v; o.textContent = v.charAt(0).toUpperCase() + v.slice(1);
+              gf.appendChild(o);
+            });
+            filterTable();
+          }
+          function filterTable(){
+            var search = (document.getElementById('searchField').value||'').toLowerCase();
+            var group = (document.getElementById('groupField')||{value:''}).value.toLowerCase();
+            var rows = document.querySelectorAll('#dataTable tbody tr');
+            rows.forEach(function(row){
+              var matchSearch = !search || row.getAttribute('data-search').indexOf(search) >= 0;
+              var matchGroup = !group || row.getAttribute(currentGroupAttr) === group;
+              row.style.display = (matchSearch && matchGroup) ? '' : 'none';
+            });
+          }
+          </script>
+        <% } %>
+
+        <!-- Add item modal -->
+        <div class="modal-bg" id="addItemModal" onclick="if(event.target===this)this.classList.remove('open')">
+          <div class="modal">
+            <h3>Add <%= tab.charAt(0).toUpperCase() + tab.slice(1).replace('_',' ') %></h3>
+            <form method="POST" action="/admin/companies/<%= company.id %>/<%= cfg.dbTable %>">
+              <% if (tab === 'contacts') { %>
+                <div class="form-row"><div class="form-group"><label>Name</label><input type="text" name="name" required></div><div class="form-group"><label>Role</label><input type="text" name="role" placeholder="Owner, Dispatcher..."></div></div>
+                <div class="form-row"><div class="form-group"><label>Email</label><input type="email" name="email"></div><div class="form-group"><label>Phone</label><input type="text" name="phone"></div></div>
+              <% } else if (tab === 'users') { %>
+                <div class="form-row"><div class="form-group"><label>Full Name *</label><input type="text" name="name" required placeholder="John Smith"></div><div class="form-group"><label>Job Title</label><input type="text" name="title" placeholder="e.g. Senior Dispatcher"></div></div>
+                <div class="form-row"><div class="form-group"><label>Personal Email</label><input type="email" name="email" placeholder="john@gmail.com"></div><div class="form-group"><label>Phone</label><input type="text" name="phone" placeholder="555-0100"></div></div>
+                <div class="form-row"><div class="form-group"><label>Department</label><select name="department"><option value="">— Select —</option><% (depts||[]).forEach(d => { %><option><%= d.name %></option><% }) %></select></div><div class="form-group"><label>Role</label><select name="role"><option value="">— Select —</option><% (roles||[]).forEach(r => { %><option><%= r.name %></option><% }) %></select></div></div>
+                <div class="form-row"><div class="form-group"><label>Company Email</label><input type="email" name="email_account" placeholder="john@company.com"></div><div class="form-group"><label>Reports To</label><select name="manager_id"><option value="">— None —</option><% (allItems||[]).forEach(u => { %><option value="<%= u.id %>"><%= u.name %></option><% }) %></select></div></div>
+                <div class="form-group"><label>Hire Date</label><input type="date" name="hire_date"></div>
+              <% } else if (tab === 'servers') { %>
+                <div class="form-row"><div class="form-group"><label>Server Name</label><input type="text" name="name" required placeholder="DC01"></div><div class="form-group"><label>Type</label><select name="type"><option>Physical</option><option>Virtual</option><option>Cloud</option></select></div></div>
+                <div class="form-row"><div class="form-group"><label>IP Address</label><input type="text" name="ip" placeholder="192.168.1.10"></div><div class="form-group"><label>OS</label><input type="text" name="os" placeholder="Windows Server 2022"></div></div>
+                <div class="form-group"><label>Purpose</label><input type="text" name="purpose" placeholder="Domain Controller, File Server..."></div>
+                <div class="form-group"><label>Location</label><select name="location"><option>On-premises</option><option>AWS</option><option>Azure</option><option>Google Cloud</option><option>Other</option></select></div>
+              <% } else if (tab === 'subscriptions') { %>
+                <div class="form-row"><div class="form-group"><label>Name</label><input type="text" name="name" required placeholder="Microsoft 365"></div><div class="form-group"><label>Vendor</label><input type="text" name="vendor" placeholder="Microsoft"></div></div>
+                <div class="form-row-3"><div class="form-group"><label>Seats</label><input type="number" name="seats" value="1"></div><div class="form-group"><label>Cost/Unit</label><input type="number" name="cost_per_unit" step="0.01" placeholder="22.00"></div><div class="form-group"><label>Billing</label><select name="billing_cycle"><option>Monthly</option><option>Yearly</option></select></div></div>
+                <div class="form-group"><label>Renewal Date</label><input type="date" name="renewal_date"></div>
+              <% } else if (tab === 'assets') { %>
+                <div class="form-row"><div class="form-group"><label>Name</label><input type="text" name="name" required placeholder="example.com"></div><div class="form-group"><label>Type</label><select name="type"><option>Domain</option><option>Website</option><option>SSL Certificate</option><option>Email Account</option><option>Cloud Account</option><option>Social Media</option><option>Other</option></select></div></div>
+                <div class="form-row"><div class="form-group"><label>Provider</label><input type="text" name="provider" placeholder="GoDaddy, Cloudflare..."></div><div class="form-group"><label>Expires</label><input type="date" name="expires_at"></div></div>
+                <div class="form-group"><label>Login URL</label><input type="text" name="login_url" placeholder="https://..."></div>
+              <% } else if (tab === 'inventory') { %>
+                <div class="form-row"><div class="form-group"><label>Name *</label><input type="text" name="name" required placeholder="Dell OptiPlex 7090"></div><div class="form-group"><label>Type</label><select name="type"><option>Desktop</option><option>Laptop</option><option>Monitor</option><option>Printer</option><option>Router</option><option>Switch</option><option>Firewall</option><option>UPS</option><option>Phone</option><option>Tablet</option><option>Server</option><option>Cable</option><option>Accessory</option><option>Other</option></select></div></div>
+                <div class="form-row"><div class="form-group"><label>Manufacturer</label><input type="text" name="manufacturer" placeholder="Dell, HP, Lenovo..."></div><div class="form-group"><label>Model</label><input type="text" name="model" placeholder="OptiPlex 7090, ThinkPad X1..."></div></div>
+                <div class="form-row"><div class="form-group"><label>Serial Number</label><input type="text" name="serial_number"></div><div class="form-group"><label>Condition</label><select name="condition"><option>New</option><option>Good</option><option>Fair</option><option>Needs Repair</option><option>Retired</option></select></div></div>
+                <div class="form-row-3"><div class="form-group"><label>Quantity</label><input type="number" name="quantity" value="1" min="1"></div><div class="form-group"><label>Unit Cost ($)</label><input type="number" name="cost" step="0.01" placeholder="0.00"></div><div class="form-group"><label>Location</label><select name="location_id"><option value="">— No Location —</option><% (locations||[]).forEach(l => { %><option value="<%= l.id %>"><%= l.name %></option><% }) %></select></div></div>
+                <div class="form-row"><div class="form-group"><label>Purchase Date</label><input type="date" name="purchase_date"></div><div class="form-group"><label>Warranty Expires</label><input type="date" name="warranty_expires"></div></div>
+                <div class="form-group"><label>Assigned To</label><select name="assigned_to"><option value="">— Unassigned —</option><% users.forEach(u => { %><option value="<%= u.name %>"><%= u.name %><%= u.department ? ' (' + u.department + ')' : '' %><%= u.role ? ' — ' + u.role : '' %></option><% }) %></select></div>
+              <% } %>
+              <div class="form-group"><label>Notes</label><textarea name="notes" placeholder="Optional notes..."></textarea></div>
+              <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('addItemModal').classList.remove('open')">Cancel</button></div>
+            </form>
+          </div>
+        </div>
+
+        <!-- CSV Import modal -->
+        <div class="modal-bg" id="csvImportModal" onclick="if(event.target===this)this.classList.remove('open')">
+          <div class="modal">
+            <h3>📤 Import <%= tab.charAt(0).toUpperCase() + tab.slice(1) %> from CSV</h3>
+            <form method="POST" action="/admin/companies/<%= company.id %>/<%= tab === 'users' ? 'users' : tab %>/csv-import" enctype="multipart/form-data">
+              <div style="margin-bottom:14px;">
+                <p style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:10px;">Upload a CSV file to bulk-import records. First row must be column headers.</p>
+                <p style="font-size:11px;color:var(--muted);margin-bottom:8px;"><strong>Required column:</strong> <code>name</code></p>
+                <p style="font-size:11px;color:var(--muted);margin-bottom:12px;"><strong>Available columns:</strong> <code><%= cfg.fields ? cfg.fields.join(', ') : '' %></code></p>
+                <a href="/admin/companies/<%= company.id %>/<%= tab === 'users' ? 'users' : tab %>/csv-template" style="font-size:11px;">Download blank template</a>
+              </div>
+              <div class="form-group">
+                <label>CSV File</label>
+                <input type="file" name="csvfile" accept=".csv" required style="padding:8px;">
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Import</button>
+                <button type="button" class="btn" onclick="document.getElementById('csvImportModal').classList.remove('open')">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+      <% } else if (tab === 'agreements') { %>
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('addAgrModal').classList.add('open')" style="margin-bottom:16px;">+ Add Agreement</button>
+        <% if (agreements.length === 0) { %>
+          <div class="empty"><span class="e-icon">📋</span><div class="e-text">No service agreements</div></div>
+        <% } else { %>
+          <table class="tbl">
+            <thead><tr><th>Service</th><th>Price</th><th>Billing</th><th>Start</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            <% agreements.forEach(a => { %>
+              <tr>
+                <td><strong><%= a.service_name || '?' %></strong></td>
+                <td>$<%= (a.custom_price || a.base_price || 0).toFixed(2) %></td>
+                <td><%= a.billing_cycle || '—' %></td>
+                <td><%= a.start_date || '—' %></td>
+                <td><span class="badge <%= a.is_active ? 'active' : 'inactive' %>"><%= a.is_active ? 'Active' : 'Inactive' %></span></td>
+                <td><form method="POST" action="/admin/companies/<%= company.id %>/agreements/<%= a.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Delete?')">🗑️</button></form></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+        <div class="modal-bg" id="addAgrModal" onclick="if(event.target===this)this.classList.remove('open')">
+          <div class="modal">
+            <h3>Add Service Agreement</h3>
+            <form method="POST" action="/admin/companies/<%= company.id %>/agreements">
+              <div class="form-group"><label>Service</label><select name="service_id"><% allServices.forEach(s => { %><option value="<%= s.id %>"><%= s.name %> ($<%= s.base_price.toFixed(2) %>/<%= s.price_type %>)</option><% }) %><% if (allServices.length === 0) { %><option value="">No services — add in Services page first</option><% } %></select></div>
+              <div class="form-row-3"><div class="form-group"><label>Custom Price</label><input type="number" name="custom_price" step="0.01" placeholder="Leave blank for default"></div><div class="form-group"><label>Billing Cycle</label><select name="billing_cycle"><option>Monthly</option><option>Yearly</option><option>One-time</option></select></div><div class="form-group"><label>Start Date</label><input type="date" name="start_date"></div></div>
+              <div class="form-group"><label>Notes</label><textarea name="notes"></textarea></div>
+              <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('addAgrModal').classList.remove('open')">Cancel</button></div>
+            </form>
+          </div>
+        </div>
+
+      <% } else if (tab === 'invoices') { %>
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('addInvModal').classList.add('open')" style="margin-bottom:16px;">+ Create Invoice</button>
+        <% if (invoices.length === 0) { %>
+          <div class="empty"><span class="e-icon">💳</span><div class="e-text">No invoices</div></div>
+        <% } else { %>
+          <table class="tbl">
+            <thead><tr><th>#</th><th>Date</th><th>Total</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            <% invoices.forEach(inv => { %>
+              <tr>
+                <td><%= inv.invoice_number || '—' %></td>
+                <td><%= inv.date || '—' %></td>
+                <td><strong>$<%= (inv.total||0).toFixed(2) %></strong></td>
+                <td><span class="badge <%= inv.status %>"><%= inv.status %></span></td>
+                <td>
+                  <% if (inv.status !== 'paid') { %><form method="POST" action="/admin/invoices/<%= inv.id %>/pay" style="display:inline"><input type="hidden" name="redirect" value="/admin/companies/<%= company.id %>?tab=invoices"><button type="submit" class="btn btn-sm btn-primary">✓ Paid</button></form><% } %>
+                  <form method="POST" action="/admin/invoices/<%= inv.id %>/delete" style="display:inline"><input type="hidden" name="redirect" value="/admin/companies/<%= company.id %>?tab=invoices"><button type="submit" class="btn-ghost" onclick="return confirm('Delete?')">🗑️</button></form>
+                </td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+        <div class="modal-bg" id="addInvModal" onclick="if(event.target===this)this.classList.remove('open')">
+          <div class="modal">
+            <h3>Create Invoice</h3>
+            <form method="POST" action="/admin/invoices">
+              <input type="hidden" name="company_id" value="<%= company.id %>">
+              <input type="hidden" name="redirect" value="/admin/companies/<%= company.id %>?tab=invoices">
+              <div class="form-row"><div class="form-group"><label>Date</label><input type="date" name="date" value="<%= new Date().toISOString().slice(0,10) %>"></div><div class="form-group"><label>Due Date</label><input type="date" name="due_date"></div></div>
+              <div class="form-group"><label>Description</label><input type="text" name="description" placeholder="Managed IT Support — March 2026"></div>
+              <div class="form-row"><div class="form-group"><label>Amount</label><input type="number" name="amount" step="0.01" required placeholder="500.00"></div><div class="form-group"><label>Status</label><select name="status"><option value="sent">Sent</option><option value="draft">Draft</option><option value="paid">Paid</option></select></div></div>
+              <div class="form-actions"><button type="submit" class="btn btn-primary">Create Invoice</button><button type="button" class="btn" onclick="document.getElementById('addInvModal').classList.remove('open')">Cancel</button></div>
+            </form>
+          </div>
+        </div>
+
+      <% } else if (tab === 'tasks') { %>
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('addTaskModal').classList.add('open')" style="margin-bottom:16px;">+ Add Task</button>
+        <% const openTasks = tasks.filter(t => t.status !== 'done'); const doneTasks = tasks.filter(t => t.status === 'done'); %>
+        <% if (tasks.length === 0) { %>
+          <div class="empty"><span class="e-icon">✅</span><div class="e-text">No tasks for this company</div></div>
+        <% } else { %>
+          <% if (openTasks.length > 0) { %>
+            <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Open (<%= openTasks.length %>)</div>
+            <% openTasks.forEach(t => { %>
+              <div class="item-card" style="cursor:default;align-items:flex-start;">
+                <div style="margin-right:10px;margin-top:2px;">
+                  <form method="POST" action="/admin/tasks/<%= t.id %>/status" style="display:inline">
+                    <input type="hidden" name="status" value="done">
+                    <input type="hidden" name="redirect" value="/admin/companies/<%= company.id %>?tab=tasks">
+                    <button type="submit" style="background:none;border:2px solid var(--border);width:22px;height:22px;border-radius:6px;cursor:pointer;" title="Mark done">&nbsp;</button>
+                  </form>
+                </div>
+                <div class="ic-main">
+                  <div class="ic-name"><%= t.title %></div>
+                  <div class="ic-sub">
+                    <% if (t.assigned_to) { %>👤 <%= t.assigned_to %> · <% } %>
+                    <% if (t.due_date) { %>📅 <%= t.due_date %> · <% } %>
+                    <span class="badge <%= t.priority === 'urgent' ? 'overdue' : t.priority === 'high' ? 'sent' : t.priority === 'low' ? 'inactive' : 'active' %>"><%= t.priority %></span>
+                    <span class="badge <%= t.status === 'in-progress' ? 'sent' : 'prospect' %>"><%= t.status %></span>
+                  </div>
+                  <% if (t.description) { %><div style="font-size:11px;color:#475569;margin-top:3px;"><%= t.description %></div><% } %>
+                </div>
+                <form method="POST" action="/admin/tasks/<%= t.id %>/delete" style="display:inline">
+                  <input type="hidden" name="redirect" value="/admin/companies/<%= company.id %>?tab=tasks">
+                  <button type="submit" class="btn-ghost" onclick="return confirm('Delete?')">🗑️</button>
+                </form>
+              </div>
+            <% }) %>
+          <% } %>
+          <% if (doneTasks.length > 0) { %>
+            <div style="font-size:12px;font-weight:700;color:var(--muted);margin:16px 0 8px;text-transform:uppercase;">Done (<%= doneTasks.length %>)</div>
+            <% doneTasks.forEach(t => { %>
+              <div class="item-card" style="cursor:default;opacity:0.6;">
+                <div style="margin-right:10px;margin-top:2px;"><span style="color:var(--success);font-size:18px;">✅</span></div>
+                <div class="ic-main"><div class="ic-name" style="text-decoration:line-through;"><%= t.title %></div></div>
+                <form method="POST" action="/admin/tasks/<%= t.id %>/delete" style="display:inline">
+                  <input type="hidden" name="redirect" value="/admin/companies/<%= company.id %>?tab=tasks">
+                  <button type="submit" class="btn-ghost" onclick="return confirm('Delete?')">🗑️</button>
+                </form>
+              </div>
+            <% }) %>
+          <% } %>
+        <% } %>
+
+        <div class="modal-bg" id="addTaskModal" onclick="if(event.target===this)this.classList.remove('open')">
+          <div class="modal">
+            <h3>Add Task for <%= company.name %></h3>
+            <form method="POST" action="/admin/companies/<%= company.id %>/tasks">
+              <div class="form-group"><label>Title *</label><input type="text" name="title" required placeholder="What needs to be done?"></div>
+              <div class="form-group"><label>Description</label><textarea name="description" placeholder="Details..."></textarea></div>
+              <div class="form-row">
+                <div class="form-group"><label>Priority</label><select name="priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
+                <div class="form-group"><label>Due Date</label><input type="date" name="due_date"></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label>Assigned To</label><select name="assigned_to"><option value="">— Unassigned —</option><% (allPeople || []).forEach(p => { %><option value="<%= p.name %>"><%= p.name %></option><% }) %></select></div>
+                <div class="form-group"><label>Related To</label><select name="related_table"><option value="">— None —</option><option value="servers">Server</option><option value="subscriptions">Subscription</option><option value="assets">Asset</option><option value="inventory">Inventory</option></select></div>
+              </div>
+              <div class="form-actions"><button type="submit" class="btn btn-primary">Add Task</button><button type="button" class="btn" onclick="document.getElementById('addTaskModal').classList.remove('open')">Cancel</button></div>
+            </form>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

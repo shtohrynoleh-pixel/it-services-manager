@@ -1,0 +1,122 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>?tab=users" style="opacity:0.4;text-decoration:none;">👥</a> → <%= usr.name %></h2></div>
+      <div style="display:flex;align-items:center;gap:8px;"><span class="badge <%= usr.is_active ? 'active' : 'inactive' %>"><%= usr.is_active ? 'Active' : 'Inactive' %></span><%- include('../partials/notif-bell') %></div>
+    </div>
+    <div class="content">
+      <!-- Profile header -->
+      <div class="card" style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+        <% if (usr.photo_url) { %>
+          <img src="<%= usr.photo_url %>" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--border);">
+        <% } else { %>
+          <div style="width:80px;height:80px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;color:var(--primary);flex-shrink:0;"><%= usr.name.charAt(0).toUpperCase() %></div>
+        <% } %>
+        <div style="flex:1;min-width:200px;">
+          <h3 style="margin-bottom:2px;font-size:20px;"><%= usr.name %></h3>
+          <% if (usr.title) { %><div style="font-size:13px;color:var(--muted);margin-bottom:6px;"><%= usr.title %></div><% } %>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <% if (usr.role) { %><span class="badge active"><%= usr.role %></span><% } %>
+            <% if (usr.department) { %><span class="badge prospect"><%= usr.department %></span><% } %>
+          </div>
+        </div>
+        <a href="/admin/companies/<%= company.id %>/users/<%= usr.id %>/edit" class="btn btn-sm">✏️ Edit</a>
+      </div>
+
+      <!-- Contact info -->
+      <div class="card">
+        <h3>📋 Contact Info</h3>
+        <div class="card-row"><span class="label">Company</span><span class="value"><a href="/admin/companies/<%= company.id %>"><%= company.name %></a></span></div>
+        <div class="card-row"><span class="label">Personal Email</span><span class="value"><%= usr.email || '—' %></span></div>
+        <div class="card-row"><span class="label">Company Email</span><span class="value" style="color:var(--primary);font-weight:700;"><%= usr.email_account || '—' %></span></div>
+        <div class="card-row"><span class="label">Phone</span><span class="value"><%= usr.phone || '—' %></span></div>
+        <div class="card-row"><span class="label">Hire Date</span><span class="value"><%= usr.hire_date || '—' %></span></div>
+        <% if (manager) { %><div class="card-row"><span class="label">Reports To</span><span class="value"><a href="/admin/companies/<%= company.id %>/users/<%= manager.id %>/profile"><%= manager.name %></a><% if (manager.title) { %> (<%= manager.title %>)<% } %></span></div><% } %>
+      </div>
+
+      <!-- Manager assignment -->
+      <div class="card">
+        <h3>👤 Reporting Structure</h3>
+        <form method="POST" action="/admin/companies/<%= company.id %>/users/<%= usr.id %>/set-manager" style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;">
+          <div class="form-group" style="flex:1;margin:0;"><label>Reports To</label><select name="manager_id"><option value="">— No manager —</option><% allUsers.forEach(u => { %><option value="<%= u.id %>" <%= usr.manager_id === u.id ? 'selected' : '' %>><%= u.name %><% if (u.title) { %> (<%= u.title %>)<% } %></option><% }) %></select></div>
+          <button type="submit" class="btn btn-sm btn-primary">Save</button>
+        </form>
+        <% if (directReports.length > 0) { %>
+          <div style="font-size:12px;font-weight:700;color:var(--muted);margin:12px 0 8px;">DIRECT REPORTS (<%= directReports.length %>)</div>
+          <% directReports.forEach(dr => { %>
+            <a href="/admin/companies/<%= company.id %>/users/<%= dr.id %>/profile" class="item-card" style="text-decoration:none;color:inherit;">
+              <div class="ic-main"><div class="ic-name"><%= dr.name %></div><div class="ic-sub"><%= dr.title || '' %> · <%= dr.role || '' %> · <%= dr.department || '' %></div></div>
+            </a>
+          <% }) %>
+        <% } %>
+      </div>
+
+      <!-- Assigned Equipment -->
+      <div class="card">
+        <h3>🔧 Assigned Equipment (<%= assignedEquip.length %>)</h3>
+        <% if (assignedEquip.length === 0) { %>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">No equipment assigned</div>
+        <% } else { %>
+          <% assignedEquip.forEach(eq => { %>
+            <div class="item-card" style="cursor:default;"><div class="ic-main"><div class="ic-name"><%= eq.name %></div><div class="ic-sub"><%= eq.type || '' %> · SN: <%= eq.serial_number || '—' %> · <span class="badge <%= eq.condition === 'Good' || eq.condition === 'New' ? 'active' : eq.condition === 'Needs Repair' ? 'overdue' : 'inactive' %>"><%= eq.condition %></span></div></div></div>
+          <% }) %>
+        <% } %>
+        <details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">+ Assign Equipment</summary>
+          <form method="POST" action="/admin/companies/<%= company.id %>/users/<%= usr.id %>/assign-equipment" style="display:flex;gap:8px;margin-top:8px;">
+            <select name="inventory_id" style="flex:1;">
+              <option value="">Select equipment...</option>
+              <% const inventory = assignedEquip; /* already have it */ %>
+            </select>
+            <button type="submit" class="btn btn-sm btn-primary">Assign</button>
+          </form>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;">Go to <a href="/admin/companies/<%= company.id %>?tab=inventory">Inventory tab</a> to assign equipment by setting "Assigned To" field to this user's name.</div>
+        </details>
+      </div>
+
+      <!-- Assigned Software -->
+      <div class="card">
+        <h3>💻 Assigned Software (<%= assignedSoftware.length %>)</h3>
+        <% if (assignedSoftware.length > 0) { %>
+          <table class="tbl">
+            <thead><tr><th>Software</th><th>Vendor</th><th>License Key</th><th>Cost</th><th></th></tr></thead>
+            <tbody>
+            <% assignedSoftware.forEach(sw => { %>
+              <tr>
+                <td><strong><%= sw.name %></strong></td>
+                <td><%= sw.vendor || '—' %></td>
+                <td style="font-family:monospace;font-size:11px;"><%= sw.license_key || '—' %></td>
+                <td>$<%= (sw.cost||0).toFixed(2) %></td>
+                <td><form method="POST" action="/admin/companies/<%= company.id %>/users/<%= usr.id %>/software/<%= sw.id %>/delete" style="display:inline"><button class="btn-ghost" onclick="return confirm('Remove?')">🗑️</button></form></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+        <details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">+ Add Software License</summary>
+          <form method="POST" action="/admin/companies/<%= company.id %>/users/<%= usr.id %>/assign-software" style="margin-top:8px;">
+            <div class="form-row"><div class="form-group"><label>Software Name</label><input type="text" name="name" required placeholder="Microsoft Office, QuickBooks..."></div><div class="form-group"><label>Vendor</label><input type="text" name="vendor" placeholder="Microsoft"></div></div>
+            <div class="form-row"><div class="form-group"><label>License Key</label><input type="text" name="license_key" placeholder="XXXX-XXXX-XXXX"></div><div class="form-group"><label>Monthly Cost ($)</label><input type="number" name="cost" step="0.01" placeholder="0.00"></div></div>
+            <button type="submit" class="btn btn-sm btn-primary">Add Software</button>
+          </form>
+        </details>
+      </div>
+
+      <!-- User's tasks -->
+      <% if (tasks.length > 0) { %>
+      <div class="card">
+        <h3>✅ Tasks (<%= tasks.length %>)</h3>
+        <% tasks.forEach(t => { %>
+          <div class="item-card" style="cursor:default;"><div class="ic-main"><div class="ic-name" style="<%= t.status === 'done' ? 'text-decoration:line-through;opacity:0.5;' : '' %>"><%= t.title %></div><div class="ic-sub"><span class="badge <%= t.status === 'done' ? 'paid' : t.status === 'in-progress' ? 'sent' : 'prospect' %>"><%= t.status %></span> · <span class="badge <%= t.priority === 'urgent' ? 'overdue' : t.priority === 'high' ? 'sent' : 'active' %>"><%= t.priority %></span><% if (t.due_date) { %> · 📅 <%= t.due_date %><% } %></div></div></div>
+        <% }) %>
+      </div>
+      <% } %>
+
+      <% if (usr.notes) { %>
+      <div class="card"><h3>📝 Notes</h3><div style="font-size:13px;white-space:pre-wrap;"><%= usr.notes %></div></div>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

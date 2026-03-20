@@ -1,0 +1,233 @@
+<%- include('../partials/head') %>
+<style>
+.intg-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:16px;}
+.intg-header{display:flex;align-items:center;gap:14px;margin-bottom:16px;}
+.intg-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+.intg-title{font-size:16px;font-weight:800;}
+.intg-desc{font-size:12px;color:var(--muted);margin-top:2px;}
+.intg-status{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;margin-left:auto;}
+.intg-status.ok{background:#d1fae5;color:#065f46;}
+.intg-status.no{background:#fee2e2;color:#991b1b;}
+.intg-field{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;}
+.intg-field-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:4px;}
+.intg-field-hint{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.5;}
+.intg-actions{display:flex;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+.pw-field{position:relative;}
+.pw-field input{padding-right:60px;}
+.pw-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:11px;color:var(--primary);cursor:pointer;font-weight:600;}
+</style>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>🔌 Integrations</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+
+      <!-- GMAIL SMTP -->
+      <div class="intg-card">
+        <div class="intg-header">
+          <div class="intg-icon" style="background:#fee2e2;">📧</div>
+          <div>
+            <div class="intg-title">Gmail Email Alerts</div>
+            <div class="intg-desc">Send monitoring alerts via Gmail SMTP using App Password (2FA required)</div>
+          </div>
+          <div class="intg-status <%= gmailOk ? 'ok' : 'no' %>">
+            <div style="width:8px;height:8px;border-radius:50%;background:<%= gmailOk ? '#10b981' : '#ef4444' %>;"></div>
+            <%= gmailOk ? 'Connected' : 'Not configured' %>
+          </div>
+        </div>
+        <form method="POST" action="/admin/integrations/gmail">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Gmail Address</label>
+              <input type="email" name="gmail_user" value="<%= s.gmail_user || '' %>" placeholder="your-email@gmail.com">
+              <div class="intg-field-hint">The Gmail account that sends alert emails</div>
+            </div>
+            <div class="form-group">
+              <label>App Password</label>
+              <div class="pw-field">
+                <input type="password" name="gmail_app_password" id="gmailPw" value="<%= s.gmail_app_password || '' %>" placeholder="xxxx-xxxx-xxxx-xxxx">
+                <button type="button" class="pw-toggle" onclick="togglePw('gmailPw')">Show</button>
+              </div>
+              <div class="intg-field-hint">Get from <a href="https://myaccount.google.com/apppasswords" target="_blank">Google App Passwords</a> (requires 2FA)</div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Alert Recipients (comma-separated emails)</label>
+            <input type="text" name="alert_emails" value="<%= s.alert_emails || '' %>" placeholder="admin@company.com, manager@company.com">
+            <div class="intg-field-hint">Who receives email alerts when monitors go down</div>
+          </div>
+          <div class="intg-actions">
+            <button type="submit" class="btn btn-primary btn-sm">💾 Save Gmail Settings</button>
+            <% if (gmailOk) { %>
+              <form method="POST" action="/admin/integrations/test-email" style="display:inline;"><button type="submit" class="btn btn-sm">📧 Send Test Email</button></form>
+            <% } %>
+          </div>
+        </form>
+      </div>
+
+      <!-- TWILIO SMS -->
+      <div class="intg-card">
+        <div class="intg-header">
+          <div class="intg-icon" style="background:#e0e7ff;">📱</div>
+          <div>
+            <div class="intg-title">Twilio SMS Alerts</div>
+            <div class="intg-desc">Send SMS notifications when critical monitors go down</div>
+          </div>
+          <div class="intg-status <%= twilioOk ? 'ok' : 'no' %>">
+            <div style="width:8px;height:8px;border-radius:50%;background:<%= twilioOk ? '#10b981' : '#ef4444' %>;"></div>
+            <%= twilioOk ? 'Connected' : 'Not configured' %>
+          </div>
+        </div>
+        <form method="POST" action="/admin/integrations/twilio">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Account SID</label>
+              <input type="text" name="twilio_sid" value="<%= s.twilio_sid || '' %>" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxx">
+              <div class="intg-field-hint">From <a href="https://console.twilio.com" target="_blank">Twilio Console</a> dashboard</div>
+            </div>
+            <div class="form-group">
+              <label>Auth Token</label>
+              <div class="pw-field">
+                <input type="password" name="twilio_token" id="twilioPw" value="<%= s.twilio_token || '' %>" placeholder="Your auth token">
+                <button type="button" class="pw-toggle" onclick="togglePw('twilioPw')">Show</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Twilio Phone Number</label>
+              <input type="text" name="twilio_from" value="<%= s.twilio_from || '' %>" placeholder="+1234567890">
+              <div class="intg-field-hint">Your Twilio phone number (with country code)</div>
+            </div>
+            <div class="form-group">
+              <label>Alert Phone Numbers (comma-separated)</label>
+              <input type="text" name="alert_phones" value="<%= s.alert_phones || '' %>" placeholder="+1234567890, +0987654321">
+              <div class="intg-field-hint">Who receives SMS alerts</div>
+            </div>
+          </div>
+          <div class="intg-actions">
+            <button type="submit" class="btn btn-primary btn-sm">💾 Save Twilio Settings</button>
+            <% if (twilioOk) { %>
+              <form method="POST" action="/admin/integrations/test-sms" style="display:inline;"><button type="submit" class="btn btn-sm">📱 Send Test SMS</button></form>
+            <% } %>
+          </div>
+        </form>
+      </div>
+
+      <!-- WEBHOOKS -->
+      <div class="intg-card">
+        <div class="intg-header">
+          <div class="intg-icon" style="background:#fef3c7;">🔗</div>
+          <div>
+            <div class="intg-title">Incoming Webhooks</div>
+            <div class="intg-desc">Accept alerts from external services (UptimeRobot, Grafana, Google Alerts, etc.)</div>
+          </div>
+          <div class="intg-status ok">
+            <div style="width:8px;height:8px;border-radius:50%;background:#10b981;"></div>
+            Always Active
+          </div>
+        </div>
+
+        <div class="intg-field">
+          <div class="intg-field-label">Webhook URL</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <code style="flex:1;background:#e2e8f0;padding:8px 12px;border-radius:6px;font-size:12px;word-break:break-all;" id="webhookUrl">POST https://YOUR-SERVER:3000/api/webhook/alert</code>
+            <button class="btn btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('webhookUrl').textContent)">📋 Copy</button>
+          </div>
+          <div class="intg-field-hint">Point your external monitoring tools to this URL</div>
+        </div>
+
+        <div class="intg-field">
+          <div class="intg-field-label">Request Format</div>
+          <pre style="background:#1e293b;color:#e2e8f0;padding:14px;border-radius:8px;font-size:11px;overflow-x:auto;margin:0;line-height:1.6;">POST /api/webhook/alert
+Content-Type: application/json
+
+{
+  "title": "Server CPU at 95%",
+  "description": "Production server is overloaded",
+  "severity": "critical",   // critical | warning | info
+  "source": "grafana"       // name of the sending tool
+}</pre>
+        </div>
+
+        <div class="intg-field">
+          <div class="intg-field-label">Example: cURL Test</div>
+          <pre style="background:#1e293b;color:#e2e8f0;padding:14px;border-radius:8px;font-size:11px;overflow-x:auto;margin:0;">curl -X POST http://localhost:3000/api/webhook/alert \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Test Alert","severity":"info","source":"curl"}'</pre>
+        </div>
+
+        <div class="intg-actions">
+          <form method="POST" action="/admin/integrations/test-webhook"><button type="submit" class="btn btn-sm btn-primary">🧪 Create Test Alert</button></form>
+          <a href="/admin/alerts" class="btn btn-sm">🔔 View Alerts</a>
+        </div>
+      </div>
+
+      <!-- PER-COMPANY WEBHOOKS -->
+      <div class="intg-card">
+        <div class="intg-header">
+          <div class="intg-icon" style="background:#e0e7ff;">🏢</div>
+          <div>
+            <div class="intg-title">Per-Company Webhooks</div>
+            <div class="intg-desc">Unique webhook URL for each company — alerts are tagged with the company name</div>
+          </div>
+        </div>
+        <% var webhookKeys = {}; try { webhookKeys = JSON.parse(s.webhook_keys || '{}'); } catch(e) {} %>
+        <div style="margin-bottom:12px;">
+          <% if (Object.keys(webhookKeys).length === 0) { %>
+            <div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;">No company webhooks yet. Generate one below.</div>
+          <% } %>
+          <% Object.keys(webhookKeys).forEach(key => { var coId = webhookKeys[key]; var co = companies.find(c => c.id === coId); %>
+            <div class="intg-field" style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;">
+                <div class="intg-field-label"><%= co ? co.name : 'Company #' + coId %></div>
+                <code style="font-size:11px;word-break:break-all;">POST /api/webhook/company/<%= key %></code>
+              </div>
+              <button class="btn btn-sm" onclick="navigator.clipboard.writeText(location.origin+'/api/webhook/company/<%= key %>')">📋</button>
+              <form method="POST" action="/admin/integrations/webhook-delete" style="display:inline;">
+                <input type="hidden" name="key" value="<%= key %>">
+                <button type="submit" class="btn-ghost" onclick="return confirm('Delete this webhook?')">🗑️</button>
+              </form>
+            </div>
+          <% }) %>
+        </div>
+        <form method="POST" action="/admin/integrations/webhook-company" style="display:flex;gap:8px;align-items:flex-end;">
+          <div class="form-group" style="flex:1;margin-bottom:0;">
+            <label>Company</label>
+            <select name="company_id" required>
+              <option value="">— Select company —</option>
+              <% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary">Generate Webhook</button>
+        </form>
+        <div class="intg-field-hint" style="margin-top:8px;">Each company gets a unique URL. Alerts sent to it are automatically tagged with the company name.</div>
+      </div>
+
+      <!-- HOW ALERTS WORK -->
+      <div class="intg-card" style="background:linear-gradient(135deg,#ecfeff,#cffafe);border-color:var(--primary);">
+        <h3 style="font-size:15px;font-weight:800;margin-bottom:12px;">📋 How Alerts Work</h3>
+        <div style="font-size:12px;line-height:1.8;color:#374151;">
+          <strong>1. Monitoring checks run every 60 seconds</strong> — each monitor has its own interval<br>
+          <strong>2. When a monitor goes DOWN:</strong><br>
+          &nbsp;&nbsp;→ Alert record created in <a href="/admin/alerts">Alerts dashboard</a><br>
+          &nbsp;&nbsp;→ Email sent to all recipients (if Gmail configured)<br>
+          &nbsp;&nbsp;→ SMS sent to all phone numbers (if Twilio configured)<br>
+          <strong>3. When a monitor RECOVERS:</strong><br>
+          &nbsp;&nbsp;→ Recovery email + SMS sent<br>
+          &nbsp;&nbsp;→ Alert auto-resolved in dashboard<br>
+          <strong>4. External webhooks</strong> create alerts that you resolve manually<br>
+          <strong>5. All alerts visible at</strong> <a href="/admin/alerts">/admin/alerts</a> with resolve buttons
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script>
+function togglePw(id){var el=document.getElementById(id);if(el.type==='password'){el.type='text';el.nextElementSibling.textContent='Hide';}else{el.type='password';el.nextElementSibling.textContent='Show';}}
+</script>
+<%- include('../partials/foot') %>

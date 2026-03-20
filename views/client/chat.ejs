@@ -1,0 +1,433 @@
+<%- include('../partials/head') %>
+<style>
+.chat-wrap{display:flex;height:calc(100vh - 60px);overflow:hidden;}
+.chat-sidebar{width:280px;border-right:1px solid var(--border);background:var(--card);display:flex;flex-direction:column;flex-shrink:0;}
+.chat-sidebar-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.chat-sidebar-head h3{font-size:14px;font-weight:800;}
+.ch-search{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;outline:none;margin:8px 12px;box-sizing:border-box;width:calc(100% - 24px);}
+.ch-search:focus{border-color:var(--primary);}
+.ch-list{flex:1;overflow-y:auto;padding:4px 0;}
+.ch-item{display:flex;gap:10px;padding:10px 16px;cursor:pointer;border-left:3px solid transparent;transition:all 0.1s;align-items:flex-start;}
+.ch-item:hover{background:var(--bg);}
+.ch-item.active{background:var(--primary-light);border-left-color:var(--primary);}
+.ch-icon{width:36px;height:36px;border-radius:10px;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;font-weight:700;}
+.ch-item.active .ch-icon{background:var(--primary);color:#fff;}
+.ch-info{flex:1;min-width:0;}
+.ch-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ch-preview{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+.ch-meta{text-align:right;flex-shrink:0;}
+.ch-time{font-size:10px;color:var(--muted);}
+.ch-unread{background:var(--primary);color:#fff;font-size:9px;font-weight:800;border-radius:10px;padding:1px 6px;margin-top:4px;display:inline-block;}
+.chat-main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);}
+.chat-header{padding:12px 20px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.chat-header h3{font-size:15px;font-weight:800;}
+.chat-header-sub{font-size:11px;color:var(--muted);}
+.chat-messages{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:4px;}
+.msg{max-width:75%;padding:8px 14px;border-radius:12px;font-size:13px;line-height:1.5;word-wrap:break-word;}
+.msg-wrap{display:flex;flex-direction:column;margin-bottom:2px;}
+.msg-wrap.me{align-items:flex-end;}
+.msg-wrap.other{align-items:flex-start;}
+.msg-wrap.system{align-items:center;}
+.msg.me{background:var(--primary);color:#fff;border-bottom-right-radius:4px;}
+.msg.other{background:var(--card);border:1px solid var(--border);border-bottom-left-radius:4px;}
+.msg.system{background:transparent;color:var(--muted);font-size:11px;font-style:italic;padding:4px 10px;}
+.msg-sender{font-size:10px;font-weight:700;color:var(--muted);margin-bottom:2px;padding:0 4px;}
+.msg-time{font-size:9px;color:var(--muted);margin-top:2px;padding:0 4px;}
+.chat-input{padding:12px 20px;background:var(--card);border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;}
+.chat-input textarea{flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit;outline:none;resize:none;max-height:100px;min-height:42px;}
+.chat-input textarea:focus{border-color:var(--primary);}
+.chat-input button{padding:10px 20px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;}
+.chat-input button:hover{background:var(--primary-dark);}
+.chat-empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;text-align:center;padding:40px;}
+.members-panel{width:220px;border-left:1px solid var(--border);background:var(--card);overflow-y:auto;padding:12px;display:none;flex-shrink:0;}
+.members-panel.open{display:block;}
+.members-panel h4{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:10px;}
+.member-item{display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:12px;border-radius:6px;}
+.member-item:hover{background:var(--bg);}
+.member-avatar{width:28px;height:28px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;}
+.member-name{font-weight:600;}
+.ch-modal-bg{position:fixed;inset:0;background:rgba(15,23,42,0.4);z-index:1000;display:none;align-items:center;justify-content:center;}
+.ch-modal-bg.open{display:flex;}
+.ch-modal{background:var(--card);border-radius:14px;box-shadow:0 24px 48px rgba(0,0,0,0.15);padding:24px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto;}
+.ch-modal h3{font-size:16px;font-weight:800;margin-bottom:16px;}
+.member-check{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;}
+.member-check input{width:auto;}
+@media(max-width:768px){
+  .chat-sidebar{position:fixed;left:-290px;top:0;bottom:0;z-index:200;transition:left 0.25s;box-shadow:4px 0 20px rgba(0,0,0,0.1);}
+  .chat-sidebar.open{left:0;}
+  .members-panel{display:none !important;}
+  .msg{max-width:90%;}
+}
+</style>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main" style="overflow:hidden;">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <h2>💬 Chat</h2>
+      </div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="chat-wrap">
+      <!-- Channel sidebar -->
+      <div class="chat-sidebar" id="chatSidebar">
+        <div class="chat-sidebar-head">
+          <h3>Channels</h3>
+          <button class="btn btn-sm btn-primary" onclick="showNewChannel()">+ New</button>
+        </div>
+        <input type="text" class="ch-search" placeholder="Search channels..." oninput="filterChannels(this.value)">
+        <div class="ch-list" id="channelList"></div>
+      </div>
+
+      <!-- Main chat area -->
+      <div class="chat-main" id="chatMain">
+        <div class="chat-empty" id="chatEmpty">
+          <div>
+            <div style="font-size:48px;margin-bottom:12px;">💬</div>
+            <div style="font-weight:700;margin-bottom:4px;">Select a channel or create one</div>
+            <div style="font-size:12px;">Chat with your team and IT admin</div>
+          </div>
+        </div>
+        <div id="chatActive" style="display:none;flex:1;display:none;flex-direction:column;overflow:hidden;">
+          <div class="chat-header">
+            <div>
+              <h3 id="chatTitle">—</h3>
+              <div class="chat-header-sub" id="chatSub"></div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-sm" onclick="toggleMembers()" title="Members">👥</button>
+              <button class="btn btn-sm" onclick="showAddMember()" title="Add member">+ Add</button>
+            </div>
+          </div>
+          <div class="chat-messages" id="chatMessages"></div>
+          <div class="chat-input">
+            <textarea id="msgInput" placeholder="Type a message..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+            <button onclick="sendMessage()">Send</button>
+          </div>
+        </div>
+        <!-- Members panel -->
+        <div class="members-panel" id="membersPanel">
+          <h4>Members</h4>
+          <input type="text" placeholder="Search members..." oninput="filterMembersPanel(this.value)" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;margin-bottom:8px;outline:none;font-family:inherit;">
+          <div id="membersList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- New channel modal -->
+<div class="ch-modal-bg" id="newChModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="ch-modal">
+    <h3>Create Channel</h3>
+    <div class="form-group">
+      <label>Channel Name *</label>
+      <input type="text" id="newChName" placeholder="e.g. Dispatch Team, IT Help...">
+    </div>
+    <div class="form-group">
+      <label>Add Members</label>
+      <input type="text" id="memberSearch" placeholder="Search people..." oninput="filterMemberPicker()" style="margin-bottom:6px;">
+      <div id="memberPicker" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="createChannel()">Create</button>
+      <button class="btn" onclick="document.getElementById('newChModal').classList.remove('open')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add member modal -->
+<div class="ch-modal-bg" id="addMemberModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="ch-modal">
+    <h3>Add Member</h3>
+    <div class="form-group">
+      <label>Search & Select User</label>
+      <input type="text" id="addMemberSearch" placeholder="Search by name, department..." oninput="filterAddMember()" style="margin-bottom:6px;">
+      <div id="addMemberList" style="max-height:250px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" onclick="document.getElementById('addMemberModal').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentChannel = null;
+let allChannels = [];
+let allUsers = [];
+let pollTimer = null;
+let lastMsgTime = '2000-01-01';
+const myName = '<%= user.full_name || user.username %>';
+
+async function loadChannels() {
+  try {
+    const r = await fetch('/chat/channels');
+    allChannels = await r.json();
+    renderChannels(allChannels);
+  } catch(e) { console.error('Load channels:', e); }
+}
+
+function renderChannels(list) {
+  const el = document.getElementById('channelList');
+  if (list.length === 0) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;">No channels yet.<br>Create one to start chatting!</div>';
+    return;
+  }
+  el.innerHTML = list.map(ch => {
+    const active = currentChannel && currentChannel.id === ch.id ? ' active' : '';
+    const icon = ch.type === 'support' ? '🎧' : ch.type === 'announcement' ? '📢' : '#';
+    const time = ch.last_msg_time ? formatTime(ch.last_msg_time) : '';
+    const preview = ch.last_message ? (ch.last_sender === myName ? 'You: ' : (ch.last_sender || '') + ': ') + ch.last_message : 'No messages yet';
+    const unread = ch.unread > 0 ? '<span class="ch-unread">' + ch.unread + '</span>' : '';
+    return '<div class="ch-item' + active + '" onclick="openChannel(' + ch.id + ')">' +
+      '<div class="ch-icon">' + icon + '</div>' +
+      '<div class="ch-info"><div class="ch-name">' + esc(ch.name) + '</div><div class="ch-preview">' + esc(preview).substring(0, 50) + '</div></div>' +
+      '<div class="ch-meta"><div class="ch-time">' + time + '</div>' + unread + '</div></div>';
+  }).join('');
+}
+
+function filterChannels(q) {
+  const filtered = q ? allChannels.filter(c => c.name.toLowerCase().includes(q.toLowerCase())) : allChannels;
+  renderChannels(filtered);
+}
+
+async function openChannel(id) {
+  if (pollTimer) clearInterval(pollTimer);
+  lastMsgTime = '2000-01-01';
+  try {
+    const r = await fetch('/chat/channels/' + id + '/messages');
+    const data = await r.json();
+    currentChannel = data.channel;
+    document.getElementById('chatEmpty').style.display = 'none';
+    document.getElementById('chatActive').style.display = 'flex';
+    document.getElementById('chatTitle').textContent = currentChannel.name;
+    document.getElementById('chatSub').textContent = (data.members || []).map(m => m.user_name).join(', ');
+    renderMessages(data.messages);
+    renderMembers(data.members);
+    if (data.messages.length > 0) lastMsgTime = data.messages[data.messages.length - 1].created_at;
+    pollTimer = setInterval(() => pollMessages(id), 3000);
+    scrollToBottom();
+    document.getElementById('msgInput').focus();
+    document.getElementById('chatSidebar').classList.remove('open');
+    loadChannels();
+  } catch(e) { console.error('Open channel:', e); }
+}
+
+function renderMessages(msgs) {
+  const el = document.getElementById('chatMessages');
+  el.innerHTML = msgs.map(m => {
+    if (m.sender_type === 'system') {
+      return '<div class="msg-wrap system"><div class="msg system">' + esc(m.message) + '</div><div class="msg-time">' + formatTime(m.created_at) + '</div></div>';
+    }
+    const isMe = m.sender_name === myName;
+    const cls = isMe ? 'me' : 'other';
+    return '<div class="msg-wrap ' + cls + '">' +
+      (!isMe ? '<div class="msg-sender">' + esc(m.sender_name) + '</div>' : '') +
+      '<div class="msg ' + cls + '">' + formatMsg(m.message) + '</div>' +
+      '<div class="msg-time">' + formatTime(m.created_at) + '</div></div>';
+  }).join('');
+  scrollToBottom();
+}
+
+function appendMessages(msgs) {
+  const el = document.getElementById('chatMessages');
+  msgs.forEach(m => {
+    const div = document.createElement('div');
+    if (m.sender_type === 'system') {
+      div.className = 'msg-wrap system';
+      div.innerHTML = '<div class="msg system">' + esc(m.message) + '</div><div class="msg-time">' + formatTime(m.created_at) + '</div>';
+    } else {
+      const isMe = m.sender_name === myName;
+      const cls = isMe ? 'me' : 'other';
+      div.className = 'msg-wrap ' + cls;
+      div.innerHTML = (!isMe ? '<div class="msg-sender">' + esc(m.sender_name) + '</div>' : '') +
+        '<div class="msg ' + cls + '">' + formatMsg(m.message) + '</div>' +
+        '<div class="msg-time">' + formatTime(m.created_at) + '</div>';
+    }
+    el.appendChild(div);
+  });
+  scrollToBottom();
+}
+
+function renderMembers(members) {
+  const el = document.getElementById('membersList');
+  el.innerHTML = (members || []).map(m => {
+    const initial = m.user_name.charAt(0).toUpperCase();
+    const isAdmin = m.user_type === 'admin';
+    return '<div class="member-item" data-name="' + esc(m.user_name).toLowerCase() + '">' +
+      '<div class="member-avatar"' + (isAdmin ? ' style="background:#fee2e2;color:#ef4444;"' : '') + '>' + initial + '</div>' +
+      '<div><div class="member-name">' + esc(m.user_name) + '</div>' +
+      (isAdmin ? '<div style="font-size:10px;color:var(--danger);">IT Admin</div>' : '') + '</div></div>';
+  }).join('');
+}
+
+function filterMembersPanel(q) {
+  const ql = q.toLowerCase();
+  document.querySelectorAll('#membersList .member-item').forEach(el => {
+    el.style.display = (!ql || el.dataset.name.includes(ql)) ? '' : 'none';
+  });
+}
+
+async function pollMessages(channelId) {
+  if (!currentChannel || currentChannel.id !== channelId) return;
+  try {
+    const r = await fetch('/chat/channels/' + channelId + '/messages?after=' + encodeURIComponent(lastMsgTime));
+    const data = await r.json();
+    if (data.messages && data.messages.length > 0) {
+      appendMessages(data.messages);
+      lastMsgTime = data.messages[data.messages.length - 1].created_at;
+      loadChannels();
+    }
+  } catch(e) {}
+}
+
+async function sendMessage() {
+  const input = document.getElementById('msgInput');
+  const msg = input.value.trim();
+  if (!msg || !currentChannel) return;
+  input.value = '';
+  input.style.height = 'auto';
+  try {
+    await fetch('/chat/channels/' + currentChannel.id + '/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg })
+    });
+    await pollMessages(currentChannel.id);
+  } catch(e) { console.error('Send:', e); }
+}
+
+function showNewChannel() {
+  document.getElementById('newChModal').classList.add('open');
+  document.getElementById('newChName').value = '';
+  loadAllUsers();
+}
+
+async function loadAllUsers() {
+  try {
+    const r = await fetch('/chat/users');
+    allUsers = await r.json();
+    renderMemberPicker();
+  } catch(e) {}
+}
+
+function renderMemberPicker() {
+  const q = (document.getElementById('memberSearch') || {}).value || '';
+  const ql = q.toLowerCase();
+  let filtered = allUsers;
+  if (ql) filtered = filtered.filter(u => (u.name||'').toLowerCase().includes(ql) || (u.department||'').toLowerCase().includes(ql));
+  const el = document.getElementById('memberPicker');
+  const wasChecked = new Set();
+  el.querySelectorAll('input:checked').forEach(c => wasChecked.add(c.value));
+  if (!filtered.length) { el.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:8px;">No users found</div>'; return; }
+  el.innerHTML = filtered.map(u => {
+    const chk = wasChecked.has(u.name) ? ' checked' : '';
+    return '<label class="member-check"><input type="checkbox" value="' + esc(u.name) + '"' + chk + '> ' + esc(u.name) + (u.department ? ' — ' + esc(u.department) : '') + '</label>';
+  }).join('');
+}
+
+function filterMemberPicker() { renderMemberPicker(); }
+
+async function createChannel() {
+  const name = document.getElementById('newChName').value.trim();
+  if (!name) return alert('Channel name is required');
+  const checked = document.querySelectorAll('#memberPicker input:checked');
+  const members = Array.from(checked).map(c => c.value);
+  try {
+    const r = await fetch('/chat/channels', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, type: 'group', member_names: members })
+    });
+    const data = await r.json();
+    document.getElementById('newChModal').classList.remove('open');
+    await loadChannels();
+    if (data.channelId) openChannel(data.channelId);
+  } catch(e) { alert('Error creating channel'); }
+}
+
+function toggleMembers() {
+  document.getElementById('membersPanel').classList.toggle('open');
+}
+
+let addMemberUsers = [];
+
+async function showAddMember() {
+  if (!currentChannel) return;
+  try {
+    const r = await fetch('/chat/users');
+    addMemberUsers = await r.json();
+    document.getElementById('addMemberSearch').value = '';
+    renderAddMemberList();
+    document.getElementById('addMemberModal').classList.add('open');
+    document.getElementById('addMemberSearch').focus();
+  } catch(e) {}
+}
+
+function renderAddMemberList() {
+  const q = (document.getElementById('addMemberSearch') || {}).value.toLowerCase();
+  let list = addMemberUsers;
+  if (q) list = list.filter(u => (u.name||'').toLowerCase().includes(q) || (u.department||'').toLowerCase().includes(q));
+  const el = document.getElementById('addMemberList');
+  if (!list.length) { el.innerHTML = '<div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;">No users found</div>'; return; }
+  el.innerHTML = list.map(u => {
+    const sub = [u.department, u.role].filter(Boolean).join(' · ');
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;transition:background 0.1s;" onmouseover="this.style.background=\'#f0f9ff\'" onmouseout="this.style.background=\'\'" onclick="addMemberByName(\'' + esc(u.name).replace(/'/g,"\\'") + '\')">' +
+      '<div style="width:32px;height:32px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">' + u.name.charAt(0).toUpperCase() + '</div>' +
+      '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;">' + esc(u.name) + '</div>' +
+      (sub ? '<div style="font-size:10px;color:var(--muted);">' + esc(sub) + '</div>' : '') + '</div>' +
+      '<span style="color:var(--primary);font-size:11px;font-weight:700;">+ Add</span></div>';
+  }).join('');
+}
+
+function filterAddMember() { renderAddMemberList(); }
+
+async function addMemberByName(name) {
+  if (!currentChannel || !name) return;
+  try {
+    await fetch('/chat/channels/' + currentChannel.id + '/members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_name: name })
+    });
+    addMemberUsers = addMemberUsers.filter(u => u.name !== name);
+    renderAddMemberList();
+    openChannel(currentChannel.id);
+  } catch(e) {}
+}
+
+function scrollToBottom() {
+  const el = document.getElementById('chatMessages');
+  setTimeout(() => { el.scrollTop = el.scrollHeight; }, 50);
+}
+
+function formatTime(dt) {
+  if (!dt) return '';
+  const d = new Date(dt + (dt.includes('Z') ? '' : 'Z'));
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff/60000) + 'm';
+  if (diff < 86400000) return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  return d.toLocaleDateString([], {month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function formatMsg(s) { return esc(s).replace(/\n/g, '<br>'); }
+
+document.getElementById('msgInput').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+});
+
+loadChannels();
+setInterval(loadChannels, 15000);
+</script>
+<%- include('../partials/foot') %>

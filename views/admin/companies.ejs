@@ -1,0 +1,72 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <h2>🏢 Companies</h2>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('addModal').classList.add('open')">+ Add Company</button>
+        <%- include('../partials/notif-bell') %>
+      </div>
+    </div>
+    <div class="content">
+      <% if (companies.length === 0) { %>
+        <div class="empty"><span class="e-icon">🏢</span><div class="e-text">No companies yet. Add your first client!</div><button class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('open')">+ Add Company</button></div>
+      <% } else { %>
+        <% companies.forEach(c => { %>
+          <a href="/admin/companies/<%= c.id %>" class="item-card" style="text-decoration:none;color:inherit;">
+            <% if (c.logo) { %><img src="<%= c.logo %>" style="width:36px;height:36px;border-radius:8px;object-fit:contain;border:1px solid var(--border);margin-right:12px;flex-shrink:0;"><% } else { %><div style="width:36px;height:36px;border-radius:8px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:900;color:var(--primary);font-size:16px;margin-right:12px;flex-shrink:0;"><%= c.name.charAt(0) %></div><% } %>
+            <div class="ic-main">
+              <div class="ic-name"><%= c.name %></div>
+              <div class="ic-sub">👥 <%= c.user_count || 0 %> users · 🖥️ <%= c.server_count || 0 %> servers · 📦 <%= c.sub_count || 0 %> subs<% if (c.task_count > 0) { %> · ✅ <%= c.task_count %> tasks<% } %></div>
+            </div>
+            <div class="ic-right"><span class="badge <%= c.status %>"><%= c.status %></span></div>
+          </a>
+        <% }) %>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Add Company Modal -->
+<div class="modal-bg" id="addModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <h3>Add New Company</h3>
+    <form method="POST" action="/admin/companies">
+      <div class="form-row">
+        <div class="form-group"><label>Company Name *</label><input type="text" name="name" required placeholder="Big Rig Trucking LLC"></div>
+        <div class="form-group"><label>Status</label><select name="status"><option value="active">Active</option><option value="prospect">Prospect</option><option value="inactive">Inactive</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Address</label><input type="text" name="address" placeholder="123 Main St"></div>
+        <div class="form-group"><label>City</label><input type="text" name="city"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>State</label><input type="text" name="state"></div>
+        <div class="form-group"><label>ZIP</label><input type="text" name="zip"></div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;">PRIMARY CONTACT</div>
+      <div class="form-row">
+        <div class="form-group"><label>Contact Name</label><input type="text" name="contact_name" placeholder="John Smith"></div>
+        <div class="form-group"><label>Email</label><input type="email" name="contact_email" placeholder="john@example.com"></div>
+      </div>
+      <div class="form-group"><label>Phone</label><input type="text" name="contact_phone" placeholder="555-0100"></div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;">CLIENT PORTAL ACCESS</div>
+      <div class="form-row">
+        <div class="form-group"><label>Username</label><input type="text" name="client_username" placeholder="Leave blank to skip"></div>
+        <div class="form-group"><label>Password</label><input type="text" name="client_password" placeholder="Client login password"></div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea name="notes" placeholder="Any notes about this company..."></textarea></div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Company</button>
+        <button type="button" class="btn" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+<%- include('../partials/foot') %>

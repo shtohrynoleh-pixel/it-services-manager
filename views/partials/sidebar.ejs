@@ -1,0 +1,237 @@
+<div class="sb-backdrop" id="sbBackdrop" onclick="closeSidebar()"></div>
+<div class="sidebar" id="sidebar">
+  <div class="sb-brand">
+    <h1><span>🖥️</span> <%= settings.business_name || 'IT Services' %></h1>
+    <p style="display:flex;justify-content:space-between;align-items:center;">
+      <span><%= user.role === 'admin' ? 'Admin Panel' : 'Client Portal' %></span>
+      <% if (user.role === 'admin') { %><button onclick="toggleEditMode()" id="editModeBtn" style="background:none;border:none;font-size:11px;cursor:pointer;color:var(--muted);padding:2px 6px;" title="Reorder menus">⚙️</button><% } %>
+    </p>
+  </div>
+  <div class="sb-nav" id="sbNav">
+    <% if (user.role === 'admin') { %>
+      <%
+        // Define all menu items with their default groups
+        const menuItems = [
+          { id:'dashboard', icon:'📊', label:'Dashboard', href:'/admin', group:'main' },
+          { id:'companies', icon:'🏢', label:'Companies', href:'/admin/companies', group:'main' },
+          { id:'all-users', icon:'👥', label:'All Users', href:'/admin/all-users', group:'main' },
+          { id:'services', icon:'⚙️', label:'Services', href:'/admin/services', group:'main' },
+          { id:'billing', icon:'💳', label:'Billing', href:'/admin/billing', group:'main' },
+          { id:'tasks', icon:'✅', label:'Tasks', href:'/admin/tasks', group:'work' },
+          { id:'projects', icon:'📁', label:'Projects', href:'/admin/projects', group:'work' },
+          { id:'schedule', icon:'📅', label:'Schedule', href:'/admin/schedule', group:'work' },
+          { id:'policies', icon:'🛡️', label:'Security Policies', href:'/admin/policies', group:'docs' },
+          { id:'sops', icon:'📋', label:'SOPs', href:'/admin/sops', group:'docs' },
+          { id:'flows', icon:'🔄', label:'Process Flows', href:'/admin/flows', group:'docs' },
+          { id:'monitoring', icon:'📡', label:'Monitoring', href:'/admin/monitoring', group:'monitor' },
+          { id:'alerts-page', icon:'🔔', label:'Alerts', href:'/admin/alerts', group:'monitor' },
+          { id:'chat', icon:'💬', label:'Chat', href:'/admin/chat', group:'work' },
+          { id:'vault', icon:'🔑', label:'Password Vault', href:'/admin/vault', group:'system' },
+          { id:'users-manage', icon:'🔐', label:'User Accounts', href:'/admin/users-manage', group:'system' },
+          { id:'settings', icon:'🔧', label:'Settings', href:'/admin/settings', group:'system' },
+          { id:'integrations', icon:'🔌', label:'Integrations', href:'/admin/integrations', group:'system' },
+          { id:'roles', icon:'👤', label:'Roles', href:'/admin/roles', group:'system' },
+          { id:'departments', icon:'🏛️', label:'Departments', href:'/admin/departments', group:'system' }
+        ];
+        const groups = [
+          { id:'main', label:'Main' },
+          { id:'work', label:'Work' },
+          { id:'docs', label:'Documentation' },
+          { id:'monitor', label:'Monitoring' },
+          { id:'system', label:'System' }
+        ];
+      %>
+
+      <% groups.forEach(g => { %>
+        <% const items = menuItems.filter(m => m.group === g.id); %>
+        <div class="sb-section" data-group="<%= g.id %>">
+          <div class="sb-section-head" onclick="toggleGroup('<%= g.id %>')">
+            <span><%= g.label %><span class="sb-section-count"><%= items.length %></span></span>
+            <span class="sb-arrow">▾</span>
+          </div>
+          <div class="sb-section-body" data-dropzone="<%= g.id %>">
+            <% items.forEach(m => { %>
+              <a class="sb-item <%= page === m.id ? 'active' : '' %>" href="<%= m.href %>" data-menu-id="<%= m.id %>" draggable="false">
+                <span class="icon"><%= m.icon %></span> <%= m.label %>
+                <span class="drag-handle" style="display:none;margin-left:auto;cursor:grab;font-size:14px;color:#94a3b8;" title="Drag to move">⠿</span>
+              </a>
+            <% }) %>
+          </div>
+        </div>
+      <% }) %>
+
+    <% } else { %>
+      <div class="sb-section" data-group="myco">
+        <div class="sb-section-head" onclick="toggleGroup('myco')"><span>My Company</span><span class="sb-arrow">▾</span></div>
+        <div class="sb-section-body">
+          <a class="sb-item <%= !tab || tab === 'dashboard' ? 'active' : '' %>" href="/client"><span class="icon">📊</span> Dashboard</a>
+          <a class="sb-item <%= tab === 'users' ? 'active' : '' %>" href="/client?tab=users"><span class="icon">👥</span> Team</a>
+          <a class="sb-item <%= tab === 'servers' ? 'active' : '' %>" href="/client?tab=servers"><span class="icon">🖥️</span> Servers</a>
+          <a class="sb-item <%= tab === 'subscriptions' ? 'active' : '' %>" href="/client?tab=subscriptions"><span class="icon">📦</span> Subscriptions</a>
+          <a class="sb-item <%= tab === 'assets' ? 'active' : '' %>" href="/client?tab=assets"><span class="icon">🌐</span> Digital Assets</a>
+          <a class="sb-item <%= tab === 'inventory' ? 'active' : '' %>" href="/client?tab=inventory"><span class="icon">🔧</span> Inventory</a>
+          <a class="sb-item <%= tab === 'invoices' ? 'active' : '' %>" href="/client?tab=invoices"><span class="icon">💳</span> Invoices</a>
+          <a class="sb-item <%= tab === 'tasks' ? 'active' : '' %>" href="/client?tab=tasks"><span class="icon">📋</span> Requests</a>
+          <a class="sb-item <%= page === 'chat' ? 'active' : '' %>" href="/client/chat"><span class="icon">💬</span> Chat</a>
+        </div>
+      </div>
+      <div class="sb-section" data-group="info">
+        <div class="sb-section-head" onclick="toggleGroup('info')"><span>Info</span><span class="sb-arrow">▾</span></div>
+        <div class="sb-section-body">
+          <a class="sb-item <%= page === 'services' ? 'active' : '' %>" href="/client/services"><span class="icon">⚙️</span> Available Services</a>
+        </div>
+      </div>
+    <% } %>
+  </div>
+  <div class="sb-footer">
+    <a class="sb-item" href="/logout"><span class="icon">🚪</span> Logout</a>
+    <div style="font-size:10px;color:var(--muted);padding:8px 20px 0">Logged in as <strong><%= user.full_name || user.username %></strong></div>
+  </div>
+</div>
+<script>
+function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sbBackdrop').classList.add('open');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sbBackdrop').classList.remove('open');}
+
+// === COLLAPSIBLE GROUPS ===
+function toggleGroup(name){
+  var el=document.querySelector('[data-group="'+name+'"]');
+  if(!el)return;
+  el.classList.toggle('collapsed');
+  saveGroupState();
+}
+function saveGroupState(){
+  var state={};
+  document.querySelectorAll('.sb-section[data-group]').forEach(function(el){
+    state[el.dataset.group]=el.classList.contains('collapsed');
+  });
+  try{localStorage.setItem('sb_groups',JSON.stringify(state));}catch(e){}
+}
+function loadGroupState(){
+  try{
+    var state=JSON.parse(localStorage.getItem('sb_groups')||'{}');
+    Object.keys(state).forEach(function(k){
+      if(state[k]){
+        var el=document.querySelector('[data-group="'+k+'"]');
+        if(el)el.classList.add('collapsed');
+      }
+    });
+    var active=document.querySelector('.sb-item.active');
+    if(active){var section=active.closest('.sb-section');if(section)section.classList.remove('collapsed');}
+  }catch(e){}
+}
+
+// === DRAG & DROP MENU REORDER ===
+var editMode=false;
+var dragItem=null;
+
+function toggleEditMode(){
+  editMode=!editMode;
+  var btn=document.getElementById('editModeBtn');
+  var handles=document.querySelectorAll('.drag-handle');
+  var items=document.querySelectorAll('.sb-item[data-menu-id]');
+  if(editMode){
+    btn.textContent='✅';
+    btn.title='Done editing';
+    handles.forEach(function(h){h.style.display='inline';});
+    items.forEach(function(it){it.setAttribute('draggable','true');it.style.opacity='1';});
+    // Expand all groups
+    document.querySelectorAll('.sb-section').forEach(function(s){s.classList.remove('collapsed');});
+  }else{
+    btn.textContent='⚙️';
+    btn.title='Reorder menus';
+    handles.forEach(function(h){h.style.display='none';});
+    items.forEach(function(it){it.setAttribute('draggable','false');it.style.opacity='1';});
+    saveMenuOrder();
+    loadGroupState();
+  }
+}
+
+// Drag events
+document.addEventListener('dragstart',function(e){
+  if(!editMode)return;
+  var item=e.target.closest('.sb-item[data-menu-id]');
+  if(!item)return;
+  dragItem=item;
+  item.style.opacity='0.4';
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',item.dataset.menuId);
+});
+
+document.addEventListener('dragend',function(e){
+  if(dragItem)dragItem.style.opacity='1';
+  dragItem=null;
+  document.querySelectorAll('.sb-section-body').forEach(function(z){z.style.background='';});
+});
+
+document.addEventListener('dragover',function(e){
+  if(!editMode||!dragItem)return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  var zone=e.target.closest('.sb-section-body[data-dropzone]');
+  if(zone)zone.style.background='rgba(8,145,178,0.06)';
+});
+
+document.addEventListener('dragleave',function(e){
+  var zone=e.target.closest('.sb-section-body[data-dropzone]');
+  if(zone)zone.style.background='';
+});
+
+document.addEventListener('drop',function(e){
+  if(!editMode||!dragItem)return;
+  e.preventDefault();
+  var zone=e.target.closest('.sb-section-body[data-dropzone]');
+  if(!zone)return;
+  zone.style.background='';
+  // Find the item we're dropping near
+  var target=e.target.closest('.sb-item[data-menu-id]');
+  if(target&&target!==dragItem){
+    var rect=target.getBoundingClientRect();
+    var mid=rect.top+rect.height/2;
+    if(e.clientY<mid){zone.insertBefore(dragItem,target);}
+    else{zone.insertBefore(dragItem,target.nextSibling);}
+  }else{
+    zone.appendChild(dragItem);
+  }
+  updateCounts();
+  saveMenuOrder();
+});
+
+function updateCounts(){
+  document.querySelectorAll('.sb-section[data-group]').forEach(function(sec){
+    var count=sec.querySelectorAll('.sb-item[data-menu-id]').length;
+    var badge=sec.querySelector('.sb-section-count');
+    if(badge)badge.textContent=count;
+  });
+}
+
+function saveMenuOrder(){
+  var order={};
+  document.querySelectorAll('.sb-section-body[data-dropzone]').forEach(function(zone){
+    var group=zone.dataset.dropzone;
+    var ids=[];
+    zone.querySelectorAll('.sb-item[data-menu-id]').forEach(function(it){ids.push(it.dataset.menuId);});
+    order[group]=ids;
+  });
+  try{localStorage.setItem('sb_menu_order',JSON.stringify(order));}catch(e){}
+}
+
+function loadMenuOrder(){
+  try{
+    var order=JSON.parse(localStorage.getItem('sb_menu_order')||'null');
+    if(!order)return;
+    Object.keys(order).forEach(function(group){
+      var zone=document.querySelector('[data-dropzone="'+group+'"]');
+      if(!zone)return;
+      order[group].forEach(function(menuId){
+        var item=document.querySelector('[data-menu-id="'+menuId+'"]');
+        if(item)zone.appendChild(item);
+      });
+    });
+    updateCounts();
+  }catch(e){}
+}
+
+// Init
+loadMenuOrder();
+loadGroupState();
+</script>

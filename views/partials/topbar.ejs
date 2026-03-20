@@ -1,0 +1,10 @@
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <button class="mob-toggle" onclick="openSidebar()">☰</button>
+    <h2><%= typeof topIcon !== 'undefined' ? topIcon + ' ' : '' %><%= typeof topTitle !== 'undefined' ? topTitle : 'Dashboard' %></h2>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <% if (typeof topActions !== 'undefined') { %><%- topActions %><% } %>
+    <%- include('notif-bell') %>
+  </div>
+</div>

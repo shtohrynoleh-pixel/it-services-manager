@@ -1,0 +1,75 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>🛡️ Security Policies</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('addModal').classList.add('open')">+ New Policy</button>
+        <select onchange="location.href='/admin/policies?company='+this.value" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">All Companies</option>
+          <% companies.forEach(c => { %><option value="<%= c.id %>" <%= filterCo == c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        </select>
+      </div>
+
+      <% if (policies.length === 0) { %>
+        <div class="empty"><span class="e-icon">🛡️</span><div class="e-text">No security policies yet</div></div>
+      <% } else { %>
+        <% var templates = policies.filter(p => !p.company_id); var companyPolicies = policies.filter(p => p.company_id); %>
+
+        <% if (templates.length > 0 && !filterCo) { %>
+        <div class="card">
+          <h3>📋 Policy Templates</h3>
+          <% templates.forEach(p => { %>
+            <a href="/admin/policies/<%= p.id %>" class="item-card" style="text-decoration:none;color:inherit;">
+              <div class="ic-main">
+                <div class="ic-name"><%= p.title %></div>
+                <div class="ic-sub"><%= p.category %> · v<%= p.version %></div>
+              </div>
+              <div class="ic-right">
+                <span class="badge <%= p.status === 'published' ? 'active' : 'draft' %>"><%= p.status %></span>
+              </div>
+            </a>
+          <% }) %>
+        </div>
+        <% } %>
+
+        <% if (companyPolicies.length > 0) { %>
+        <div class="card">
+          <h3>🏢 Company Policies</h3>
+          <% companyPolicies.forEach(p => { %>
+            <a href="/admin/policies/<%= p.id %>" class="item-card" style="text-decoration:none;color:inherit;">
+              <div class="ic-main">
+                <div class="ic-name"><%= p.title %></div>
+                <div class="ic-sub"><%= p.company_name || '—' %> · <%= p.category %> · <%= p.ack_count %> acknowledged</div>
+              </div>
+              <div class="ic-right">
+                <span class="badge <%= p.status === 'published' ? 'active' : 'draft' %>"><%= p.status %></span>
+              </div>
+            </a>
+          <% }) %>
+        </div>
+        <% } %>
+      <% } %>
+
+      <!-- Add modal -->
+      <div class="modal-bg" id="addModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal">
+          <h3>New Security Policy</h3>
+          <form method="POST" action="/admin/policies">
+            <div class="form-row"><div class="form-group"><label>Title *</label><input type="text" name="title" required placeholder="e.g. Password Policy"></div><div class="form-group"><label>Category</label><select name="category"><option>General</option><option>Security</option><option>Devices</option><option>Network</option><option>Data</option><option>Email</option><option>Remote Work</option><option>Compliance</option></select></div></div>
+            <div class="form-group"><label>Company (leave blank for template)</label><select name="company_id"><option value="">— Template (all companies) —</option><% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+            <div class="form-group"><label>Description</label><input type="text" name="description" placeholder="Brief description..."></div>
+            <div class="form-group"><label>Policy Content</label><textarea name="content" rows="10" placeholder="Write the full policy text here..."></textarea></div>
+            <div class="form-row"><div class="form-group"><label>Status</label><select name="status"><option value="draft">Draft</option><option value="published">Published</option></select></div><div class="form-check" style="margin-top:20px;"><input type="checkbox" name="requires_ack" value="1" checked> Require employee acknowledgment</div></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Create</button><button type="button" class="btn" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

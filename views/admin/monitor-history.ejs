@@ -1,0 +1,66 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <h2><a href="/admin/monitoring" style="opacity:0.4;text-decoration:none;">📡</a> → <%= mon.name %></h2>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:12px;height:12px;border-radius:50%;background:<%= mon.last_status === 'up' ? 'var(--success)' : mon.last_status === 'down' ? 'var(--danger)' : '#94a3b8' %>;"></div>
+        <strong style="font-size:13px;text-transform:uppercase;"><%= mon.last_status %></strong>
+        <%- include('../partials/notif-bell') %>
+      </div>
+    </div>
+    <div class="content">
+      <div class="metrics">
+        <div class="metric <%= mon.last_status === 'up' ? 'ok' : mon.last_status === 'down' ? 'bad' : '' %>">
+          <div class="m-label">Status</div>
+          <div class="m-val <%= mon.last_status === 'up' ? 'green' : mon.last_status === 'down' ? 'red' : '' %>"><%= mon.last_status.toUpperCase() %></div>
+        </div>
+        <div class="metric"><div class="m-label">Uptime</div><div class="m-val <%= (mon.uptime_pct||0) >= 99 ? 'green' : (mon.uptime_pct||0) >= 90 ? '' : 'red' %>"><%= (mon.uptime_pct||0).toFixed(1) %>%</div></div>
+        <div class="metric"><div class="m-label">Last Response</div><div class="m-val"><%= mon.last_response_ms || 0 %>ms</div></div>
+        <div class="metric"><div class="m-label">Total Checks</div><div class="m-val"><%= logs.length %></div></div>
+      </div>
+
+      <div class="card">
+        <h3>📋 Monitor Info</h3>
+        <div class="card-row"><span class="label">Company</span><span class="value"><%= mon.company_name || '—' %></span></div>
+        <div class="card-row"><span class="label">Type</span><span class="value"><%= mon.type %></span></div>
+        <div class="card-row"><span class="label">Target</span><span class="value"><%= mon.target || '—' %></span></div>
+        <div class="card-row"><span class="label">Check Type</span><span class="value"><%= mon.check_type %></span></div>
+        <div class="card-row"><span class="label">Interval</span><span class="value">Every <%= mon.interval_min %> min</span></div>
+        <div class="card-row"><span class="label">Alert Email</span><span class="value"><%= mon.alert_email || '—' %></span></div>
+        <div class="card-row"><span class="label">Last Check</span><span class="value"><%= mon.last_check || 'Never' %></span></div>
+      </div>
+
+      <div class="card">
+        <h3>📊 Check History (Last 100)</h3>
+        <% if (logs.length === 0) { %>
+          <div class="empty"><span class="e-icon">📊</span><div class="e-text">No checks yet. Click "Check" on the monitoring page.</div></div>
+        <% } else { %>
+          <table class="tbl">
+            <thead><tr><th>Time</th><th>Status</th><th>Response</th><th>Error</th></tr></thead>
+            <tbody>
+            <% logs.forEach(l => { %>
+              <tr>
+                <td><%= l.checked_at %></td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <div style="width:8px;height:8px;border-radius:50%;background:<%= l.status === 'up' ? 'var(--success)' : 'var(--danger)' %>;"></div>
+                    <strong style="color:<%= l.status === 'up' ? 'var(--success)' : 'var(--danger)' %>"><%= l.status.toUpperCase() %></strong>
+                  </div>
+                </td>
+                <td><%= l.response_ms || 0 %>ms</td>
+                <td style="color:var(--danger);font-size:11px;"><%= l.error || '—' %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

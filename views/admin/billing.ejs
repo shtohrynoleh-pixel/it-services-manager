@@ -1,0 +1,61 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>💳 Billing</h2></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="btn btn-primary btn-sm" onclick="document.getElementById('addInvModal').classList.add('open')">+ Create Invoice</button><%- include('../partials/notif-bell') %></div>
+    </div>
+    <div class="content">
+      <%
+        const paid = invoices.filter(i => i.status === 'paid');
+        const unpaid = invoices.filter(i => i.status === 'sent' || i.status === 'overdue');
+        const paidTotal = paid.reduce((s,i) => s + (i.total||0), 0);
+        const unpaidTotal = unpaid.reduce((s,i) => s + (i.total||0), 0);
+      %>
+      <div class="metrics">
+        <div class="metric"><div class="m-label">Total Invoices</div><div class="m-val"><%= invoices.length %></div></div>
+        <div class="metric ok"><div class="m-label">Total Paid</div><div class="m-val green">$<%= paidTotal.toFixed(2) %></div></div>
+        <div class="metric <%= unpaid.length > 0 ? 'bad' : '' %>"><div class="m-label">Unpaid</div><div class="m-val <%= unpaid.length > 0 ? 'red' : '' %>">$<%= unpaidTotal.toFixed(2) %></div></div>
+      </div>
+      <% if (invoices.length === 0) { %>
+        <div class="empty"><span class="e-icon">💳</span><div class="e-text">No invoices yet</div></div>
+      <% } else { %>
+        <div class="card" style="overflow-x:auto;">
+          <table class="tbl">
+            <thead><tr><th>#</th><th>Company</th><th>Date</th><th>Amount</th><th>Status</th><th>Paid</th><th></th></tr></thead>
+            <tbody>
+            <% invoices.forEach(inv => { %>
+              <tr>
+                <td style="font-weight:600;font-size:11px;color:var(--muted);"><%= inv.invoice_number || '—' %></td>
+                <td><strong><%= inv.company_name || '?' %></strong></td>
+                <td><%= inv.date || '—' %></td>
+                <td><strong>$<%= (inv.total||0).toFixed(2) %></strong></td>
+                <td><span class="badge <%= inv.status %>"><%= inv.status %></span></td>
+                <td><%= inv.paid_date || '—' %></td>
+                <td style="white-space:nowrap;">
+                  <% if (inv.status !== 'paid') { %><form method="POST" action="/admin/invoices/<%= inv.id %>/pay" style="display:inline"><button type="submit" class="btn btn-sm btn-primary">✓ Paid</button></form><% } %>
+                  <form method="POST" action="/admin/invoices/<%= inv.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Delete invoice?')">🗑️</button></form>
+                </td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+<div class="modal-bg" id="addInvModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <h3>Create Invoice</h3>
+    <form method="POST" action="/admin/invoices">
+      <div class="form-group"><label>Company *</label><select name="company_id" required><option value="">Select company</option><% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+      <div class="form-row"><div class="form-group"><label>Date</label><input type="date" name="date" value="<%= new Date().toISOString().slice(0,10) %>"></div><div class="form-group"><label>Due Date</label><input type="date" name="due_date"></div></div>
+      <div class="form-group"><label>Description</label><input type="text" name="description" placeholder="Managed IT Support — March 2026"></div>
+      <div class="form-row"><div class="form-group"><label>Amount *</label><input type="number" name="amount" step="0.01" required placeholder="500.00"></div><div class="form-group"><label>Status</label><select name="status"><option value="sent">Sent</option><option value="draft">Draft</option><option value="paid">Paid</option></select></div></div>
+      <div class="form-actions"><button type="submit" class="btn btn-primary">Create Invoice</button><button type="button" class="btn" onclick="document.getElementById('addInvModal').classList.remove('open')">Cancel</button></div>
+    </form>
+  </div>
+</div>
+<%- include('../partials/foot') %>
