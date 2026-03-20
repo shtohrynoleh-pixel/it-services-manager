@@ -6,13 +6,16 @@ const fs = require('fs');
 const router = express.Router();
 const { requireAdmin } = require('../middleware/auth');
 
-// Multer setup for CSV uploads
+// Multer setup
 const uploadDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// CSV-only upload
 const upload = multer({ dest: uploadDir, limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
   if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) cb(null, true);
   else cb(new Error('Only CSV files allowed'));
 }});
+// General file upload (50MB limit)
+const fileUpload = multer({ dest: uploadDir, limits: { fileSize: 50 * 1024 * 1024 } });
 
 // Simple CSV parser (handles quoted fields with commas)
 function parseCSV(text) {
@@ -59,14 +62,40 @@ module.exports = function(db) {
     return s;
   };
 
-  // Notification count — tasks assigned to admin that are pending
+  // Notifications — tasks + schedules grouped by time
   const getNotifications = () => {
     try {
-      const allOpen = db.prepare("SELECT t.*, c.name as company_name FROM tasks t LEFT JOIN companies c ON t.company_id = c.id WHERE t.status != 'done' ORDER BY CASE t.priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, t.created_at DESC LIMIT 20").all();
+      const today = new Date().toISOString().slice(0, 10);
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+      const weekEnd = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+
+      // Open tasks
+      const allOpen = db.prepare("SELECT t.*, c.name as company_name, 'task' as item_type FROM tasks t LEFT JOIN companies c ON t.company_id = c.id WHERE t.status != 'done' ORDER BY CASE t.priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, t.due_date ASC LIMIT 30").all();
       const clientTasks = allOpen.filter(t => t.created_by === 'client');
       const myTasks = allOpen.filter(t => t.created_by !== 'client');
-      return { allOpen, clientTasks, myTasks, count: allOpen.length };
-    } catch(e) { return { allOpen: [], clientTasks: [], myTasks: [], count: 0 }; }
+
+      // Schedules
+      const schedules = safeAll("SELECT s.*, c.name as company_name, sv.name as service_name, 'schedule' as item_type FROM service_schedule s LEFT JOIN companies c ON s.company_id = c.id LEFT JOIN services sv ON s.service_id = sv.id WHERE s.is_active = 1 ORDER BY s.next_due ASC");
+
+      // Categorize by time
+      const overdueTasks = allOpen.filter(t => t.due_date && t.due_date < today);
+      const todayTasks = allOpen.filter(t => t.due_date === today);
+      const upcomingTasks = allOpen.filter(t => t.due_date && t.due_date > today && t.due_date <= weekEnd);
+
+      const overdueSchedules = schedules.filter(s => s.next_due && s.next_due < today);
+      const todaySchedules = schedules.filter(s => s.next_due === today);
+      const upcomingSchedules = schedules.filter(s => s.next_due && s.next_due > today && s.next_due <= weekEnd);
+
+      const totalCount = allOpen.length + overdueSchedules.length + todaySchedules.length;
+
+      return {
+        allOpen, clientTasks, myTasks,
+        overdueTasks, todayTasks, upcomingTasks,
+        overdueSchedules, todaySchedules, upcomingSchedules,
+        schedules,
+        count: totalCount
+      };
+    } catch(e) { return { allOpen: [], clientTasks: [], myTasks: [], overdueTasks: [], todayTasks: [], upcomingTasks: [], overdueSchedules: [], todaySchedules: [], upcomingSchedules: [], schedules: [], count: 0 }; }
   };
 
   // Inject notifications into every admin render
@@ -338,6 +367,155 @@ module.exports = function(db) {
     res.redirect('/admin/companies/' + req.params.cid + '/email-security');
   });
 
+  // === FILE MANAGEMENT (must be before generic /:id/:table) ===
+  router.get('/companies/:cid/files', (req, res) => {
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.cid);
+    if (!company) return res.redirect('/admin/companies');
+    const folderId = req.query.folder || null;
+    const folders = safeAll('SELECT * FROM file_folders WHERE company_id = ? AND parent_id IS ? ORDER BY name', [company.id, folderId]);
+    const files = safeAll('SELECT * FROM company_files WHERE company_id = ? AND folder_id IS ? ORDER BY original_name', [company.id, folderId]);
+    const currentFolder = folderId ? safeGet('SELECT * FROM file_folders WHERE id = ? AND company_id = ?', [folderId, company.id]) : null;
+    // Breadcrumb
+    const breadcrumbs = [];
+    if (currentFolder) {
+      let f = currentFolder;
+      while (f) { breadcrumbs.unshift(f); f = f.parent_id ? safeGet('SELECT * FROM file_folders WHERE id = ?', [f.parent_id]) : null; }
+    }
+    // Folder access
+    const folderAccess = folderId ? safeAll('SELECT * FROM folder_access WHERE folder_id = ?', [folderId]) : [];
+    const companyUsers = safeAll('SELECT id, name, department, role FROM company_users WHERE company_id = ? AND is_active = 1 ORDER BY name', [company.id]);
+    // Stats
+    const totalFiles = safeGet('SELECT COUNT(*) as c FROM company_files WHERE company_id = ?', [company.id]);
+    const totalFolders = safeGet('SELECT COUNT(*) as c FROM file_folders WHERE company_id = ?', [company.id]);
+    const totalSize = safeGet('SELECT SUM(size) as s FROM company_files WHERE company_id = ?', [company.id]);
+    res.render(V('company-files'), { user: req.session.user, company, folders, files, currentFolder, folderId, breadcrumbs, folderAccess, companyUsers, totalFiles: totalFiles.c, totalFolders: totalFolders.c, totalSize: totalSize.s || 0, settings: getSettings(), page: 'companies' });
+  });
+
+  // Create folder
+  router.post('/companies/:cid/folders', (req, res) => {
+    const { name, parent_id } = req.body;
+    if (!name) return res.redirect('/admin/companies/' + req.params.cid + '/files' + (req.body.parent_id ? '?folder=' + req.body.parent_id : ''));
+    try {
+      db.prepare('INSERT INTO file_folders (company_id, parent_id, name, created_by) VALUES (?,?,?,?)').run(
+        req.params.cid, parent_id || null, name.trim(), req.session.user.full_name || 'admin'
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/files' + (parent_id ? '?folder=' + parent_id : ''));
+  });
+
+  // Delete folder
+  router.post('/companies/:cid/folders/:fid/delete', (req, res) => {
+    const parentId = req.body.parent_id || null;
+    try {
+      // Move files to parent folder
+      db.prepare('UPDATE company_files SET folder_id = ? WHERE folder_id = ? AND company_id = ?').run(parentId, req.params.fid, req.params.cid);
+      // Move sub-folders to parent
+      db.prepare('UPDATE file_folders SET parent_id = ? WHERE parent_id = ? AND company_id = ?').run(parentId, req.params.fid, req.params.cid);
+      db.prepare('DELETE FROM folder_access WHERE folder_id = ?').run(req.params.fid);
+      db.prepare('DELETE FROM file_folders WHERE id = ? AND company_id = ?').run(req.params.fid, req.params.cid);
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/files' + (parentId ? '?folder=' + parentId : ''));
+  });
+
+  // Rename folder
+  router.post('/companies/:cid/folders/:fid/rename', (req, res) => {
+    const { name } = req.body;
+    try { db.prepare('UPDATE file_folders SET name = ? WHERE id = ? AND company_id = ?').run(name, req.params.fid, req.params.cid); } catch(e) {}
+    const folder = safeGet('SELECT parent_id FROM file_folders WHERE id = ?', [req.params.fid]);
+    res.redirect('/admin/companies/' + req.params.cid + '/files' + (folder && folder.parent_id ? '?folder=' + folder.parent_id : ''));
+  });
+
+  // Add/remove folder access
+  router.post('/companies/:cid/folders/:fid/access', (req, res) => {
+    const { user_name, permission } = req.body;
+    if (!user_name) return res.redirect('/admin/companies/' + req.params.cid + '/files?folder=' + req.params.fid);
+    try {
+      const exists = safeGet('SELECT id FROM folder_access WHERE folder_id = ? AND user_name = ?', [req.params.fid, user_name]);
+      if (exists) {
+        db.prepare('UPDATE folder_access SET permission = ? WHERE id = ?').run(permission || 'view', exists.id);
+      } else {
+        db.prepare('INSERT INTO folder_access (folder_id, user_name, permission) VALUES (?,?,?)').run(req.params.fid, user_name, permission || 'view');
+      }
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/files?folder=' + req.params.fid);
+  });
+
+  router.post('/companies/:cid/folders/:fid/access/:aid/delete', (req, res) => {
+    try { db.prepare('DELETE FROM folder_access WHERE id = ?').run(req.params.aid); } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/files?folder=' + req.params.fid);
+  });
+
+  // Upload file
+  router.post('/companies/:cid/files/upload', fileUpload.single('file'), (req, res) => {
+    const folderId = req.body.folder_id || null;
+    if (!req.file) return res.redirect('/admin/companies/' + req.params.cid + '/files' + (folderId ? '?folder=' + folderId : ''));
+    try {
+      db.prepare('INSERT INTO company_files (company_id, folder_id, filename, original_name, size, mime_type, uploaded_by) VALUES (?,?,?,?,?,?,?)').run(
+        req.params.cid, folderId, req.file.filename, req.file.originalname, req.file.size, req.file.mimetype, req.session.user.full_name || 'admin'
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/files' + (folderId ? '?folder=' + folderId : ''));
+  });
+
+  // Download file
+  router.get('/companies/:cid/files/:fileId/download', (req, res) => {
+    const file = safeGet('SELECT * FROM company_files WHERE id = ? AND company_id = ?', [req.params.fileId, req.params.cid]);
+    if (!file) return res.status(404).send('File not found');
+    const filePath = require('path').join(__dirname, '..', 'uploads', file.filename);
+    res.download(filePath, file.original_name);
+  });
+
+  // Delete file
+  router.post('/companies/:cid/files/:fileId/delete', (req, res) => {
+    const file = safeGet('SELECT * FROM company_files WHERE id = ? AND company_id = ?', [req.params.fileId, req.params.cid]);
+    const folderId = req.body.folder_id || null;
+    if (file) {
+      try {
+        const filePath = require('path').join(__dirname, '..', 'uploads', file.filename);
+        require('fs').unlinkSync(filePath);
+      } catch(e) {}
+      try { db.prepare('DELETE FROM company_files WHERE id = ?').run(file.id); } catch(e) {}
+    }
+    res.redirect('/admin/companies/' + req.params.cid + '/files' + (folderId ? '?folder=' + folderId : ''));
+  });
+
+  // Move file to folder
+  router.post('/companies/:cid/files/:fileId/move', (req, res) => {
+    const { folder_id } = req.body;
+    try { db.prepare('UPDATE company_files SET folder_id = ? WHERE id = ? AND company_id = ?').run(folder_id || null, req.params.fileId, req.params.cid); } catch(e) {}
+    res.redirect(req.body.redirect || '/admin/companies/' + req.params.cid + '/files');
+  });
+
+  // === INVENTORY LOCATIONS (must be before generic /:id/:table) ===
+  router.post('/companies/:cid/locations', (req, res) => {
+    const { name, type, address, parent_id, notes } = req.body;
+    try {
+      db.prepare('INSERT INTO inventory_locations (company_id, name, type, address, parent_id, notes) VALUES (?,?,?,?,?,?)').run(
+        req.params.cid, name, type || 'office', address || null, parent_id || null, notes || null
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '?tab=inventory');
+  });
+
+  router.post('/companies/:cid/locations/:lid/edit', (req, res) => {
+    const { name, type, address, parent_id, notes } = req.body;
+    try {
+      db.prepare('UPDATE inventory_locations SET name=?, type=?, address=?, parent_id=?, notes=? WHERE id=? AND company_id=?').run(
+        name, type || 'office', address || null, parent_id || null, notes || null, req.params.lid, req.params.cid
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '?tab=inventory');
+  });
+
+  router.post('/companies/:cid/locations/:lid/delete', (req, res) => {
+    try {
+      db.prepare('UPDATE inventory SET location_id = NULL WHERE location_id = ? AND company_id = ?').run(req.params.lid, req.params.cid);
+      db.prepare('UPDATE inventory_locations SET parent_id = NULL WHERE parent_id = ? AND company_id = ?').run(req.params.lid, req.params.cid);
+      db.prepare('DELETE FROM inventory_locations WHERE id = ? AND company_id = ?').run(req.params.lid, req.params.cid);
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '?tab=inventory');
+  });
+
   // === COMPANY LOGO ===
   router.post('/companies/:id/logo', (req, res) => {
     const { logo_url } = req.body;
@@ -452,6 +630,47 @@ module.exports = function(db) {
     const result = db.prepare('INSERT INTO invoices (company_id, invoice_number, date, due_date, subtotal, total, status) VALUES (?,?,?,?,?,?,?)').run(company_id, invNum, date, due_date, total, total, status || 'sent');
     db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, total) VALUES (?,?,1,?,?)').run(result.lastInsertRowid, description, total, total);
     res.redirect(req.body.redirect || '/admin/billing');
+  });
+
+  // Invoice detail view
+  router.get('/invoices/:id', (req, res) => {
+    const invoice = safeGet('SELECT i.*, c.name as company_name, c.address, c.city, c.state, c.zip FROM invoices i LEFT JOIN companies c ON i.company_id = c.id WHERE i.id = ?', [req.params.id]);
+    if (!invoice) return res.redirect('/admin/billing');
+    const items = safeAll('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id', [invoice.id]);
+    res.render(V('invoice-detail'), { user: req.session.user, invoice, items, settings: getSettings(), page: 'billing' });
+  });
+
+  // Add line item
+  router.post('/invoices/:id/items', (req, res) => {
+    const { description, quantity, unit_price } = req.body;
+    const qty = parseFloat(quantity) || 1;
+    const price = parseFloat(unit_price) || 0;
+    const total = qty * price;
+    db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, total) VALUES (?,?,?,?,?)').run(req.params.id, description, qty, price, total);
+    // Recalculate invoice total
+    const sum = safeGet('SELECT SUM(total) as s FROM invoice_items WHERE invoice_id = ?', [req.params.id]);
+    db.prepare('UPDATE invoices SET subtotal = ?, total = ? WHERE id = ?').run(sum.s || 0, sum.s || 0, req.params.id);
+    res.redirect('/admin/invoices/' + req.params.id);
+  });
+
+  // Delete line item
+  router.post('/invoices/:id/items/:itemId/delete', (req, res) => {
+    db.prepare('DELETE FROM invoice_items WHERE id = ? AND invoice_id = ?').run(req.params.itemId, req.params.id);
+    const sum = safeGet('SELECT SUM(total) as s FROM invoice_items WHERE invoice_id = ?', [req.params.id]);
+    db.prepare('UPDATE invoices SET subtotal = ?, total = ? WHERE id = ?').run(sum.s || 0, sum.s || 0, req.params.id);
+    res.redirect('/admin/invoices/' + req.params.id);
+  });
+
+  // Edit invoice
+  router.post('/invoices/:id/edit', (req, res) => {
+    const { invoice_number, date, due_date, status, notes, tax } = req.body;
+    const taxAmt = parseFloat(tax) || 0;
+    const sub = safeGet('SELECT SUM(total) as s FROM invoice_items WHERE invoice_id = ?', [req.params.id]);
+    const total = (sub.s || 0) + taxAmt;
+    db.prepare('UPDATE invoices SET invoice_number=?, date=?, due_date=?, status=?, notes=?, tax=?, subtotal=?, total=? WHERE id=?').run(
+      invoice_number, date, due_date, status, notes || null, taxAmt, sub.s || 0, total, req.params.id
+    );
+    res.redirect('/admin/invoices/' + req.params.id);
   });
 
   router.post('/invoices/:id/pay', (req, res) => {
@@ -1297,35 +1516,6 @@ module.exports = function(db) {
     res.render(V('org-chart'), { user: req.session.user, company, users, depts, settings: getSettings(), page: 'companies' });
   });
 
-  // === INVENTORY LOCATIONS ===
-  router.post('/companies/:cid/locations', (req, res) => {
-    const { name, type, address, parent_id, notes } = req.body;
-    try {
-      db.prepare('INSERT INTO inventory_locations (company_id, name, type, address, parent_id, notes) VALUES (?,?,?,?,?,?)').run(
-        req.params.cid, name, type || 'office', address || null, parent_id || null, notes || null
-      );
-    } catch(e) {}
-    res.redirect('/admin/companies/' + req.params.cid + '?tab=inventory');
-  });
-
-  router.post('/companies/:cid/locations/:lid/edit', (req, res) => {
-    const { name, type, address, parent_id, notes } = req.body;
-    try {
-      db.prepare('UPDATE inventory_locations SET name=?, type=?, address=?, parent_id=?, notes=? WHERE id=? AND company_id=?').run(
-        name, type || 'office', address || null, parent_id || null, notes || null, req.params.lid, req.params.cid
-      );
-    } catch(e) {}
-    res.redirect('/admin/companies/' + req.params.cid + '?tab=inventory');
-  });
-
-  router.post('/companies/:cid/locations/:lid/delete', (req, res) => {
-    try {
-      db.prepare('UPDATE inventory SET location_id = NULL WHERE location_id = ? AND company_id = ?').run(req.params.lid, req.params.cid);
-      db.prepare('UPDATE inventory_locations SET parent_id = NULL WHERE parent_id = ? AND company_id = ?').run(req.params.lid, req.params.cid);
-      db.prepare('DELETE FROM inventory_locations WHERE id = ? AND company_id = ?').run(req.params.lid, req.params.cid);
-    } catch(e) {}
-    res.redirect('/admin/companies/' + req.params.cid + '?tab=inventory');
-  });
 
   // === SECURITY POLICIES ===
   router.get('/policies', (req, res) => {

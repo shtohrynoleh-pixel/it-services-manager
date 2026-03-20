@@ -498,6 +498,9 @@ function initDB() {
       sender_id INTEGER,
       sender_name TEXT NOT NULL,
       message TEXT NOT NULL,
+      attachment TEXT,
+      attachment_name TEXT,
+      attachment_type TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (channel_id) REFERENCES chat_channels(id) ON DELETE CASCADE
     );
@@ -581,6 +584,43 @@ function initDB() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    -- File directories
+    CREATE TABLE IF NOT EXISTS file_folders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      parent_id INTEGER,
+      name TEXT NOT NULL,
+      created_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+      FOREIGN KEY (parent_id) REFERENCES file_folders(id) ON DELETE CASCADE
+    );
+
+    -- Folder user access
+    CREATE TABLE IF NOT EXISTS folder_access (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      folder_id INTEGER NOT NULL,
+      user_name TEXT NOT NULL,
+      permission TEXT DEFAULT 'view',
+      FOREIGN KEY (folder_id) REFERENCES file_folders(id) ON DELETE CASCADE
+    );
+
+    -- Files
+    CREATE TABLE IF NOT EXISTS company_files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      folder_id INTEGER,
+      filename TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      size INTEGER DEFAULT 0,
+      mime_type TEXT,
+      uploaded_by TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+      FOREIGN KEY (folder_id) REFERENCES file_folders(id) ON DELETE SET NULL
+    );
+
     -- Service schedule (recurring service visits/tasks per company)
     CREATE TABLE IF NOT EXISTS service_schedule (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -649,6 +689,13 @@ function initDB() {
   if (hasDepts.c === 0) {
     const di = db.prepare('INSERT INTO departments (name, description, sort_order) VALUES (?,?,?)');
     [['Executive','Leadership and ownership',1],['Operations','Dispatch, logistics, and daily operations',2],['Driving','CDL drivers and fleet operators',3],['Maintenance','Truck and equipment maintenance',4],['Accounting','Finance, billing, and payroll',5],['Safety','Safety compliance and training',6],['HR','Hiring, onboarding, and employee management',7],['Administration','Office support and front desk',8],['IT','Technology and systems',9],['Warehouse','Loading, unloading, and yard operations',10]].forEach(d => di.run(...d));
+  }
+
+  // Add chat attachment columns if missing
+  try { db.prepare('SELECT attachment FROM chat_messages LIMIT 1').get(); } catch(e) {
+    try { db.exec('ALTER TABLE chat_messages ADD COLUMN attachment TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE chat_messages ADD COLUMN attachment_name TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE chat_messages ADD COLUMN attachment_type TEXT'); } catch(e2) {}
   }
 
   // Add inventory columns if missing

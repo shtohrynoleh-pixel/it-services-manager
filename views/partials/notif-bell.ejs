@@ -1,40 +1,144 @@
 <% if (typeof notifications !== 'undefined' && notifications) { %>
+<style>
+.notif-tabs{display:flex;border-bottom:1px solid var(--border);background:#f8fafc;}
+.notif-tab{flex:1;padding:8px 6px;text-align:center;font-size:10px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.12s;}
+.notif-tab:hover{color:var(--primary);}
+.notif-tab.active{color:var(--primary);border-bottom-color:var(--primary);background:#fff;}
+.notif-tab .nt-count{background:var(--danger);color:#fff;font-size:8px;border-radius:8px;padding:0 4px;margin-left:2px;display:inline-block;min-width:14px;text-align:center;}
+.notif-tab .nt-count.ok{background:var(--success);}
+.notif-section{display:none;max-height:350px;overflow-y:auto;}
+.notif-section.active{display:block;}
+.notif-group{padding:6px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;background:#f8fafc;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1;}
+.notif-group.danger{color:#991b1b;background:#fee2e2;}
+.notif-group.today{color:#92400e;background:#fef3c7;}
+</style>
 <div class="notif-wrap">
   <button class="notif-btn" onclick="document.getElementById('notifDrop').classList.toggle('open')" title="Notifications">
     🔔
-    <% if (notifications.count > 0) { %><span class="notif-badge"><%= notifications.count %></span><% } %>
+    <% if (notifications.count > 0) { %><span class="notif-badge"><%= notifications.count > 99 ? '99+' : notifications.count %></span><% } %>
   </button>
   <div class="notif-drop" id="notifDrop">
     <% if (notifications.count === 0) { %>
-      <div class="notif-empty">✅ All caught up! No open tasks.</div>
+      <div class="notif-empty">✅ All caught up!</div>
     <% } else { %>
+      <!-- Tabs -->
+      <div class="notif-tabs">
+        <div class="notif-tab active" onclick="switchNotifTab('all')">All <span class="nt-count"><%= notifications.count %></span></div>
+        <div class="notif-tab" onclick="switchNotifTab('tasks')">Tasks <span class="nt-count"><%= notifications.allOpen.length %></span></div>
+        <div class="notif-tab" onclick="switchNotifTab('schedule')">Schedule <span class="nt-count"><%= notifications.overdueSchedules.length + notifications.todaySchedules.length + notifications.upcomingSchedules.length %></span></div>
+        <% if (notifications.clientTasks.length > 0) { %><div class="notif-tab" onclick="switchNotifTab('client')">Requests <span class="nt-count"><%= notifications.clientTasks.length %></span></div><% } %>
+      </div>
+
+      <!-- ALL tab -->
+      <div class="notif-section active" id="notif-all">
+        <% if (notifications.overdueTasks.length > 0 || notifications.overdueSchedules.length > 0) { %>
+          <div class="notif-group danger">🔴 Overdue (<%= notifications.overdueTasks.length + notifications.overdueSchedules.length %>)</div>
+          <% notifications.overdueTasks.slice(0,3).forEach(t => { %>
+            <a href="/admin/tasks" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon">⚠️</span><div class="ni-text"><div class="ni-title"><%= t.title %></div><div class="ni-sub"><%= t.company_name || '' %> · Due: <%= t.due_date %> · ✅ Task</div></div></a>
+          <% }) %>
+          <% notifications.overdueSchedules.slice(0,3).forEach(s => { %>
+            <a href="/admin/schedule" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon">📅</span><div class="ni-text"><div class="ni-title"><%= s.title %></div><div class="ni-sub"><%= s.company_name || '' %> · Due: <%= s.next_due %> · 📅 Schedule</div></div></a>
+          <% }) %>
+        <% } %>
+
+        <% if (notifications.todayTasks.length > 0 || notifications.todaySchedules.length > 0) { %>
+          <div class="notif-group today">📌 Today (<%= notifications.todayTasks.length + notifications.todaySchedules.length %>)</div>
+          <% notifications.todayTasks.forEach(t => { %>
+            <a href="/admin/tasks" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon"><%= t.priority === 'urgent' ? '🔴' : t.priority === 'high' ? '🟠' : '🔵' %></span><div class="ni-text"><div class="ni-title"><%= t.title %></div><div class="ni-sub"><%= t.company_name || '' %> · <%= t.priority %> · ✅ Task</div></div></a>
+          <% }) %>
+          <% notifications.todaySchedules.forEach(s => { %>
+            <a href="/admin/schedule" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon">📅</span><div class="ni-text"><div class="ni-title"><%= s.title %></div><div class="ni-sub"><%= s.company_name || '' %><%= s.time_slot ? ' · ' + s.time_slot : '' %><%= s.assigned_to ? ' · 👤 ' + s.assigned_to : '' %></div></div></a>
+          <% }) %>
+        <% } %>
+
+        <% if (notifications.upcomingTasks.length > 0 || notifications.upcomingSchedules.length > 0) { %>
+          <div class="notif-group">📆 This Week (<%= notifications.upcomingTasks.length + notifications.upcomingSchedules.length %>)</div>
+          <% notifications.upcomingTasks.slice(0,3).forEach(t => { %>
+            <a href="/admin/tasks" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon"><%= t.priority === 'urgent' ? '🔴' : '📋' %></span><div class="ni-text"><div class="ni-title"><%= t.title %></div><div class="ni-sub"><%= t.company_name || '' %> · Due: <%= t.due_date %></div></div></a>
+          <% }) %>
+          <% notifications.upcomingSchedules.slice(0,3).forEach(s => { %>
+            <a href="/admin/schedule" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon">📅</span><div class="ni-text"><div class="ni-title"><%= s.title %></div><div class="ni-sub"><%= s.company_name || '' %> · Due: <%= s.next_due %><%= s.day_of_week ? ' · ' + s.day_of_week : '' %></div></div></a>
+          <% }) %>
+        <% } %>
+
+        <% var noDate = notifications.allOpen.filter(t => !t.due_date); %>
+        <% if (noDate.length > 0) { %>
+          <div class="notif-group">📋 No Due Date (<%= noDate.length %>)</div>
+          <% noDate.slice(0,3).forEach(t => { %>
+            <a href="/admin/tasks" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon"><%= t.priority === 'urgent' ? '🔴' : t.priority === 'high' ? '🟠' : '⏳' %></span><div class="ni-text"><div class="ni-title"><%= t.title %></div><div class="ni-sub"><%= t.company_name || '' %> · <%= t.priority %><%= t.assigned_to ? ' · 👤 ' + t.assigned_to : '' %></div></div></a>
+          <% }) %>
+        <% } %>
+
+        <div style="padding:8px 16px;border-top:1px solid var(--border);display:flex;gap:12px;">
+          <a href="/admin/tasks" style="font-size:11px;font-weight:700;">All tasks →</a>
+          <a href="/admin/schedule" style="font-size:11px;font-weight:700;">All schedules →</a>
+        </div>
+      </div>
+
+      <!-- TASKS tab -->
+      <div class="notif-section" id="notif-tasks">
+        <% if (notifications.allOpen.length === 0) { %>
+          <div class="notif-empty">No open tasks</div>
+        <% } else { %>
+          <% if (notifications.overdueTasks.length > 0) { %><div class="notif-group danger">Overdue (<%= notifications.overdueTasks.length %>)</div><% } %>
+          <% notifications.overdueTasks.forEach(t => { %>
+            <a href="/admin/tasks" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon">⚠️</span><div class="ni-text"><div class="ni-title"><%= t.title %></div><div class="ni-sub"><%= t.company_name || '' %> · Due: <%= t.due_date %> · <%= t.priority %><%= t.assigned_to ? ' · 👤 ' + t.assigned_to : '' %></div></div></a>
+          <% }) %>
+          <% if (notifications.todayTasks.length > 0) { %><div class="notif-group today">Today (<%= notifications.todayTasks.length %>)</div><% } %>
+          <% notifications.todayTasks.forEach(t => { %>
+            <a href="/admin/tasks" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon"><%= t.priority === 'urgent' ? '🔴' : '📌' %></span><div class="ni-text"><div class="ni-title"><%= t.title %></div><div class="ni-sub"><%= t.company_name || '' %> · <%= t.priority %><%= t.assigned_to ? ' · 👤 ' + t.assigned_to : '' %></div></div></a>
+          <% }) %>
+          <% if (notifications.upcomingTasks.length > 0) { %><div class="notif-group">This Week (<%= notifications.upcomingTasks.length %>)</div><% } %>
+          <% notifications.upcomingTasks.forEach(t => { %>
+            <a href="/admin/tasks" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon">📋</span><div class="ni-text"><div class="ni-title"><%= t.title %></div><div class="ni-sub"><%= t.company_name || '' %> · Due: <%= t.due_date %></div></div></a>
+          <% }) %>
+          <div style="padding:8px 16px;border-top:1px solid var(--border);"><a href="/admin/tasks" style="font-size:11px;font-weight:700;">View all tasks →</a></div>
+        <% } %>
+      </div>
+
+      <!-- SCHEDULE tab -->
+      <div class="notif-section" id="notif-schedule">
+        <% var allSch = [...notifications.overdueSchedules, ...notifications.todaySchedules, ...notifications.upcomingSchedules]; %>
+        <% if (allSch.length === 0) { %>
+          <div class="notif-empty">No upcoming schedules this week</div>
+        <% } else { %>
+          <% if (notifications.overdueSchedules.length > 0) { %><div class="notif-group danger">Overdue (<%= notifications.overdueSchedules.length %>)</div><% } %>
+          <% notifications.overdueSchedules.forEach(s => { %>
+            <a href="/admin/schedule" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon">🚨</span><div class="ni-text"><div class="ni-title"><%= s.title %></div><div class="ni-sub"><%= s.company_name || '' %> · Due: <%= s.next_due %> · <%= s.frequency %><%= s.assigned_to ? ' · 👤 ' + s.assigned_to : '' %></div></div></a>
+          <% }) %>
+          <% if (notifications.todaySchedules.length > 0) { %><div class="notif-group today">Today (<%= notifications.todaySchedules.length %>)</div><% } %>
+          <% notifications.todaySchedules.forEach(s => { %>
+            <a href="/admin/schedule" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon">📅</span><div class="ni-text"><div class="ni-title"><%= s.title %></div><div class="ni-sub"><%= s.company_name || '' %><%= s.time_slot ? ' · ' + s.time_slot : '' %><%= s.day_of_week ? ' · ' + s.day_of_week : '' %><%= s.assigned_to ? ' · 👤 ' + s.assigned_to : '' %></div></div></a>
+          <% }) %>
+          <% if (notifications.upcomingSchedules.length > 0) { %><div class="notif-group">This Week (<%= notifications.upcomingSchedules.length %>)</div><% } %>
+          <% notifications.upcomingSchedules.forEach(s => { %>
+            <a href="/admin/schedule" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon">📆</span><div class="ni-text"><div class="ni-title"><%= s.title %></div><div class="ni-sub"><%= s.company_name || '' %> · Due: <%= s.next_due %> · <%= s.frequency %></div></div></a>
+          <% }) %>
+          <div style="padding:8px 16px;border-top:1px solid var(--border);"><a href="/admin/schedule" style="font-size:11px;font-weight:700;">View all schedules →</a></div>
+        <% } %>
+      </div>
+
+      <!-- CLIENT REQUESTS tab -->
       <% if (notifications.clientTasks.length > 0) { %>
-        <h4>📥 Client Requests (<%= notifications.clientTasks.length %>)</h4>
-        <% notifications.clientTasks.slice(0,5).forEach(t => { %>
-          <a href="/admin/tasks" class="notif-item" style="text-decoration:none;color:inherit;">
-            <span class="ni-icon"><%= t.priority === 'urgent' ? '🔴' : t.priority === 'high' ? '🟠' : '🔵' %></span>
-            <div class="ni-text">
-              <div class="ni-title"><%= t.title %></div>
-              <div class="ni-sub"><%= t.company_name || '' %> · <%= t.priority %><% if (t.assigned_to) { %> · 👤 <%= t.assigned_to %><% } %></div>
-            </div>
-          </a>
+      <div class="notif-section" id="notif-client">
+        <div class="notif-group">📥 Client Requests (<%= notifications.clientTasks.length %>)</div>
+        <% notifications.clientTasks.slice(0,10).forEach(t => { %>
+          <a href="/admin/tasks" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon"><%= t.priority === 'urgent' ? '🔴' : t.priority === 'high' ? '🟠' : '🔵' %></span><div class="ni-text"><div class="ni-title"><%= t.title %></div><div class="ni-sub"><%= t.company_name || '' %> · <%= t.priority %><% if (t.due_date) { %> · Due: <%= t.due_date %><% } %></div></div></a>
         <% }) %>
+        <div style="padding:8px 16px;border-top:1px solid var(--border);"><a href="/admin/tasks?filter=open" style="font-size:11px;font-weight:700;">View all requests →</a></div>
+      </div>
       <% } %>
-      <% if (notifications.myTasks.length > 0) { %>
-        <h4>✅ Open Tasks (<%= notifications.myTasks.length %>)</h4>
-        <% notifications.myTasks.slice(0,5).forEach(t => { %>
-          <a href="/admin/tasks" class="notif-item" style="text-decoration:none;color:inherit;">
-            <span class="ni-icon"><%= t.priority === 'urgent' ? '🔴' : t.priority === 'high' ? '🟠' : t.status === 'in-progress' ? '🔄' : '⏳' %></span>
-            <div class="ni-text">
-              <div class="ni-title"><%= t.title %></div>
-              <div class="ni-sub"><%= t.company_name || 'No company' %><% if (t.assigned_to) { %> · 👤 <%= t.assigned_to %><% } %> · <%= t.status %></div>
-            </div>
-          </a>
-        <% }) %>
-      <% } %>
-      <div style="padding:8px 16px;border-top:1px solid var(--border);"><a href="/admin/tasks" style="font-size:11px;font-weight:700;">View all tasks →</a></div>
     <% } %>
   </div>
 </div>
-<script>document.addEventListener('click',function(e){var d=document.getElementById('notifDrop');if(d&&!e.target.closest('.notif-wrap'))d.classList.remove('open');});</script>
+<script>
+document.addEventListener('click',function(e){var d=document.getElementById('notifDrop');if(d&&!e.target.closest('.notif-wrap'))d.classList.remove('open');});
+function switchNotifTab(name){
+  document.querySelectorAll('.notif-tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.notif-section').forEach(function(s){s.classList.remove('active');});
+  event.target.closest('.notif-tab').classList.add('active');
+  var el=document.getElementById('notif-'+name);
+  if(el)el.classList.add('active');
+}
+</script>
 <% } %>

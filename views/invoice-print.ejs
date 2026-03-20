@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Invoice <%= invoice.invoice_number %></title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',Arial,sans-serif;color:#1e293b;font-size:14px;background:#fff;}
+.invoice{max-width:800px;margin:0 auto;padding:40px;}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:40px;}
+.brand h1{font-size:22px;font-weight:800;color:#0891b2;}
+.brand p{font-size:12px;color:#64748b;margin-top:2px;}
+.inv-meta{text-align:right;}
+.inv-num{font-size:28px;font-weight:900;color:#0891b2;}
+.inv-date{font-size:12px;color:#64748b;margin-top:4px;}
+.parties{display:flex;gap:40px;margin-bottom:30px;}
+.party{flex:1;}
+.party-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:6px;}
+.party-name{font-size:16px;font-weight:700;margin-bottom:2px;}
+.party-addr{font-size:12px;color:#64748b;line-height:1.6;}
+table{width:100%;border-collapse:collapse;margin-bottom:20px;}
+thead th{background:#f8fafc;padding:10px 14px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;border-bottom:2px solid #e2e8f0;}
+tbody td{padding:12px 14px;border-bottom:1px solid #f1f5f9;font-size:13px;}
+.text-right{text-align:right;}
+.totals{margin-left:auto;width:280px;}
+.total-row{display:flex;justify-content:space-between;padding:8px 14px;font-size:13px;}
+.total-row.grand{background:#f0fdfa;border-radius:8px;font-size:18px;font-weight:900;color:#0891b2;margin-top:4px;padding:12px 14px;}
+.status{display:inline-block;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;text-transform:uppercase;}
+.status-paid{background:#d1fae5;color:#065f46;}
+.status-sent{background:#fef3c7;color:#92400e;}
+.status-overdue{background:#fee2e2;color:#991b1b;}
+.status-draft{background:#f1f5f9;color:#64748b;}
+.footer{margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center;line-height:1.6;}
+.notes{margin-top:20px;padding:14px;background:#f8fafc;border-radius:8px;font-size:12px;color:#475569;line-height:1.6;}
+@media print{
+  body{background:none;}
+  .invoice{padding:20px;}
+  .no-print{display:none!important;}
+}
+</style>
+</head>
+<body>
+<div class="no-print" style="background:#0891b2;color:#fff;padding:10px 20px;text-align:center;font-size:13px;">
+  <button onclick="window.print()" style="background:#fff;color:#0891b2;border:none;padding:8px 24px;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">🖨️ Print / Save as PDF</button>
+  <span style="margin-left:12px;">Use Ctrl+P or the button above to save as PDF</span>
+</div>
+
+<div class="invoice">
+  <div class="header">
+    <div class="brand">
+      <h1><%= settings.business_name || 'IT Services Pro' %></h1>
+      <p><%= settings.business_email || '' %><%= settings.business_phone ? ' · ' + settings.business_phone : '' %></p>
+    </div>
+    <div class="inv-meta">
+      <div class="inv-num"><%= invoice.invoice_number %></div>
+      <div class="inv-date">
+        Date: <strong><%= invoice.date || '—' %></strong><br>
+        Due: <strong><%= invoice.due_date || '—' %></strong>
+      </div>
+      <div style="margin-top:8px;">
+        <span class="status status-<%= invoice.status %>"><%= invoice.status %></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="parties">
+    <div class="party">
+      <div class="party-label">From</div>
+      <div class="party-name"><%= settings.business_name || 'IT Services Pro' %></div>
+      <div class="party-addr"><%= settings.business_email || '' %><br><%= settings.business_phone || '' %></div>
+    </div>
+    <div class="party">
+      <div class="party-label">Bill To</div>
+      <div class="party-name"><%= invoice.company_name || '—' %></div>
+      <div class="party-addr"><%= [invoice.address, invoice.city, invoice.state, invoice.zip].filter(Boolean).join(', ') || '' %></div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Description</th><th class="text-right">Qty</th><th class="text-right">Unit Price</th><th class="text-right">Amount</th></tr>
+    </thead>
+    <tbody>
+      <% items.forEach(item => { %>
+      <tr>
+        <td><%= item.description || '—' %></td>
+        <td class="text-right"><%= item.quantity %></td>
+        <td class="text-right">$<%= (item.unit_price||0).toFixed(2) %></td>
+        <td class="text-right"><strong>$<%= (item.total||0).toFixed(2) %></strong></td>
+      </tr>
+      <% }) %>
+      <% if (items.length === 0) { %>
+      <tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:20px;">No line items</td></tr>
+      <% } %>
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div class="total-row"><span>Subtotal</span><span>$<%= (invoice.subtotal||0).toFixed(2) %></span></div>
+    <% if (invoice.tax) { %><div class="total-row"><span>Tax</span><span>$<%= (invoice.tax||0).toFixed(2) %></span></div><% } %>
+    <div class="total-row grand"><span>Total</span><span>$<%= (invoice.total||0).toFixed(2) %></span></div>
+    <% if (invoice.status === 'paid') { %>
+      <div style="text-align:center;margin-top:12px;padding:8px;background:#d1fae5;border-radius:6px;color:#065f46;font-weight:700;font-size:13px;">PAID<%= invoice.paid_date ? ' — ' + invoice.paid_date : '' %></div>
+    <% } %>
+  </div>
+
+  <% if (invoice.notes) { %>
+  <div class="notes"><strong>Notes:</strong><br><%= invoice.notes %></div>
+  <% } %>
+
+  <div class="footer">
+    Thank you for your business!<br>
+    <%= settings.business_name || 'IT Services Pro' %><%= settings.business_email ? ' · ' + settings.business_email : '' %>
+  </div>
+</div>
+</body>
+</html>

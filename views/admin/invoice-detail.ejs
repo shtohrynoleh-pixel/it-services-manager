@@ -1,0 +1,82 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/billing" style="opacity:0.4;text-decoration:none;">💳</a> → <%= invoice.invoice_number %></h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <a href="/invoice/<%= invoice.invoice_number %>/print" target="_blank" class="btn btn-sm btn-primary">🖨️ Print / PDF</a>
+        <button onclick="navigator.clipboard.writeText(location.origin+'/invoice/<%= invoice.invoice_number %>/print')" class="btn btn-sm">📋 Copy Link</button>
+        <% if (invoice.status !== 'paid') { %><form method="POST" action="/admin/invoices/<%= invoice.id %>/pay" style="display:inline"><button type="submit" class="btn btn-sm" style="background:var(--success);color:#fff;border-color:var(--success);">✓ Mark Paid</button></form><% } %>
+        <form method="POST" action="/admin/invoices/<%= invoice.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this invoice?')"><button type="submit" class="btn btn-sm btn-danger">🗑️ Delete</button></form>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+          <div>
+            <h3 style="margin-bottom:4px;"><%= invoice.invoice_number %></h3>
+            <div style="font-size:13px;"><strong><%= invoice.company_name || '—' %></strong></div>
+            <div style="font-size:12px;color:var(--muted);"><%= [invoice.address, invoice.city, invoice.state, invoice.zip].filter(Boolean).join(', ') || '' %></div>
+          </div>
+          <div style="text-align:right;">
+            <span class="badge <%= invoice.status %>"><%= invoice.status %></span>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Date: <%= invoice.date || '—' %></div>
+            <div style="font-size:12px;color:var(--muted);">Due: <%= invoice.due_date || '—' %></div>
+            <% if (invoice.paid_date) { %><div style="font-size:12px;color:var(--success);font-weight:700;">Paid: <%= invoice.paid_date %></div><% } %>
+          </div>
+        </div>
+      </div>
+
+      <!-- Line items -->
+      <div class="card">
+        <h3>Line Items</h3>
+        <table class="tbl">
+          <thead><tr><th>Description</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Unit Price</th><th style="text-align:right;">Total</th><th></th></tr></thead>
+          <tbody>
+          <% items.forEach(item => { %>
+            <tr>
+              <td><%= item.description || '—' %></td>
+              <td style="text-align:right;"><%= item.quantity %></td>
+              <td style="text-align:right;">$<%= (item.unit_price||0).toFixed(2) %></td>
+              <td style="text-align:right;font-weight:700;">$<%= (item.total||0).toFixed(2) %></td>
+              <td><form method="POST" action="/admin/invoices/<%= invoice.id %>/items/<%= item.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Remove?')">🗑️</button></form></td>
+            </tr>
+          <% }) %>
+          </tbody>
+          <tfoot>
+            <tr style="border-top:2px solid var(--border);"><td colspan="3" style="text-align:right;font-weight:600;">Subtotal</td><td style="text-align:right;font-weight:700;">$<%= (invoice.subtotal||0).toFixed(2) %></td><td></td></tr>
+            <tr><td colspan="3" style="text-align:right;font-weight:600;">Tax</td><td style="text-align:right;">$<%= (invoice.tax||0).toFixed(2) %></td><td></td></tr>
+            <tr style="font-size:16px;"><td colspan="3" style="text-align:right;font-weight:800;">Total</td><td style="text-align:right;font-weight:900;color:var(--primary);">$<%= (invoice.total||0).toFixed(2) %></td><td></td></tr>
+          </tfoot>
+        </table>
+
+        <!-- Add line item -->
+        <form method="POST" action="/admin/invoices/<%= invoice.id %>/items" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:700;margin-bottom:8px;">+ Add Line Item</div>
+          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+            <div class="form-group" style="flex:2;min-width:200px;margin-bottom:0;"><label>Description</label><input type="text" name="description" required placeholder="Service or item description"></div>
+            <div class="form-group" style="flex:0 0 80px;margin-bottom:0;"><label>Qty</label><input type="number" name="quantity" value="1" step="0.01" min="0.01"></div>
+            <div class="form-group" style="flex:0 0 120px;margin-bottom:0;"><label>Unit Price</label><input type="number" name="unit_price" step="0.01" required placeholder="0.00"></div>
+            <button type="submit" class="btn btn-sm btn-primary">Add</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Edit invoice details -->
+      <details class="card">
+        <summary style="cursor:pointer;font-weight:700;">Edit Invoice Details</summary>
+        <form method="POST" action="/admin/invoices/<%= invoice.id %>/edit" style="margin-top:12px;">
+          <div class="form-row"><div class="form-group"><label>Invoice #</label><input type="text" name="invoice_number" value="<%= invoice.invoice_number %>"></div><div class="form-group"><label>Status</label><select name="status"><% ['draft','sent','paid','overdue'].forEach(s => { %><option <%= invoice.status === s ? 'selected' : '' %>><%= s %></option><% }) %></select></div></div>
+          <div class="form-row"><div class="form-group"><label>Date</label><input type="date" name="date" value="<%= invoice.date || '' %>"></div><div class="form-group"><label>Due Date</label><input type="date" name="due_date" value="<%= invoice.due_date || '' %>"></div></div>
+          <div class="form-group"><label>Tax ($)</label><input type="number" name="tax" step="0.01" value="<%= invoice.tax || 0 %>"></div>
+          <div class="form-group"><label>Notes</label><textarea name="notes"><%= invoice.notes || '' %></textarea></div>
+          <button type="submit" class="btn btn-sm btn-primary">Save Changes</button>
+        </form>
+      </details>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

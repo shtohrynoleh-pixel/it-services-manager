@@ -19,6 +19,22 @@
         <div class="metric"><div class="m-label">Total Monitors</div><div class="m-val"><%= monitors.length %></div></div>
       </div>
 
+      <!-- Filters -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="monSearch" placeholder="Search monitors..." oninput="filterMon()" style="flex:1;min-width:150px;max-width:300px;padding:6px 12px;font-size:12px;">
+        <select id="monFilter" onchange="filterMon()" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">All Status</option>
+          <option value="up">Online only</option>
+          <option value="down">Offline only</option>
+          <option value="unknown">Unknown only</option>
+        </select>
+        <select id="monType" onchange="filterMon()" style="padding:6px 12px;font-size:12px;border:1px solid var(--border);border-radius:8px;">
+          <option value="">All Types</option>
+          <% var types = [...new Set(monitors.map(m => m.type).filter(Boolean))].sort(); %>
+          <% types.forEach(t => { %><option value="<%= t %>"><%= t %></option><% }) %>
+        </select>
+      </div>
+
       <% if (monitors.length === 0) { %>
         <div class="empty"><span class="e-icon">📡</span><div class="e-text">No monitors set up yet</div><button class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('open')">+ Add First Monitor</button></div>
       <% } else { %>
@@ -26,7 +42,7 @@
           const statusColor = m.last_status === 'up' ? 'var(--success)' : m.last_status === 'down' ? 'var(--danger)' : '#94a3b8';
           const statusBg = m.last_status === 'up' ? 'var(--success-light)' : m.last_status === 'down' ? 'var(--danger-light)' : '#f1f5f9';
         %>
-          <div class="item-card" style="cursor:default;align-items:flex-start;">
+          <div class="item-card mon-card" data-status="<%= m.last_status %>" data-type="<%= m.type %>" data-search="<%= [m.name, m.company_name, m.target, m.type, m.check_type].filter(Boolean).join(' ').toLowerCase() %>" style="cursor:default;align-items:flex-start;">
             <div style="margin-right:12px;margin-top:4px;">
               <div style="width:14px;height:14px;border-radius:50%;background:<%= statusColor %>;box-shadow:0 0 8px <%= statusColor %>;"></div>
             </div>
@@ -54,6 +70,37 @@
           </div>
         <% }) %>
       <% } %>
+
+      <script>
+      function filterMon(){
+        var q=(document.getElementById('monSearch').value||'').toLowerCase();
+        var st=document.getElementById('monFilter').value;
+        var tp=document.getElementById('monType').value;
+        document.querySelectorAll('.mon-card').forEach(function(c){
+          var matchQ=!q||c.dataset.search.indexOf(q)>=0;
+          var matchSt=!st||c.dataset.status===st;
+          var matchTp=!tp||c.dataset.type===tp;
+          c.style.display=(matchQ&&matchSt&&matchTp)?'':'none';
+        });
+      }
+      </script>
+
+      <!-- Tips card -->
+      <div class="card" style="margin-top:16px;background:#f0fdfa;border-color:var(--primary);">
+        <h3>💡 Monitoring Tips</h3>
+        <div style="font-size:12px;line-height:1.8;color:#374151;">
+          <strong>Local network devices</strong> (routers, switches, servers on LAN):<br>
+          &nbsp;&nbsp;→ Use <strong>TCP Port Check</strong> with the internal IP (e.g. <code>192.168.1.1:80</code>)<br>
+          &nbsp;&nbsp;→ Note: your EC2 server must be able to reach the device (VPN or public IP required for remote LAN)<br><br>
+          <strong>Internet services</strong> (websites, APIs, cloud apps):<br>
+          &nbsp;&nbsp;→ Use <strong>HTTP/HTTPS</strong> with the full URL<br><br>
+          <strong>Specific services</strong> on servers:<br>
+          &nbsp;&nbsp;→ RDP: <code>server-ip:3389</code> · SSH: <code>server-ip:22</code> · SQL: <code>server-ip:1433</code> · FTP: <code>server-ip:21</code><br><br>
+          <strong>For local network monitoring</strong> when the EC2 can't reach your LAN:<br>
+          &nbsp;&nbsp;→ Install a lightweight agent on a local machine that reports to your webhook<br>
+          &nbsp;&nbsp;→ Or set up a VPN between your office and EC2
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -67,15 +114,68 @@
         <div class="form-group"><label>Company</label><select name="company_id"><option value="">— Select —</option><% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Type</label><select name="type"><option value="server">Server</option><option value="router">Router</option><option value="switch">Switch</option><option value="firewall">Firewall</option><option value="printer">Printer</option><option value="ups">UPS</option><option value="website">Website</option><option value="service">Service/App</option><option value="other">Other</option></select></div>
-        <div class="form-group"><label>Target (IP/URL)</label><input type="text" name="target" placeholder="192.168.1.1 or https://example.com"></div>
+        <div class="form-group"><label>Type</label><select name="type">
+          <optgroup label="Network">
+            <option value="server">Server</option>
+            <option value="router">Router</option>
+            <option value="switch">Switch</option>
+            <option value="firewall">Firewall</option>
+            <option value="access-point">Access Point</option>
+            <option value="vpn">VPN Gateway</option>
+          </optgroup>
+          <optgroup label="Devices">
+            <option value="printer">Printer</option>
+            <option value="ups">UPS</option>
+            <option value="nas">NAS/Storage</option>
+            <option value="camera">IP Camera</option>
+            <option value="phone-system">Phone System</option>
+          </optgroup>
+          <optgroup label="Internet">
+            <option value="website">Website</option>
+            <option value="service">Service/App</option>
+            <option value="api">API Endpoint</option>
+            <option value="dns">DNS</option>
+            <option value="ssl">SSL Certificate</option>
+          </optgroup>
+          <option value="other">Other</option>
+        </select></div>
+        <div class="form-group"><label>Target (IP/URL/Host:Port)</label><input type="text" name="target" placeholder="192.168.1.1, https://example.com, or 10.0.0.1:443">
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;">For local network: use internal IP (e.g. 192.168.1.1). For internet: use URL or domain. For port check: use host:port (e.g. 10.0.0.1:3389)</div>
+        </div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Check Type</label><select name="check_type"><option value="ping">Ping</option><option value="http">HTTP</option><option value="https">HTTPS</option><option value="port">Port Check</option></select></div>
-        <div class="form-group"><label>Check Interval (min)</label><input type="number" name="interval_min" value="5" min="1"></div>
+        <div class="form-group"><label>Check Method</label><select name="check_type" id="checkType" onchange="updateCheckHelp()">
+          <optgroup label="Web">
+            <option value="http">HTTP (port 80)</option>
+            <option value="https">HTTPS (port 443)</option>
+          </optgroup>
+          <optgroup label="Network">
+            <option value="port">TCP Port Check</option>
+            <option value="ping">TCP Connect (default port 80)</option>
+          </optgroup>
+        </select>
+          <div id="checkHelp" style="font-size:10px;color:var(--muted);margin-top:4px;"></div>
+        </div>
+        <div class="form-group"><label>Check Interval (min)</label><input type="number" name="interval_min" value="5" min="1">
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;">How often to check. 1 = every minute, 5 = every 5 min</div>
+        </div>
       </div>
-      <div class="form-group"><label>Alert Email</label><input type="email" name="alert_email" placeholder="Notify when down"></div>
-      <div class="form-group"><label>Notes</label><textarea name="notes" placeholder="Location, purpose, etc."></textarea></div>
+      <div class="form-group"><label>Alert Email (optional)</label><input type="email" name="alert_email" placeholder="Extra email to notify when this monitor goes down"></div>
+      <div class="form-group"><label>Notes</label><textarea name="notes" placeholder="Location, purpose, local vs internet, etc."></textarea></div>
+      <script>
+      function updateCheckHelp(){
+        var t=document.getElementById('checkType').value;
+        var h=document.getElementById('checkHelp');
+        var tips={
+          'http':'Sends HTTP GET request. Good for websites and web apps. Target: URL or domain.',
+          'https':'Sends HTTPS GET request with SSL. Good for secure websites. Target: URL or domain.',
+          'port':'Tries to connect to a specific TCP port. Good for local servers (RDP:3389, SSH:22, SQL:1433). Target: IP:PORT',
+          'ping':'Tries TCP connect on port 80. Good for routers, switches, firewalls. Target: IP address'
+        };
+        h.textContent=tips[t]||'';
+      }
+      updateCheckHelp();
+      </script>
       <div class="form-actions"><button type="submit" class="btn btn-primary">Add Monitor</button><button type="button" class="btn" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button></div>
     </form>
   </div>

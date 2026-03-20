@@ -73,6 +73,7 @@
         <% } %>
         <!-- Quick links -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+          <a href="/admin/companies/<%= company.id %>/files" class="btn btn-sm">📁 Files</a>
           <a href="/admin/companies/<%= company.id %>/email-security" class="btn btn-sm">📧 Email Security</a>
           <a href="/admin/companies/<%= company.id %>/org-chart" class="btn btn-sm">🏛️ Org Chart</a>
           <a href="/admin/policies?company=<%= company.id %>" class="btn btn-sm">🛡️ Security Policies</a>

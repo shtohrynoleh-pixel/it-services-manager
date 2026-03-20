@@ -27,13 +27,15 @@
             <tbody>
             <% invoices.forEach(inv => { %>
               <tr>
-                <td style="font-weight:600;font-size:11px;color:var(--muted);"><%= inv.invoice_number || '—' %></td>
+                <td><a href="/admin/invoices/<%= inv.id %>" style="font-weight:600;font-size:11px;"><%= inv.invoice_number || '—' %></a></td>
                 <td><strong><%= inv.company_name || '?' %></strong></td>
                 <td><%= inv.date || '—' %></td>
                 <td><strong>$<%= (inv.total||0).toFixed(2) %></strong></td>
                 <td><span class="badge <%= inv.status %>"><%= inv.status %></span></td>
                 <td><%= inv.paid_date || '—' %></td>
                 <td style="white-space:nowrap;">
+                  <a href="/admin/invoices/<%= inv.id %>" class="btn btn-sm" title="View/Edit">📋</a>
+                  <a href="/invoice/<%= inv.invoice_number %>/print" target="_blank" class="btn btn-sm" title="Print">🖨️</a>
                   <% if (inv.status !== 'paid') { %><form method="POST" action="/admin/invoices/<%= inv.id %>/pay" style="display:inline"><button type="submit" class="btn btn-sm btn-primary">✓ Paid</button></form><% } %>
                   <form method="POST" action="/admin/invoices/<%= inv.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Delete invoice?')">🗑️</button></form>
                 </td>

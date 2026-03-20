@@ -120,7 +120,7 @@
           <% } else { %>
             <div class="card" style="overflow-x:auto;">
               <table class="tbl">
-                <thead><tr><th>#</th><th>Date</th><th>Amount</th><th>Status</th><th>Paid</th></tr></thead>
+                <thead><tr><th>#</th><th>Date</th><th>Amount</th><th>Status</th><th>Paid</th><th></th></tr></thead>
                 <tbody>
                 <% invoices.forEach(inv => { %>
                   <tr>
@@ -129,6 +129,7 @@
                     <td><strong>$<%= (inv.total||0).toFixed(2) %></strong></td>
                     <td><span class="badge <%= inv.status %>"><%= inv.status %></span></td>
                     <td><%= inv.paid_date || '—' %></td>
+                    <td><a href="/invoice/<%= inv.invoice_number %>/print" target="_blank" class="btn btn-sm">🖨️ View / PDF</a></td>
                   </tr>
                 <% }) %>
                 </tbody>

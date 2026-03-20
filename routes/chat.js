@@ -1,6 +1,13 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { requireLogin } = require('../middleware/auth');
+
+const uploadDir = path.join(__dirname, '..', 'uploads', 'chat');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+const chatUpload = multer({ dest: uploadDir, limits: { fileSize: 10 * 1024 * 1024 } });
 
 module.exports = function(db) {
   router.use(requireLogin);
@@ -157,12 +164,12 @@ module.exports = function(db) {
     const channel = safeGet('SELECT * FROM chat_channels WHERE id = ?', [req.params.id]);
     if (!canAccess(cu, channel)) return res.status(403).json({ error: 'Access denied' });
 
-    const { message } = req.body;
-    if (!message || !message.trim()) return res.status(400).json({ error: 'Message required' });
+    const { message, attachment, attachment_name, attachment_type } = req.body;
+    if ((!message || !message.trim()) && !attachment) return res.status(400).json({ error: 'Message required' });
 
     try {
-      const r = db.prepare('INSERT INTO chat_messages (channel_id, sender_type, sender_id, sender_name, message) VALUES (?,?,?,?,?)').run(
-        req.params.id, cu.type, cu.id, cu.name, message.trim()
+      const r = db.prepare('INSERT INTO chat_messages (channel_id, sender_type, sender_id, sender_name, message, attachment, attachment_name, attachment_type) VALUES (?,?,?,?,?,?,?,?)').run(
+        req.params.id, cu.type, cu.id, cu.name, (message || '').trim() || (attachment_name || 'file'), attachment || null, attachment_name || null, attachment_type || null
       );
 
       // Ensure sender is a member
@@ -259,6 +266,41 @@ module.exports = function(db) {
       }
     });
     res.json({ unread: total });
+  });
+
+  // === UPLOAD FILE IN CHAT ===
+  router.post('/channels/:id/upload', chatUpload.single('file'), (req, res) => {
+    const cu = chatUser(req);
+    const channel = safeGet('SELECT * FROM chat_channels WHERE id = ?', [req.params.id]);
+    if (!canAccess(cu, channel)) return res.status(403).json({ error: 'Access denied' });
+    if (!req.file) return res.status(400).json({ error: 'No file' });
+
+    const fileUrl = '/chat/files/' + req.file.filename;
+    const isImage = (req.file.mimetype || '').startsWith('image/');
+
+    try {
+      const r = db.prepare('INSERT INTO chat_messages (channel_id, sender_type, sender_id, sender_name, message, attachment, attachment_name, attachment_type) VALUES (?,?,?,?,?,?,?,?)').run(
+        req.params.id, cu.type, cu.id, cu.name,
+        isImage ? '📷 ' + req.file.originalname : '📎 ' + req.file.originalname,
+        fileUrl, req.file.originalname, req.file.mimetype
+      );
+
+      const isMember = safeGet('SELECT id FROM chat_members WHERE channel_id = ? AND user_name = ?', [req.params.id, cu.name]);
+      if (isMember) {
+        db.prepare("UPDATE chat_members SET last_read_at = datetime('now') WHERE id = ?").run(isMember.id);
+      }
+
+      res.json({ ok: true, messageId: r.lastInsertRowid, fileUrl, fileName: req.file.originalname, isImage });
+    } catch(e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Serve chat files
+  router.get('/files/:filename', (req, res) => {
+    const filePath = path.join(uploadDir, req.params.filename);
+    if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
+    res.sendFile(filePath);
   });
 
   // === COMPANY USERS (for member picker) ===

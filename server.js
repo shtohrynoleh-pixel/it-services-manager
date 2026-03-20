@@ -94,6 +94,18 @@ app.post('/api/webhook/company/:key', (req, res) => {
   }
 });
 
+// Public invoice print view (no login required — shared via link)
+app.get('/invoice/:invNum/print', (req, res) => {
+  try {
+    const invoice = db.prepare('SELECT i.*, c.name as company_name, c.address, c.city, c.state, c.zip, c.logo FROM invoices i LEFT JOIN companies c ON i.company_id = c.id WHERE i.invoice_number = ?').get(req.params.invNum);
+    if (!invoice) return res.status(404).send('Invoice not found');
+    const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id').all(invoice.id);
+    const settings = {};
+    db.prepare('SELECT key, value FROM settings').all().forEach(r => { settings[r.key] = r.value; });
+    res.render('invoice-print', { invoice, items, settings });
+  } catch(e) { res.status(500).send('Error loading invoice'); }
+});
+
 app.use('/', require('./routes/auth')(db));
 app.use('/admin', require('./routes/admin')(db));
 app.use('/client', require('./routes/client')(db));

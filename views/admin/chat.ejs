@@ -104,8 +104,11 @@
             </div>
           </div>
           <div class="chat-messages" id="chatMessages"></div>
+          <div id="pastePreview" style="display:none;padding:8px 20px;"></div>
           <div class="chat-input">
-            <textarea id="msgInput" placeholder="Type a message..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+            <input type="file" id="chatFileInput" style="display:none" onchange="chatAttachFile(this)">
+            <button onclick="document.getElementById('chatFileInput').click()" style="padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:16px;" title="Attach file">📎</button>
+            <textarea id="msgInput" placeholder="Type a message... (Ctrl+V to paste image)" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
             <button onclick="sendMessage()">Send</button>
           </div>
         </div>
@@ -245,7 +248,7 @@ async function openChannel(id) {
     }
 
     // Start polling
-    pollTimer = setInterval(() => pollMessages(id), 3000);
+    pollTimer = setInterval(() => pollMessages(id), 1500);
 
     // Scroll to bottom
     scrollToBottom();
@@ -261,39 +264,33 @@ async function openChannel(id) {
   } catch(e) { console.error('Open channel:', e); }
 }
 
-function renderMessages(msgs) {
-  const el = document.getElementById('chatMessages');
-  el.innerHTML = msgs.map(m => {
-    if (m.sender_type === 'system') {
-      return '<div class="msg-wrap system"><div class="msg system">' + esc(m.message) + '</div><div class="msg-time">' + formatTime(m.created_at) + '</div></div>';
+function msgHtml(m) {
+  if (m.sender_type === 'system') return '<div class="msg-wrap system"><div class="msg system">' + esc(m.message) + '</div><div class="msg-time">' + formatTime(m.created_at) + '</div></div>';
+  const isMe = m.sender_name === myName;
+  const cls = isMe ? 'me' : 'other';
+  var att = '';
+  if (m.attachment) {
+    if ((m.attachment_type||'').startsWith('image/')) {
+      att = '<img src="' + esc(m.attachment) + '" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:6px;cursor:pointer;border:1px solid rgba(0,0,0,0.08);" onclick="window.open(\'' + esc(m.attachment) + '\',\'_blank\')">';
+    } else {
+      att = '<a href="' + esc(m.attachment) + '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(0,0,0,0.05);border-radius:6px;font-size:11px;margin-top:4px;text-decoration:none;color:inherit;">📎 ' + esc(m.attachment_name||'file') + '</a>';
     }
-    const isMe = m.sender_name === myName;
-    const cls = isMe ? 'me' : 'other';
-    return '<div class="msg-wrap ' + cls + '">' +
-      (!isMe ? '<div class="msg-sender">' + esc(m.sender_name) + '</div>' : '') +
-      '<div class="msg ' + cls + '">' + formatMsg(m.message) + '</div>' +
-      '<div class="msg-time">' + formatTime(m.created_at) + '</div></div>';
-  }).join('');
+  }
+  var txt = m.message && !m.message.startsWith('📷 ') && !m.message.startsWith('📎 ') ? formatMsg(m.message) : '';
+  return '<div class="msg-wrap ' + cls + '">' +
+    (!isMe ? '<div class="msg-sender">' + esc(m.sender_name) + '</div>' : '') +
+    '<div class="msg ' + cls + '">' + (txt || esc(m.attachment_name||m.message)) + att + '</div>' +
+    '<div class="msg-time">' + formatTime(m.created_at) + '</div></div>';
+}
+
+function renderMessages(msgs) {
+  document.getElementById('chatMessages').innerHTML = msgs.map(msgHtml).join('');
   scrollToBottom();
 }
 
 function appendMessages(msgs) {
   const el = document.getElementById('chatMessages');
-  msgs.forEach(m => {
-    const div = document.createElement('div');
-    if (m.sender_type === 'system') {
-      div.className = 'msg-wrap system';
-      div.innerHTML = '<div class="msg system">' + esc(m.message) + '</div><div class="msg-time">' + formatTime(m.created_at) + '</div>';
-    } else {
-      const isMe = m.sender_name === myName;
-      const cls = isMe ? 'me' : 'other';
-      div.className = 'msg-wrap ' + cls;
-      div.innerHTML = (!isMe ? '<div class="msg-sender">' + esc(m.sender_name) + '</div>' : '') +
-        '<div class="msg ' + cls + '">' + formatMsg(m.message) + '</div>' +
-        '<div class="msg-time">' + formatTime(m.created_at) + '</div>';
-    }
-    el.appendChild(div);
-  });
+  msgs.forEach(m => { var d = document.createElement('div'); d.innerHTML = msgHtml(m); if (d.firstChild) el.appendChild(d.firstChild); });
   scrollToBottom();
 }
 
@@ -331,24 +328,81 @@ async function pollMessages(channelId) {
 }
 
 // === SEND ===
-async function sendMessage() {
-  const input = document.getElementById('msgInput');
-  const msg = input.value.trim();
-  if (!msg || !currentChannel) return;
+var pendingFile = null;
 
+async function sendMessage() {
+  if (!currentChannel) return;
+  const input = document.getElementById('msgInput');
+  const msg = input ? input.value.trim() : '';
+
+  if (pendingFile) {
+    var fd = new FormData();
+    fd.append('file', pendingFile);
+    pendingFile = null;
+    document.getElementById('pastePreview').style.display = 'none';
+    document.getElementById('pastePreview').innerHTML = '';
+    if (input) { input.value = ''; input.style.height = 'auto'; }
+    try {
+      await fetch('/chat/channels/' + currentChannel.id + '/upload', { method: 'POST', body: fd });
+      await pollMessages(currentChannel.id);
+    } catch(e) { console.error('Upload:', e); }
+    return;
+  }
+
+  if (!msg) return;
   input.value = '';
   input.style.height = 'auto';
-
   try {
-    await fetch('/chat/channels/' + currentChannel.id + '/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg })
-    });
-    // Immediate poll to see our message
+    await fetch('/chat/channels/' + currentChannel.id + '/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg }) });
     await pollMessages(currentChannel.id);
   } catch(e) { console.error('Send:', e); }
 }
+
+function chatAttachFile(input) {
+  if (!input.files || !input.files[0]) return;
+  pendingFile = input.files[0];
+  var prev = document.getElementById('pastePreview');
+  var isImg = pendingFile.type.startsWith('image/');
+  if (isImg) {
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      prev.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:#f0f9ff;border-radius:8px;"><img src="'+ev.target.result+'" style="max-height:60px;border-radius:6px;"><span style="font-size:12px;">'+esc(pendingFile.name)+'</span><button onclick="clearPendingFile()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:16px;">✕</button></div>';
+      prev.style.display = 'block';
+    };
+    reader.readAsDataURL(pendingFile);
+  } else {
+    prev.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:#f0f9ff;border-radius:8px;">📎 <span style="font-size:12px;">'+esc(pendingFile.name)+'</span><button onclick="clearPendingFile()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:16px;">✕</button></div>';
+    prev.style.display = 'block';
+  }
+  input.value = '';
+}
+
+function clearPendingFile() {
+  pendingFile = null;
+  var prev = document.getElementById('pastePreview');
+  prev.style.display = 'none';
+  prev.innerHTML = '';
+}
+
+// Paste handler for images
+document.getElementById('msgInput').addEventListener('paste', function(e) {
+  var items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') !== -1) {
+      e.preventDefault();
+      pendingFile = items[i].getAsFile();
+      var prev = document.getElementById('pastePreview');
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        prev.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:#f0f9ff;border-radius:8px;"><img src="'+ev.target.result+'" style="max-height:60px;border-radius:6px;"><span style="font-size:12px;">Screenshot</span><button onclick="clearPendingFile()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:16px;">✕</button></div>';
+        prev.style.display = 'block';
+      };
+      reader.readAsDataURL(pendingFile);
+      return;
+    }
+  }
+});
 
 // === CREATE CHANNEL ===
 function showNewChannel() {

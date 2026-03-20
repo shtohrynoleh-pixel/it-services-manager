@@ -1,0 +1,230 @@
+<%- include('../partials/head') %>
+<style>
+.file-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px;}
+.file-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:all 0.15s;position:relative;}
+.file-item:hover{border-color:var(--primary);box-shadow:0 2px 12px rgba(8,145,178,0.08);transform:translateY(-1px);}
+.file-item .fi-icon{font-size:36px;margin-bottom:8px;}
+.file-item .fi-name{font-size:12px;font-weight:700;word-break:break-word;line-height:1.3;}
+.file-item .fi-sub{font-size:10px;color:var(--muted);margin-top:4px;}
+.file-item .fi-actions{position:absolute;top:6px;right:6px;display:none;}
+.file-item:hover .fi-actions{display:flex;gap:2px;}
+.fi-actions button,.fi-actions a{background:var(--card);border:1px solid var(--border);border-radius:4px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;text-decoration:none;color:var(--muted);}
+.fi-actions button:hover,.fi-actions a:hover{background:var(--bg);color:var(--danger);}
+.breadcrumb{display:flex;align-items:center;gap:4px;font-size:12px;margin-bottom:14px;flex-wrap:wrap;}
+.breadcrumb a{font-weight:600;}
+.breadcrumb span{color:var(--muted);}
+.access-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.access-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:var(--primary-light);color:var(--primary-dark);border-radius:6px;font-size:11px;font-weight:600;}
+.access-tag form{display:inline;}
+.access-tag button{background:none;border:none;cursor:pointer;color:var(--muted);font-size:10px;padding:0;}
+.access-tag button:hover{color:var(--danger);}
+</style>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <h2><a href="/admin/companies/<%= company.id %>" style="opacity:0.4;text-decoration:none;">🏢</a> → 📁 Files — <%= company.name %></h2>
+      </div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <!-- Stats -->
+      <div class="metrics">
+        <div class="metric hi"><div class="m-label">Total Files</div><div class="m-val pri"><%= totalFiles %></div></div>
+        <div class="metric"><div class="m-label">Folders</div><div class="m-val"><%= totalFolders %></div></div>
+        <div class="metric"><div class="m-label">Storage Used</div><div class="m-val"><%= totalSize > 1048576 ? (totalSize/1048576).toFixed(1) + ' MB' : totalSize > 1024 ? (totalSize/1024).toFixed(0) + ' KB' : totalSize + ' B' %></div></div>
+      </div>
+
+      <!-- Breadcrumb -->
+      <div class="breadcrumb">
+        <a href="/admin/companies/<%= company.id %>/files">📁 Root</a>
+        <% breadcrumbs.forEach(b => { %>
+          <span>›</span>
+          <a href="/admin/companies/<%= company.id %>/files?folder=<%= b.id %>"><%= b.name %></a>
+        <% }) %>
+      </div>
+
+      <!-- Toolbar -->
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('uploadModal').classList.add('open')">📤 Upload File</button>
+        <button class="btn btn-sm" onclick="document.getElementById('folderModal').classList.add('open')">📁 New Folder</button>
+        <% if (currentFolder) { %>
+          <button class="btn btn-sm" onclick="document.getElementById('accessModal').classList.add('open')">👥 Manage Access</button>
+        <% } %>
+        <input type="text" id="fileSearch" placeholder="Search files & folders..." oninput="filterFiles()" style="flex:1;min-width:150px;max-width:300px;padding:6px 12px;font-size:12px;">
+      </div>
+
+      <% if (currentFolder) { %>
+        <!-- Folder access tags -->
+        <% if (folderAccess.length > 0) { %>
+          <div style="margin-bottom:12px;font-size:11px;color:var(--muted);">
+            <strong>Access:</strong>
+            <div class="access-list">
+              <% folderAccess.forEach(a => { %>
+                <span class="access-tag">
+                  👤 <%= a.user_name %> (<%= a.permission %>)
+                  <form method="POST" action="/admin/companies/<%= company.id %>/folders/<%= folderId %>/access/<%= a.id %>/delete"><button type="submit" title="Remove">✕</button></form>
+                </span>
+              <% }) %>
+            </div>
+          </div>
+        <% } %>
+      <% } %>
+
+      <!-- Folders & Files grid -->
+      <% if (folders.length === 0 && files.length === 0) { %>
+        <div class="empty"><span class="e-icon">📁</span><div class="e-text"><%= currentFolder ? 'This folder is empty' : 'No files or folders yet' %></div></div>
+      <% } else { %>
+        <div class="file-grid" id="fileGrid">
+          <!-- Go up -->
+          <% if (currentFolder) { %>
+            <a href="/admin/companies/<%= company.id %>/files<%= currentFolder.parent_id ? '?folder=' + currentFolder.parent_id : '' %>" class="file-item" style="text-decoration:none;color:inherit;">
+              <div class="fi-icon">⬆️</div>
+              <div class="fi-name">..</div>
+              <div class="fi-sub">Go up</div>
+            </a>
+          <% } %>
+
+          <!-- Folders -->
+          <% folders.forEach(f => { %>
+            <div class="file-item" data-search="<%= f.name.toLowerCase() %>" onclick="location.href='/admin/companies/<%= company.id %>/files?folder=<%= f.id %>'">
+              <div class="fi-actions">
+                <form method="POST" action="/admin/companies/<%= company.id %>/folders/<%= f.id %>/delete" onclick="event.stopPropagation()">
+                  <input type="hidden" name="parent_id" value="<%= folderId || '' %>">
+                  <button type="submit" onclick="return confirm('Delete folder? Files will move to parent.')" title="Delete">🗑️</button>
+                </form>
+              </div>
+              <div class="fi-icon">📁</div>
+              <div class="fi-name"><%= f.name %></div>
+              <div class="fi-sub">Folder<%= f.created_by ? ' · ' + f.created_by : '' %></div>
+            </div>
+          <% }) %>
+
+          <!-- Files -->
+          <% files.forEach(f => {
+            var ext = (f.original_name || '').split('.').pop().toLowerCase();
+            var icon = ['pdf'].includes(ext) ? '📕' : ['doc','docx'].includes(ext) ? '📘' : ['xls','xlsx','csv'].includes(ext) ? '📗' : ['ppt','pptx'].includes(ext) ? '📙' : ['jpg','jpeg','png','gif','svg','webp'].includes(ext) ? '🖼️' : ['zip','rar','7z','tar','gz'].includes(ext) ? '📦' : ['txt','log','md'].includes(ext) ? '📄' : ['mp4','avi','mov'].includes(ext) ? '🎬' : '📎';
+            var sizeStr = f.size > 1048576 ? (f.size/1048576).toFixed(1) + ' MB' : f.size > 1024 ? (f.size/1024).toFixed(0) + ' KB' : f.size + ' B';
+          %>
+            <div class="file-item" data-search="<%= f.original_name.toLowerCase() %>" onclick="location.href='/admin/companies/<%= company.id %>/files/<%= f.id %>/download'">
+              <div class="fi-actions">
+                <a href="/admin/companies/<%= company.id %>/files/<%= f.id %>/download" onclick="event.stopPropagation()" title="Download">📥</a>
+                <form method="POST" action="/admin/companies/<%= company.id %>/files/<%= f.id %>/delete" onclick="event.stopPropagation()" style="display:inline;">
+                  <input type="hidden" name="folder_id" value="<%= folderId || '' %>">
+                  <button type="submit" onclick="return confirm('Delete this file?')" title="Delete">🗑️</button>
+                </form>
+              </div>
+              <div class="fi-icon"><%= icon %></div>
+              <div class="fi-name"><%= f.original_name %></div>
+              <div class="fi-sub"><%= sizeStr %><%= f.uploaded_by ? ' · ' + f.uploaded_by : '' %></div>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+
+      <!-- Upload Modal -->
+      <div class="modal-bg" id="uploadModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal">
+          <h3>📤 Upload File</h3>
+          <form method="POST" action="/admin/companies/<%= company.id %>/files/upload" enctype="multipart/form-data">
+            <input type="hidden" name="folder_id" value="<%= folderId || '' %>">
+            <div class="form-group">
+              <label>Select File (max 50MB)</label>
+              <input type="file" name="file" required style="padding:8px;">
+            </div>
+            <% if (currentFolder) { %>
+              <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Uploading to: <strong><%= breadcrumbs.map(b => b.name).join(' / ') || 'Root' %></strong></div>
+            <% } %>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Upload</button>
+              <button type="button" class="btn" onclick="document.getElementById('uploadModal').classList.remove('open')">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- New Folder Modal -->
+      <div class="modal-bg" id="folderModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal">
+          <h3>📁 New Folder</h3>
+          <form method="POST" action="/admin/companies/<%= company.id %>/folders">
+            <input type="hidden" name="parent_id" value="<%= folderId || '' %>">
+            <div class="form-group">
+              <label>Folder Name *</label>
+              <input type="text" name="name" required placeholder="e.g. Contracts, IT Docs, Invoices...">
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Create</button>
+              <button type="button" class="btn" onclick="document.getElementById('folderModal').classList.remove('open')">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Manage Access Modal -->
+      <% if (currentFolder) { %>
+      <div class="modal-bg" id="accessModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal">
+          <h3>👥 Folder Access — <%= currentFolder.name %></h3>
+          <% if (folderAccess.length > 0) { %>
+            <div style="margin-bottom:14px;">
+              <% folderAccess.forEach(a => { %>
+                <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;">
+                  <div style="flex:1;font-size:12px;font-weight:600;"><%= a.user_name %></div>
+                  <span class="badge <%= a.permission === 'edit' ? 'active' : 'draft' %>"><%= a.permission %></span>
+                  <form method="POST" action="/admin/companies/<%= company.id %>/folders/<%= folderId %>/access/<%= a.id %>/delete" style="display:inline;">
+                    <button type="submit" class="btn-ghost" style="font-size:11px;">✕</button>
+                  </form>
+                </div>
+              <% }) %>
+            </div>
+          <% } else { %>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">No access restrictions — all admins can access. Add users to restrict visibility.</div>
+          <% } %>
+          <form method="POST" action="/admin/companies/<%= company.id %>/folders/<%= folderId %>/access">
+            <div style="font-size:12px;font-weight:700;margin-bottom:8px;">+ Grant Access</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>User</label>
+                <select name="user_name" required>
+                  <option value="">— Select —</option>
+                  <% companyUsers.forEach(u => { %>
+                    <option value="<%= u.name %>"><%= u.name %><%= u.department ? ' (' + u.department + ')' : '' %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Permission</label>
+                <select name="permission">
+                  <option value="view">View only</option>
+                  <option value="edit">View & Edit</option>
+                  <option value="admin">Full access</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary">Grant Access</button>
+          </form>
+          <div class="form-actions">
+            <button type="button" class="btn" onclick="document.getElementById('accessModal').classList.remove('open')">Close</button>
+          </div>
+        </div>
+      </div>
+      <% } %>
+
+      <div style="margin-top:16px;"><a href="/admin/companies/<%= company.id %>" class="btn btn-sm">← Back to <%= company.name %></a></div>
+
+      <script>
+      function filterFiles(){
+        var q=(document.getElementById('fileSearch').value||'').toLowerCase();
+        document.querySelectorAll('#fileGrid .file-item').forEach(function(el){
+          if(!el.dataset.search){el.style.display='';return;}
+          el.style.display=(!q||el.dataset.search.indexOf(q)>=0)?'':'none';
+        });
+      }
+      </script>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>
