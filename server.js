@@ -112,9 +112,14 @@ app.use('/client', require('./routes/client')(db));
 app.use('/chat', require('./routes/chat')(db));
 
 app.get('/', (req, res) => {
-  if (!req.session.user) return res.redirect('/login');
-  if (req.session.user.role === 'admin') return res.redirect('/admin');
-  return res.redirect('/client');
+  if (req.session.user) {
+    if (req.session.user.role === 'admin') return res.redirect('/admin');
+    return res.redirect('/client');
+  }
+  const services = db.prepare('SELECT * FROM services WHERE is_public = 1 AND is_active = 1 ORDER BY base_price DESC').all();
+  const settings = {};
+  try { db.prepare('SELECT key, value FROM settings').all().forEach(r => { settings[r.key] = r.value; }); } catch(e) {}
+  res.render('landing', { services, settings, user: null });
 });
 
 app.use((req, res) => {
