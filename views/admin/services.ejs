@@ -13,7 +13,7 @@
       <% } else { %>
         <% services.forEach(s => { %>
           <div class="card">
-            <h3><%= s.name %> <span class="badge <%= s.is_public ? 'active' : 'inactive' %>"><%= s.is_public ? 'Public' : 'Private' %></span><% if (!s.is_active) { %> <span class="badge inactive">Disabled</span><% } %></h3>
+            <h3><%= s.name %> <span class="badge <%= s.is_public ? 'active' : 'inactive' %>"><%= s.is_public ? 'Public' : 'Private' %></span><% if (s.show_on_landing) { %> <span class="badge prospect">Landing</span><% } %><% if (!s.is_active) { %> <span class="badge inactive">Disabled</span><% } %></h3>
             <div style="font-size:12px;color:#475569;margin-bottom:10px;line-height:1.6;white-space:pre-wrap;"><%= s.description || 'No description' %></div>
             <div class="card-row"><span class="label">Price</span><span class="value" style="font-size:16px;color:var(--primary);font-weight:800;">$<%= (s.base_price||0).toFixed(2) %> <span style="font-size:11px;color:var(--muted);font-weight:400;">/ <%= s.price_type %></span></span></div>
             <div class="card-row"><span class="label">Category</span><span class="value"><span class="badge active"><%= s.category || '—' %></span></span></div>
@@ -35,7 +35,10 @@
         <div class="form-group"><label>Base Price</label><input type="number" name="base_price" step="0.01" placeholder="500.00"></div>
         <div class="form-group"><label>Price Type</label><select name="price_type"><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="one-time">One-time</option><option value="hourly">Hourly</option><option value="per-user">Per User</option></select></div>
       </div>
-      <div class="form-check"><input type="checkbox" name="is_public" value="1" checked> Show on public services page</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <div class="form-check"><input type="checkbox" name="is_public" value="1" checked> Show on services list</div>
+        <div class="form-check"><input type="checkbox" name="show_on_landing" value="1"> Show on landing page</div>
+      </div>
       <div class="form-actions"><button type="submit" class="btn btn-primary">Save Service</button><button type="button" class="btn" onclick="document.getElementById('addSvcModal').classList.remove('open')">Cancel</button></div>
     </form>
   </div>

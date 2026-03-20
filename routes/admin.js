@@ -630,8 +630,8 @@ module.exports = function(db) {
   });
 
   router.post('/services', (req, res) => {
-    const { name, category, description, price_type, base_price, is_public } = req.body;
-    db.prepare('INSERT INTO services (name, category, description, price_type, base_price, is_public) VALUES (?,?,?,?,?,?)').run(name, category, description, price_type, parseFloat(base_price) || 0, is_public ? 1 : 0);
+    const { name, category, description, price_type, base_price, is_public, show_on_landing } = req.body;
+    db.prepare('INSERT INTO services (name, category, description, price_type, base_price, is_public, show_on_landing) VALUES (?,?,?,?,?,?,?)').run(name, category, description, price_type, parseFloat(base_price) || 0, is_public ? 1 : 0, show_on_landing ? 1 : 0);
     res.redirect('/admin/services');
   });
 
@@ -647,9 +647,9 @@ module.exports = function(db) {
   });
 
   router.post('/services/:id/edit', (req, res) => {
-    const { name, category, description, price_type, base_price, is_public, is_active } = req.body;
-    db.prepare('UPDATE services SET name=?, category=?, description=?, price_type=?, base_price=?, is_public=?, is_active=? WHERE id=?').run(
-      name, category, description, price_type, parseFloat(base_price) || 0, is_public ? 1 : 0, is_active ? 1 : 0, req.params.id
+    const { name, category, description, price_type, base_price, is_public, is_active, show_on_landing } = req.body;
+    db.prepare('UPDATE services SET name=?, category=?, description=?, price_type=?, base_price=?, is_public=?, is_active=?, show_on_landing=? WHERE id=?').run(
+      name, category, description, price_type, parseFloat(base_price) || 0, is_public ? 1 : 0, is_active ? 1 : 0, show_on_landing ? 1 : 0, req.params.id
     );
     res.redirect('/admin/services');
   });

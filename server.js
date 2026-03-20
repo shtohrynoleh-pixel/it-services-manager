@@ -106,6 +106,31 @@ app.get('/invoice/:invNum/print', (req, res) => {
   } catch(e) { res.status(500).send('Error loading invoice'); }
 });
 
+// Contact form → creates a task
+app.post('/contact', (req, res) => {
+  try {
+    const { name, company, email, phone, message } = req.body;
+    const title = '📬 Website Inquiry from ' + (name || 'Unknown');
+    const desc = [
+      'Name: ' + (name || '—'),
+      'Company: ' + (company || '—'),
+      'Email: ' + (email || '—'),
+      'Phone: ' + (phone || '—'),
+      '',
+      'Message:',
+      message || '—'
+    ].join('\n');
+    db.prepare("INSERT INTO tasks (title, description, priority, status, assigned_to, created_by) VALUES (?,?,?,?,?,?)").run(
+      title, desc, 'medium', 'todo', 'admin', 'website'
+    );
+  } catch(e) { console.error('Contact form error:', e.message); }
+  // Re-render landing with success
+  const services = db.prepare('SELECT * FROM services WHERE show_on_landing = 1 AND is_active = 1 ORDER BY base_price DESC').all();
+  const settings = {};
+  try { db.prepare('SELECT key, value FROM settings').all().forEach(r => { settings[r.key] = r.value; }); } catch(e) {}
+  res.render('landing', { services, settings, user: null, submitted: true });
+});
+
 app.use('/', require('./routes/auth')(db));
 app.use('/admin', require('./routes/admin')(db));
 app.use('/client', require('./routes/client')(db));
@@ -116,7 +141,7 @@ app.get('/', (req, res) => {
     if (req.session.user.role === 'admin') return res.redirect('/admin');
     return res.redirect('/client');
   }
-  const services = db.prepare('SELECT * FROM services WHERE is_public = 1 AND is_active = 1 ORDER BY base_price DESC').all();
+  const services = db.prepare('SELECT * FROM services WHERE show_on_landing = 1 AND is_active = 1 ORDER BY base_price DESC').all();
   const settings = {};
   try { db.prepare('SELECT key, value FROM settings').all().forEach(r => { settings[r.key] = r.value; }); } catch(e) {}
   res.render('landing', { services, settings, user: null });

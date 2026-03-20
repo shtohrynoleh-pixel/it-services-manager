@@ -701,6 +701,11 @@ function initDB() {
     [['Executive','Leadership and ownership',1],['Operations','Dispatch, logistics, and daily operations',2],['Driving','CDL drivers and fleet operators',3],['Maintenance','Truck and equipment maintenance',4],['Accounting','Finance, billing, and payroll',5],['Safety','Safety compliance and training',6],['HR','Hiring, onboarding, and employee management',7],['Administration','Office support and front desk',8],['IT','Technology and systems',9],['Warehouse','Loading, unloading, and yard operations',10]].forEach(d => di.run(...d));
   }
 
+  // Add show_on_landing to services if missing
+  try { db.prepare('SELECT show_on_landing FROM services LIMIT 1').get(); } catch(e) {
+    try { db.exec('ALTER TABLE services ADD COLUMN show_on_landing INTEGER DEFAULT 0'); } catch(e2) {}
+  }
+
   // Add storage_quota to companies if missing (in MB)
   try { db.prepare('SELECT storage_quota FROM companies LIMIT 1').get(); } catch(e) {
     try { db.exec('ALTER TABLE companies ADD COLUMN storage_quota INTEGER DEFAULT 500'); } catch(e2) {}
@@ -918,7 +923,7 @@ function initDB() {
   // Seed default settings
   const bizName = db.prepare('SELECT value FROM settings WHERE key = ?').get('business_name');
   if (!bizName) {
-    db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('business_name', 'IT Services Pro');
+    db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('business_name', 'IT Forge');
     db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('business_email', '');
     db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('business_phone', '');
   }
