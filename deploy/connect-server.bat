@@ -73,8 +73,8 @@ git add -A
 git commit -m "%msg%"
 git push origin main
 echo.
-echo [3/4] Updating server...
-ssh -i "%KEY%" %SERVER% "cd /opt/itm && git pull origin main && npm install --production 2>&1 | tail -3 && pm2 restart itm 2>/dev/null || pm2 start server.js --name itm && pm2 save"
+echo [3/4] Updating server (database safe)...
+ssh -i "%KEY%" %SERVER% "cd /opt/itm && git stash 2>/dev/null; git pull origin main && npm install --production 2>&1 | tail -3 && pm2 restart itm 2>/dev/null || pm2 start server.js --name itm && pm2 save"
 echo.
 echo [4/4] Verifying...
 ssh -i "%KEY%" %SERVER% "pm2 status"
@@ -154,8 +154,8 @@ git add -A
 git commit -m "%msg%"
 git push origin main --force
 echo.
-echo [2/3] Force updating server...
-ssh -i "%KEY%" %SERVER% "cd /opt/itm && git fetch origin && git reset --hard origin/main && npm install --production 2>&1 | tail -3 && pm2 restart itm 2>/dev/null || pm2 start server.js --name itm && pm2 save"
+echo [2/3] Force updating server (keeping database + .env)...
+ssh -i "%KEY%" %SERVER% "cd /opt/itm && cp db/app.db /tmp/itm-backup.db 2>/dev/null; cp .env /tmp/itm-backup.env 2>/dev/null; git fetch origin && git reset --hard origin/main && cp /tmp/itm-backup.db db/app.db 2>/dev/null; cp /tmp/itm-backup.env .env 2>/dev/null; npm install --production 2>&1 | tail -3 && pm2 restart itm 2>/dev/null || pm2 start server.js --name itm && pm2 save"
 echo.
 echo [3/3] Verifying...
 ssh -i "%KEY%" %SERVER% "pm2 status"
