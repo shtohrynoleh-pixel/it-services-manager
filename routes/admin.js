@@ -489,11 +489,22 @@ module.exports = function(db) {
     res.redirect('/admin/companies/' + req.params.cid + '/files' + (folderId ? '?folder=' + folderId : ''));
   });
 
+  // Serve file inline (for preview)
+  router.get('/companies/:cid/files/:fileId/view', (req, res) => {
+    const file = safeGet('SELECT * FROM company_files WHERE id = ? AND company_id = ?', [req.params.fileId, req.params.cid]);
+    if (!file) return res.status(404).send('File not found');
+    const filePath = require('path').resolve(__dirname, '..', 'uploads', file.filename);
+    const mime = file.mime_type || 'application/octet-stream';
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', 'inline; filename="' + file.original_name + '"');
+    res.sendFile(filePath);
+  });
+
   // Download file
   router.get('/companies/:cid/files/:fileId/download', (req, res) => {
     const file = safeGet('SELECT * FROM company_files WHERE id = ? AND company_id = ?', [req.params.fileId, req.params.cid]);
     if (!file) return res.status(404).send('File not found');
-    const filePath = require('path').join(__dirname, '..', 'uploads', file.filename);
+    const filePath = require('path').resolve(__dirname, '..', 'uploads', file.filename);
     res.download(filePath, file.original_name);
   });
 
@@ -546,6 +557,23 @@ module.exports = function(db) {
       db.prepare('DELETE FROM inventory_locations WHERE id = ? AND company_id = ?').run(req.params.lid, req.params.cid);
     } catch(e) {}
     res.redirect('/admin/companies/' + req.params.cid + '?tab=inventory');
+  });
+
+  // === GRANT PORTAL ACCESS from company user ===
+  router.post('/companies/:id/grant-portal-access', (req, res) => {
+    const { company_user_id, username, password } = req.body;
+    if (!username || !password) return res.redirect('/admin/companies/' + req.params.id + '?tab=overview');
+    try {
+      const cu = safeGet('SELECT * FROM company_users WHERE id = ? AND company_id = ?', [company_user_id, req.params.id]);
+      const hash = bcrypt.hashSync(password, 10);
+      db.prepare('INSERT INTO users (username, password, role, company_id, full_name, email, phone, is_active) VALUES (?,?,?,?,?,?,?,1)').run(
+        username, hash, 'client', req.params.id,
+        cu ? cu.name : null,
+        cu ? (cu.email_account || cu.email) : null,
+        cu ? cu.phone : null
+      );
+    } catch(e) { console.error('Grant portal access error:', e.message); }
+    res.redirect('/admin/companies/' + req.params.id + '?tab=overview');
   });
 
   // === COMPANY LOGO ===

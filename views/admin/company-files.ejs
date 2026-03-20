@@ -31,6 +31,24 @@
 .breadcrumb span{color:var(--muted);}
 .access-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
 .access-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:var(--primary-light);color:var(--primary-dark);border-radius:6px;font-size:10px;font-weight:600;}
+/* Preview modal */
+.preview-bg{position:fixed;inset:0;background:rgba(15,23,42,0.7);z-index:1200;display:none;align-items:center;justify-content:center;padding:20px;}
+.preview-bg.open{display:flex;}
+.preview-box{background:#fff;border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,0.2);width:100%;max-width:900px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;}
+.preview-head{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #e2e8f0;flex-shrink:0;}
+.preview-head h3{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;margin-right:12px;}
+.preview-head-btns{display:flex;gap:6px;flex-shrink:0;}
+.preview-head-btns a,.preview-head-btns button{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #e2e8f0;background:#fff;text-decoration:none;color:#475569;font-family:inherit;display:inline-flex;align-items:center;gap:4px;}
+.preview-head-btns a:hover,.preview-head-btns button:hover{background:#f8fafc;}
+.preview-head-btns .btn-close{border:none;font-size:18px;padding:4px 10px;color:#94a3b8;}
+.preview-body{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;background:#f1f5f9;min-height:300px;}
+.preview-body img{max-width:100%;max-height:75vh;object-fit:contain;}
+.preview-body iframe{width:100%;height:75vh;border:none;}
+.preview-body video,.preview-body audio{max-width:100%;max-height:75vh;}
+.preview-nopreview{text-align:center;padding:40px;color:#94a3b8;}
+.preview-nopreview .pp-icon{font-size:48px;margin-bottom:12px;}
+.preview-nopreview .pp-name{font-size:14px;font-weight:700;color:#475569;margin-bottom:4px;}
+.preview-nopreview .pp-size{font-size:12px;}
 </style>
 <div class="app-wrap">
   <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
@@ -128,7 +146,7 @@
             </div>
           <% }) %>
           <% files.forEach(f => { %>
-            <div class="file-item" data-search="<%= f.original_name.toLowerCase() %>" onclick="location.href='/admin/companies/<%= company.id %>/files/<%= f.id %>/download'">
+            <div class="file-item" data-search="<%= f.original_name.toLowerCase() %>" onclick="openPreview(<%= f.id %>,'<%= f.original_name.replace(/'/g,"\\'") %>','<%= (f.mime_type||'').replace(/'/g,"\\'") %>',<%= f.size %>)">
               <div class="fi-actions">
                 <button class="fi-btn" onclick="event.stopPropagation();openMoveModal(<%= f.id %>,'<%= f.original_name.replace(/'/g,"\\'") %>')" title="Move">📂</button>
                 <a href="/admin/companies/<%= company.id %>/files/<%= f.id %>/download" class="fi-btn" onclick="event.stopPropagation()" title="Download">📥</a>
@@ -158,7 +176,7 @@
             </div>
           <% }) %>
           <% files.forEach(f => { %>
-            <div class="fl-row" data-search="<%= f.original_name.toLowerCase() %>" onclick="location.href='/admin/companies/<%= company.id %>/files/<%= f.id %>/download'">
+            <div class="fl-row" data-search="<%= f.original_name.toLowerCase() %>" onclick="openPreview(<%= f.id %>,'<%= f.original_name.replace(/'/g,"\\'") %>','<%= (f.mime_type||'').replace(/'/g,"\\'") %>',<%= f.size %>)">
               <div class="fl-icon"><%= fIcon(f.original_name) %></div><div class="fl-name"><%= f.original_name %></div><div class="fl-size"><%= fSize(f.size) %></div><div class="fl-date"><%= f.created_at ? f.created_at.split('T')[0] : '' %></div><div class="fl-by"><%= f.uploaded_by || '' %></div>
               <div class="fl-actions">
                 <button class="fi-btn" onclick="event.stopPropagation();openMoveModal(<%= f.id %>,'<%= f.original_name.replace(/'/g,"\\'") %>')" title="Move">📂</button>
@@ -245,9 +263,88 @@
       </div>
       <% } %>
 
+      <!-- Preview Modal -->
+      <div class="preview-bg" id="previewModal" onclick="if(event.target===this)closePreview()">
+        <div class="preview-box">
+          <div class="preview-head">
+            <h3 id="previewTitle">—</h3>
+            <div class="preview-head-btns">
+              <a id="previewDownload" href="#" title="Download">📥 Download</a>
+              <a id="previewNewTab" href="#" target="_blank" title="Open in new tab">↗ Open</a>
+              <button class="btn-close" onclick="closePreview()">✕</button>
+            </div>
+          </div>
+          <div class="preview-body" id="previewBody"></div>
+        </div>
+      </div>
+
       <div style="margin-top:16px;"><a href="/admin/companies/<%= company.id %>" class="btn btn-sm">← Back to <%= company.name %></a></div>
 
       <script>
+      var CID = '<%= company.id %>';
+
+      function openPreview(fileId, fileName, mimeType, fileSize) {
+        var viewUrl = '/admin/companies/' + CID + '/files/' + fileId + '/view';
+        var dlUrl = '/admin/companies/' + CID + '/files/' + fileId + '/download';
+        var ext = fileName.split('.').pop().toLowerCase();
+        var body = document.getElementById('previewBody');
+        var modal = document.getElementById('previewModal');
+
+        document.getElementById('previewTitle').textContent = fileName;
+        document.getElementById('previewDownload').href = dlUrl;
+        document.getElementById('previewNewTab').href = viewUrl;
+
+        // Determine preview type
+        if (mimeType.startsWith('image/')) {
+          body.innerHTML = '<img src="' + viewUrl + '" alt="' + fileName + '">';
+        } else if (mimeType === 'application/pdf' || ext === 'pdf') {
+          body.innerHTML = '<iframe src="' + viewUrl + '"></iframe>';
+        } else if (mimeType.startsWith('video/')) {
+          body.innerHTML = '<video controls autoplay><source src="' + viewUrl + '" type="' + mimeType + '">Your browser does not support video.</video>';
+        } else if (mimeType.startsWith('audio/')) {
+          body.innerHTML = '<div style="padding:40px;"><audio controls autoplay style="width:100%;"><source src="' + viewUrl + '" type="' + mimeType + '"></audio></div>';
+        } else if (['txt','log','md','csv','json','xml','html','css','js','py','sh','bat','yml','yaml','ini','conf','env'].includes(ext)) {
+          body.innerHTML = '<div style="padding:20px;width:100%;"><pre style="background:#1e293b;color:#e2e8f0;padding:20px;border-radius:8px;font-size:12px;overflow:auto;max-height:70vh;white-space:pre-wrap;">Loading...</pre></div>';
+          fetch(viewUrl).then(r => r.text()).then(text => {
+            body.querySelector('pre').textContent = text;
+          });
+        } else if (['doc','docx','xls','xlsx','ppt','pptx'].includes(ext)) {
+          // Use Google Docs viewer for Office files (only works if server is public)
+          body.innerHTML = '<div class="preview-nopreview"><div class="pp-icon">' + getIcon(ext) + '</div><div class="pp-name">' + fileName + '</div><div class="pp-size">' + formatSize(fileSize) + '</div><div style="margin-top:16px;"><a href="' + dlUrl + '" style="padding:10px 24px;background:#0891b2;color:#fff;border-radius:8px;font-weight:700;font-size:13px;text-decoration:none;">📥 Download to View</a></div></div>';
+        } else {
+          body.innerHTML = '<div class="preview-nopreview"><div class="pp-icon">' + getIcon(ext) + '</div><div class="pp-name">' + fileName + '</div><div class="pp-size">' + formatSize(fileSize) + '</div><div style="margin-top:12px;font-size:12px;">Preview not available for this file type.</div><div style="margin-top:16px;"><a href="' + dlUrl + '" style="padding:10px 24px;background:#0891b2;color:#fff;border-radius:8px;font-weight:700;font-size:13px;text-decoration:none;">📥 Download</a></div></div>';
+        }
+
+        modal.classList.add('open');
+      }
+
+      function closePreview() {
+        document.getElementById('previewModal').classList.remove('open');
+        document.getElementById('previewBody').innerHTML = '';
+      }
+
+      // Keyboard: Escape to close
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closePreview();
+      });
+
+      function getIcon(ext) {
+        if (['pdf'].includes(ext)) return '📕';
+        if (['doc','docx'].includes(ext)) return '📘';
+        if (['xls','xlsx','csv'].includes(ext)) return '📗';
+        if (['ppt','pptx'].includes(ext)) return '📙';
+        if (['jpg','jpeg','png','gif','svg','webp'].includes(ext)) return '🖼️';
+        if (['zip','rar','7z'].includes(ext)) return '📦';
+        if (['mp4','avi','mov'].includes(ext)) return '🎬';
+        if (['mp3','wav','ogg'].includes(ext)) return '🎵';
+        return '📎';
+      }
+
+      function formatSize(s) {
+        if (s > 1048576) return (s/1048576).toFixed(1)+' MB';
+        if (s > 1024) return (s/1024).toFixed(0)+' KB';
+        return s+' B';
+      }
       function setView(v){
         document.getElementById('viewGrid').style.display=v==='grid'?'':'none';
         document.getElementById('viewList').style.display=v==='list'?'':'none';

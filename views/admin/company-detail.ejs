@@ -83,22 +83,60 @@
 
         <!-- Client portal users -->
         <div class="card">
-          <h3>🔐 Client Portal Users</h3>
-          <% if (clientUsers.length === 0) { %>
-            <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">No client login accounts yet.</div>
+          <h3>🔐 Client Portal Access</h3>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Grant portal access to company users so they can log in, view data, submit requests, and chat.</p>
+
+          <% if (clientUsers.length > 0) { %>
+            <table class="tbl" style="margin-bottom:14px;">
+              <thead><tr><th>Username</th><th>Name</th><th>Email</th><th>Active</th><th></th></tr></thead>
+              <tbody>
+              <% clientUsers.forEach(cu => { %>
+                <tr>
+                  <td><strong><%= cu.username %></strong></td>
+                  <td><%= cu.full_name || '—' %></td>
+                  <td><%= cu.email || '—' %></td>
+                  <td><span class="badge <%= cu.is_active ? 'active' : 'inactive' %>"><%= cu.is_active ? 'Yes' : 'No' %></span></td>
+                  <td style="white-space:nowrap;">
+                    <form method="POST" action="/admin/companies/<%= company.id %>/client-users/<%= cu.id %>/delete" style="display:inline;"><button type="submit" class="btn-ghost" onclick="return confirm('Remove portal access for ' + '<%= cu.username %>' + '?')">🗑️</button></form>
+                  </td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table>
           <% } else { %>
-            <% clientUsers.forEach(cu => { %>
-              <div class="item-card" style="cursor:default;">
-                <div class="ic-main"><div class="ic-name"><%= cu.username %></div><div class="ic-sub"><%= cu.full_name || '' %> · <%= cu.email || '' %></div></div>
-                <form method="POST" action="/admin/companies/<%= company.id %>/client-users/<%= cu.id %>/delete" style="display:inline;"><button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this login?')">×</button></form>
-              </div>
-            <% }) %>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">No portal accounts yet.</div>
           <% } %>
-          <details style="margin-top:12px;"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">+ Add Client Login</summary>
+
+          <!-- Quick grant from existing company users -->
+          <% var usersWithoutAccess = users.filter(u => !clientUsers.find(cu => cu.full_name === u.name || cu.username === (u.email_account || u.email || '').split('@')[0])); %>
+          <% if (usersWithoutAccess.length > 0) { %>
+            <details style="margin-bottom:12px;" open><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--primary);">⚡ Quick Grant — From Existing Team Members (<%= usersWithoutAccess.length %>)</summary>
+              <div style="margin-top:8px;">
+                <% usersWithoutAccess.forEach(u => { %>
+                  <form method="POST" action="/admin/companies/<%= company.id %>/grant-portal-access" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;">
+                    <input type="hidden" name="company_user_id" value="<%= u.id %>">
+                    <div style="flex:1;">
+                      <strong style="font-size:12px;"><%= u.name %></strong>
+                      <span style="font-size:11px;color:var(--muted);"><%= u.department ? ' · ' + u.department : '' %><%= u.role ? ' · ' + u.role : '' %></span>
+                      <div style="font-size:10px;color:var(--muted);"><%= u.email_account || u.email || 'No email' %></div>
+                    </div>
+                    <div style="display:flex;gap:4px;align-items:center;">
+                      <input type="text" name="username" value="<%= (u.email_account || u.email || u.name.toLowerCase().replace(/\s+/g,'.')).split('@')[0] %>" placeholder="Username" style="width:120px;padding:4px 8px;font-size:11px;border:1px solid var(--border);border-radius:6px;" required>
+                      <input type="text" name="password" placeholder="Password" style="width:100px;padding:4px 8px;font-size:11px;border:1px solid var(--border);border-radius:6px;" required>
+                      <button type="submit" class="btn btn-sm btn-primary" style="white-space:nowrap;">Grant Access</button>
+                    </div>
+                  </form>
+                <% }) %>
+              </div>
+            </details>
+          <% } %>
+
+          <!-- Manual add -->
+          <details><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">+ Add Portal Login Manually</summary>
             <form method="POST" action="/admin/companies/<%= company.id %>/client-users" style="margin-top:10px;">
               <div class="form-row">
-                <div class="form-group"><label>Username</label><input type="text" name="username" required></div>
-                <div class="form-group"><label>Password</label><input type="text" name="password" required></div>
+                <div class="form-group"><label>Username *</label><input type="text" name="username" required></div>
+                <div class="form-group"><label>Password *</label><input type="text" name="password" required></div>
               </div>
               <div class="form-row">
                 <div class="form-group"><label>Full Name</label><input type="text" name="full_name"></div>
@@ -276,8 +314,8 @@
           <div class="metrics" style="margin-bottom:14px;">
             <div class="metric hi"><div class="m-label">Total Users</div><div class="m-val pri"><%= allItems.length %></div></div>
             <div class="metric ok"><div class="m-label">Active</div><div class="m-val green"><%= allItems.filter(x => x.is_active).length %></div></div>
+            <div class="metric"><div class="m-label">Portal Access</div><div class="m-val"><%= clientUsers.length %></div></div>
             <div class="metric"><div class="m-label">With Email</div><div class="m-val"><%= allItems.filter(x => x.email_account).length %></div></div>
-            <div class="metric"><div class="m-label">With Phone</div><div class="m-val"><%= allItems.filter(x => x.phone).length %></div></div>
           </div>
         <% } %>
 
@@ -292,7 +330,11 @@
               <tr data-search="<%= cfg.fields.map(f => (it[f]||'')).join(' ').toLowerCase() %><%= it.manufacturer ? ' ' + it.manufacturer.toLowerCase() : '' %><%= it.model ? ' ' + it.model.toLowerCase() : '' %>" data-group="<%= (it[cfg.groupField]||'').toLowerCase() %>" <% if (cfg.extraGroups) { cfg.extraGroups.forEach(eg => { %>data-<%= eg.replace('_','-') %>="<%= (it[eg]||'').toString().toLowerCase() %>" <% }) } %>>
                 <% cfg.fields.forEach((f, fi) => { %>
                   <td>
-                    <% if (f === 'name' && tab === 'users') { %><a href="/admin/companies/<%= company.id %>/users/<%= it.id %>/profile" style="font-weight:700;"><%= it[f] || '—' %></a><% if (it.title) { %><div style="font-size:10px;color:var(--muted);"><%= it.title %></div><% } %>
+                    <% if (f === 'name' && tab === 'users') { %>
+                      <a href="/admin/companies/<%= company.id %>/users/<%= it.id %>/profile" style="font-weight:700;"><%= it[f] || '—' %></a>
+                      <% var hasPortal = clientUsers.find(cu => cu.full_name === it.name); %>
+                      <% if (hasPortal) { %><span class="badge active" style="font-size:8px;margin-left:4px;">Portal</span><% } %>
+                      <% if (it.title) { %><div style="font-size:10px;color:var(--muted);"><%= it.title %></div><% } %>
                     <% } else if (f === 'assigned_to' && it[f]) { %><% var assignedUser = users.find(u => u.name === it[f]); %><% if (assignedUser) { %><a href="/admin/companies/<%= company.id %>/users/<%= assignedUser.id %>/profile" style="font-weight:600;"><%= it[f] %></a><% } else { %><%= it[f] %><% } %>
                     <% } else if (f === 'cost_per_unit' || f === 'cost') { %><%= (it[f]||0) > 0 ? '$' + (it[f]||0).toFixed(2) : '—' %>
                     <% } else if (f === 'is_active') { %><span class="badge <%= it[f] ? 'active' : 'inactive' %>"><%= it[f] ? 'Active' : 'Inactive' %></span>
@@ -301,13 +343,39 @@
                   </td>
                 <% }) %>
                 <td style="white-space:nowrap;">
-                  <% if (tab === 'users') { %><a href="/admin/companies/<%= company.id %>/users/<%= it.id %>/profile" class="btn-ghost" title="Profile">👤</a><% } %>
+                  <% if (tab === 'users') { %>
+                    <a href="/admin/companies/<%= company.id %>/users/<%= it.id %>/profile" class="btn-ghost" title="Profile">👤</a>
+                    <% var userHasPortal = clientUsers.find(cu => cu.full_name === it.name); %>
+                    <% if (!userHasPortal) { %><button class="btn-ghost" title="Grant Portal Access" onclick="event.stopPropagation();document.getElementById('grantModal-<%= it.id %>').classList.add('open')" style="color:var(--primary);">🔑</button><% } %>
+                  <% } %>
                   <a href="/admin/companies/<%= company.id %>/<%= tab %>/<%= it.id %>/edit" class="btn-ghost" title="Edit">✏️</a><form method="POST" action="/admin/companies/<%= company.id %>/<%= cfg.dbTable %>/<%= it.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Delete?')">🗑️</button></form></td>
               </tr>
             <% }) %>
             </tbody>
           </table>
           </div>
+
+          <!-- Grant portal access modals (one per user) -->
+          <% if (tab === 'users') { allItems.forEach(it => { var uhp = clientUsers.find(cu => cu.full_name === it.name); if (!uhp) { %>
+            <div class="modal-bg" id="grantModal-<%= it.id %>" onclick="if(event.target===this)this.classList.remove('open')">
+              <div class="modal" style="max-width:400px;">
+                <h3>🔑 Grant Portal Access</h3>
+                <p style="font-size:13px;margin-bottom:14px;">Create a login for <strong><%= it.name %></strong> to access the client portal.</p>
+                <form method="POST" action="/admin/companies/<%= company.id %>/grant-portal-access">
+                  <input type="hidden" name="company_user_id" value="<%= it.id %>">
+                  <div class="form-group"><label>Username *</label><input type="text" name="username" value="<%= (it.email_account || it.email || it.name.toLowerCase().replace(/\s+/g,'.')).split('@')[0] %>" required></div>
+                  <div class="form-group"><label>Password *</label><input type="text" name="password" required placeholder="Set a password"></div>
+                  <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
+                    Name: <%= it.name %><br>
+                    Email: <%= it.email_account || it.email || '—' %><br>
+                    Dept: <%= it.department || '—' %> · Role: <%= it.role || '—' %>
+                  </div>
+                  <div class="form-actions"><button type="submit" class="btn btn-primary">Grant Access</button><button type="button" class="btn" onclick="document.getElementById('grantModal-<%= it.id %>').classList.remove('open')">Cancel</button></div>
+                </form>
+              </div>
+            </div>
+          <% } }) } %>
+
           <script>
           var currentGroupAttr = 'data-group';
           function changeGroupBy(){
