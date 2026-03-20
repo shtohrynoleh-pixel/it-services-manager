@@ -22,7 +22,7 @@
         </div>
         <div class="metrics">
           <a href="/client?tab=subscriptions" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Subscriptions</div><div class="m-val"><%= subs.length %></div></a>
-          <a href="/client?tab=users" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Software</div><div class="m-val"><%= software.length %></div></a>
+          <a href="/client?tab=subscriptions" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Software</div><div class="m-val"><%= software.length %></div></a>
           <a href="/client?tab=inventory" class="metric" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Equipment</div><div class="m-val"><%= inventory.length %></div></a>
           <a href="/client?tab=invoices" class="metric <%= unpaid.length > 0 ? 'bad' : '' %>" style="text-decoration:none;color:inherit;cursor:pointer;"><div class="m-label">Unpaid Invoices</div><div class="m-val <%= unpaid.length > 0 ? 'red' : '' %>"><%= unpaid.length %></div></a>
         </div>

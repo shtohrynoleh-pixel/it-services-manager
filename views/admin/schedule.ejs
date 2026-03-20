@@ -3,7 +3,7 @@
   <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
   <div class="main">
     <div class="topbar">
-      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>📅 Service Schedule</h2></div>
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><i class="ti ti-calendar-event"></i> Service Schedule</h2></div>
       <div style="display:flex;align-items:center;gap:8px;"><button class="btn btn-primary btn-sm" onclick="document.getElementById('addModal').classList.add('open')">+ Add Schedule</button><%- include('../partials/notif-bell') %></div>
     </div>
     <div class="content">

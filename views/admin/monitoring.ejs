@@ -3,7 +3,7 @@
   <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
   <div class="main">
     <div class="topbar">
-      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>📡 Equipment Monitoring</h2></div>
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><i class="ti ti-activity"></i> Equipment Monitoring</h2></div>
       <div style="display:flex;align-items:center;gap:8px;"><form method="POST" action="/admin/monitoring/check-all" style="display:inline"><button type="submit" class="btn btn-sm" title="Check all monitors now">🔄 Check All</button></form><button class="btn btn-primary btn-sm" onclick="document.getElementById('addModal').classList.add('open')">+ Add Monitor</button><%- include('../partials/notif-bell') %></div>
     </div>
     <div class="content">

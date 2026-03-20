@@ -12,27 +12,27 @@
       <%
         // Define all menu items with their default groups
         const menuItems = [
-          { id:'dashboard', icon:'📊', label:'Dashboard', href:'/admin', group:'main' },
-          { id:'companies', icon:'🏢', label:'Companies', href:'/admin/companies', group:'main' },
-          { id:'all-users', icon:'👥', label:'All Users', href:'/admin/all-users', group:'main' },
-          { id:'services', icon:'⚙️', label:'Services', href:'/admin/services', group:'main' },
-          { id:'billing', icon:'💳', label:'Billing', href:'/admin/billing', group:'main' },
-          { id:'tasks', icon:'✅', label:'Tasks', href:'/admin/tasks', group:'work' },
-          { id:'projects', icon:'📁', label:'Projects', href:'/admin/projects', group:'work' },
-          { id:'schedule', icon:'📅', label:'Schedule', href:'/admin/schedule', group:'work' },
-          { id:'policies', icon:'🛡️', label:'Security Policies', href:'/admin/policies', group:'docs' },
-          { id:'sops', icon:'📋', label:'SOPs', href:'/admin/sops', group:'docs' },
-          { id:'flows', icon:'🔄', label:'Process Flows', href:'/admin/flows', group:'docs' },
-          { id:'monitoring', icon:'📡', label:'Monitoring', href:'/admin/monitoring', group:'monitor' },
-          { id:'alerts-page', icon:'🔔', label:'Alerts', href:'/admin/alerts', group:'monitor' },
-          { id:'chat', icon:'💬', label:'Chat', href:'/admin/chat', group:'work' },
-          { id:'vault', icon:'🔑', label:'Password Vault', href:'/admin/vault', group:'system' },
-          { id:'users-manage', icon:'🔐', label:'User Accounts', href:'/admin/users-manage', group:'system' },
-          { id:'admins', icon:'👑', label:'Admin Management', href:'/admin/admins', group:'system', superOnly:true },
-          { id:'settings', icon:'🔧', label:'Settings', href:'/admin/settings', group:'system' },
-          { id:'integrations', icon:'🔌', label:'Integrations', href:'/admin/integrations', group:'system' },
-          { id:'roles', icon:'👤', label:'Roles', href:'/admin/roles', group:'system' },
-          { id:'departments', icon:'🏛️', label:'Departments', href:'/admin/departments', group:'system' }
+          { id:'dashboard', icon:'ti ti-dashboard', label:'Dashboard', href:'/admin', group:'main' },
+          { id:'companies', icon:'ti ti-building', label:'Companies', href:'/admin/companies', group:'main' },
+          { id:'all-users', icon:'ti ti-users-group', label:'All Users', href:'/admin/all-users', group:'main' },
+          { id:'services', icon:'ti ti-settings-cog', label:'Services', href:'/admin/services', group:'main' },
+          { id:'billing', icon:'ti ti-file-invoice', label:'Billing', href:'/admin/billing', group:'main' },
+          { id:'tasks', icon:'ti ti-checkbox', label:'Tasks', href:'/admin/tasks', group:'work' },
+          { id:'projects', icon:'ti ti-folder', label:'Projects', href:'/admin/projects', group:'work' },
+          { id:'schedule', icon:'ti ti-calendar-event', label:'Schedule', href:'/admin/schedule', group:'work' },
+          { id:'chat', icon:'ti ti-message-circle', label:'Chat', href:'/admin/chat', group:'work' },
+          { id:'policies', icon:'ti ti-shield-check', label:'Security Policies', href:'/admin/policies', group:'docs' },
+          { id:'sops', icon:'ti ti-list-check', label:'SOPs', href:'/admin/sops', group:'docs' },
+          { id:'flows', icon:'ti ti-git-branch', label:'Process Flows', href:'/admin/flows', group:'docs' },
+          { id:'monitoring', icon:'ti ti-activity', label:'Monitoring', href:'/admin/monitoring', group:'monitor' },
+          { id:'alerts-page', icon:'ti ti-bell', label:'Alerts', href:'/admin/alerts', group:'monitor' },
+          { id:'vault', icon:'ti ti-key', label:'Password Vault', href:'/admin/vault', group:'system' },
+          { id:'users-manage', icon:'ti ti-user-shield', label:'User Accounts', href:'/admin/users-manage', group:'system' },
+          { id:'admins', icon:'ti ti-crown', label:'Admin Management', href:'/admin/admins', group:'system', superOnly:true },
+          { id:'settings', icon:'ti ti-settings', label:'Settings', href:'/admin/settings', group:'system' },
+          { id:'integrations', icon:'ti ti-plug', label:'Integrations', href:'/admin/integrations', group:'system' },
+          { id:'roles', icon:'ti ti-user-check', label:'Roles', href:'/admin/roles', group:'system' },
+          { id:'departments', icon:'ti ti-building-community', label:'Departments', href:'/admin/departments', group:'system' }
         ];
         const groups = [
           { id:'main', label:'Main' },
@@ -53,7 +53,7 @@
           <div class="sb-section-body" data-dropzone="<%= g.id %>">
             <% items.forEach(m => { %>
               <a class="sb-item <%= page === m.id ? 'active' : '' %>" href="<%= m.href %>" data-menu-id="<%= m.id %>" draggable="false">
-                <span class="icon"><%= m.icon %></span> <%= m.label %>
+                <i class="<%= m.icon %>" style="font-size:17px;width:20px;text-align:center;"></i> <%= m.label %>
                 <span class="drag-handle" style="display:none;margin-left:auto;cursor:grab;font-size:14px;color:#94a3b8;" title="Drag to move">⠿</span>
               </a>
             <% }) %>
@@ -65,37 +65,37 @@
       <div class="sb-section" data-group="myco">
         <div class="sb-section-head" onclick="toggleGroup('myco')"><span>My Company</span><span class="sb-arrow">▾</span></div>
         <div class="sb-section-body">
-          <a class="sb-item <%= !tab || tab === 'dashboard' ? 'active' : '' %>" href="/client"><span class="icon">📊</span> Dashboard</a>
-          <a class="sb-item <%= tab === 'users' ? 'active' : '' %>" href="/client?tab=users"><span class="icon">👥</span> Team</a>
-          <a class="sb-item <%= tab === 'servers' ? 'active' : '' %>" href="/client?tab=servers"><span class="icon">🖥️</span> Servers</a>
-          <a class="sb-item <%= tab === 'subscriptions' ? 'active' : '' %>" href="/client?tab=subscriptions"><span class="icon">📦</span> Subscriptions</a>
-          <a class="sb-item <%= tab === 'assets' ? 'active' : '' %>" href="/client?tab=assets"><span class="icon">🌐</span> Digital Assets</a>
-          <a class="sb-item <%= tab === 'inventory' ? 'active' : '' %>" href="/client?tab=inventory"><span class="icon">🔧</span> Inventory</a>
-          <a class="sb-item <%= tab === 'invoices' ? 'active' : '' %>" href="/client?tab=invoices"><span class="icon">💳</span> Invoices</a>
-          <a class="sb-item <%= tab === 'tasks' ? 'active' : '' %>" href="/client?tab=tasks"><span class="icon">📋</span> Requests</a>
-          <a class="sb-item <%= page === 'chat' ? 'active' : '' %>" href="/client/chat"><span class="icon">💬</span> Chat</a>
+          <a class="sb-item <%= !tab || tab === 'dashboard' ? 'active' : '' %>" href="/client"><i class="ti ti-dashboard" style="font-size:17px;width:20px;text-align:center;"></i> Dashboard</a>
+          <a class="sb-item <%= tab === 'users' ? 'active' : '' %>" href="/client?tab=users"><i class="ti ti-users-group" style="font-size:17px;width:20px;text-align:center;"></i> Team</a>
+          <a class="sb-item <%= tab === 'servers' ? 'active' : '' %>" href="/client?tab=servers"><i class="ti ti-server" style="font-size:17px;width:20px;text-align:center;"></i> Servers</a>
+          <a class="sb-item <%= tab === 'subscriptions' ? 'active' : '' %>" href="/client?tab=subscriptions"><i class="ti ti-package" style="font-size:17px;width:20px;text-align:center;"></i> Subscriptions</a>
+          <a class="sb-item <%= tab === 'assets' ? 'active' : '' %>" href="/client?tab=assets"><i class="ti ti-world" style="font-size:17px;width:20px;text-align:center;"></i> Digital Assets</a>
+          <a class="sb-item <%= tab === 'inventory' ? 'active' : '' %>" href="/client?tab=inventory"><i class="ti ti-device-desktop" style="font-size:17px;width:20px;text-align:center;"></i> Inventory</a>
+          <a class="sb-item <%= tab === 'invoices' ? 'active' : '' %>" href="/client?tab=invoices"><i class="ti ti-file-invoice" style="font-size:17px;width:20px;text-align:center;"></i> Invoices</a>
+          <a class="sb-item <%= tab === 'tasks' ? 'active' : '' %>" href="/client?tab=tasks"><i class="ti ti-ticket" style="font-size:17px;width:20px;text-align:center;"></i> Requests</a>
+          <a class="sb-item <%= page === 'chat' ? 'active' : '' %>" href="/client/chat"><i class="ti ti-message-circle" style="font-size:17px;width:20px;text-align:center;"></i> Chat</a>
         </div>
       </div>
       <div class="sb-section" data-group="work">
         <div class="sb-section-head" onclick="toggleGroup('work')"><span>Work</span><span class="sb-arrow">▾</span></div>
         <div class="sb-section-body">
-          <a class="sb-item <%= page === 'projects' ? 'active' : '' %>" href="/client/projects"><span class="icon">📁</span> Projects</a>
-          <a class="sb-item <%= page === 'sops' ? 'active' : '' %>" href="/client/sops"><span class="icon">📋</span> SOPs</a>
-          <a class="sb-item <%= page === 'policies' ? 'active' : '' %>" href="/client/policies"><span class="icon">🛡️</span> Policies</a>
-          <a class="sb-item <%= page === 'passwords' ? 'active' : '' %>" href="/client/passwords"><span class="icon">🔑</span> Passwords</a>
+          <a class="sb-item <%= page === 'projects' ? 'active' : '' %>" href="/client/projects"><i class="ti ti-folder" style="font-size:17px;width:20px;text-align:center;"></i> Projects</a>
+          <a class="sb-item <%= page === 'sops' ? 'active' : '' %>" href="/client/sops"><i class="ti ti-list-check" style="font-size:17px;width:20px;text-align:center;"></i> SOPs</a>
+          <a class="sb-item <%= page === 'policies' ? 'active' : '' %>" href="/client/policies"><i class="ti ti-shield-check" style="font-size:17px;width:20px;text-align:center;"></i> Policies</a>
+          <a class="sb-item <%= page === 'passwords' ? 'active' : '' %>" href="/client/passwords"><i class="ti ti-key" style="font-size:17px;width:20px;text-align:center;"></i> Passwords</a>
         </div>
       </div>
       <div class="sb-section" data-group="info">
         <div class="sb-section-head" onclick="toggleGroup('info')"><span>Info & Settings</span><span class="sb-arrow">▾</span></div>
         <div class="sb-section-body">
-          <a class="sb-item <%= page === 'services' ? 'active' : '' %>" href="/client/services"><span class="icon">⚙️</span> Available Services</a>
-          <a class="sb-item <%= page === 'account' ? 'active' : '' %>" href="/client/account"><span class="icon">👤</span> My Account</a>
+          <a class="sb-item <%= page === 'services' ? 'active' : '' %>" href="/client/services"><i class="ti ti-settings-cog" style="font-size:17px;width:20px;text-align:center;"></i> Available Services</a>
+          <a class="sb-item <%= page === 'account' ? 'active' : '' %>" href="/client/account"><i class="ti ti-user-circle" style="font-size:17px;width:20px;text-align:center;"></i> My Account</a>
         </div>
       </div>
     <% } %>
   </div>
   <div class="sb-footer">
-    <a class="sb-item" href="/logout"><span class="icon">🚪</span> Logout</a>
+    <a class="sb-item" href="/logout"><i class="ti ti-logout" style="font-size:17px;width:20px;text-align:center;"></i> Logout</a>
     <div style="font-size:10px;color:var(--muted);padding:8px 20px 0">Logged in as <strong><%= user.full_name || user.username %></strong></div>
   </div>
 </div>

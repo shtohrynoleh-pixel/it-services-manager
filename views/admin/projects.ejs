@@ -3,7 +3,7 @@
   <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
   <div class="main">
     <div class="topbar">
-      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>📁 Projects</h2></div>
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><i class="ti ti-folder"></i> Projects</h2></div>
       <div class="topbar-actions"><a href="/admin/project-statuses" class="btn btn-sm">⚙️ Statuses</a><button class="btn btn-primary btn-sm" onclick="document.getElementById('addModal').classList.add('open')">+ New Project</button><%- include('../partials/notif-bell') %></div>
     </div>
     <div class="content">
