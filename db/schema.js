@@ -636,6 +636,16 @@ function initDB() {
       FOREIGN KEY (folder_id) REFERENCES file_folders(id) ON DELETE SET NULL
     );
 
+    -- Gamification: XP events
+    CREATE TABLE IF NOT EXISTS user_xp (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL,
+      action TEXT NOT NULL,
+      xp INTEGER NOT NULL,
+      description TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
     -- Service schedule (recurring service visits/tasks per company)
     CREATE TABLE IF NOT EXISTS service_schedule (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

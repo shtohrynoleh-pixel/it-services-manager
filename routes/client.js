@@ -5,9 +5,15 @@ const { requireLogin } = require('../middleware/auth');
 module.exports = function(db) {
   router.use(requireLogin);
 
+  const { getRank, getUserXP, awardXP, checkDailyLogin } = require('../lib/xp');
+
   router.use((req, res, next) => {
     if (req.session.user.role !== 'client') return res.redirect('/admin');
     if (!req.session.user.company_id) return res.redirect('/login');
+    const username = req.session.user.full_name || req.session.user.username;
+    const totalXp = getUserXP(db, username);
+    res.locals.userRank = getRank(totalXp);
+    checkDailyLogin(db, username);
     next();
   });
 
@@ -53,6 +59,7 @@ module.exports = function(db) {
         cid, name, title || null, email || null, phone || null, department || null, role || null, email_account || null
       );
     } catch(e) {}
+    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_user');
     res.redirect('/client?tab=users');
   });
 
@@ -65,6 +72,7 @@ module.exports = function(db) {
         cid, name, type || null, ip || null, os || null, purpose || null, location || null, notes || null
       );
     } catch(e) {}
+    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_server');
     res.redirect('/client?tab=servers');
   });
 
@@ -77,6 +85,7 @@ module.exports = function(db) {
         cid, name, vendor || null, type || null, parseInt(seats) || 1, parseFloat(cost_per_unit) || 0, billing_cycle || 'Monthly', renewal_date || null, notes || null
       );
     } catch(e) {}
+    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_subscription');
     res.redirect('/client?tab=subscriptions');
   });
 
@@ -89,6 +98,7 @@ module.exports = function(db) {
         cid, name, type || null, provider || null, expires_at || null, login_url || null, notes || null
       );
     } catch(e) {}
+    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_asset');
     res.redirect('/client?tab=assets');
   });
 
@@ -101,6 +111,7 @@ module.exports = function(db) {
         cid, name, type || null, manufacturer || null, model || null, serial_number || null, parseInt(quantity) || 1, parseFloat(cost) || 0, condition || 'New', notes || null
       );
     } catch(e) {}
+    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_inventory');
     res.redirect('/client?tab=inventory');
   });
 
@@ -114,6 +125,7 @@ module.exports = function(db) {
         title, description || '', cid, priority || 'medium'
       );
     } catch(e) {}
+    awardXP(db, req.session.user.full_name || req.session.user.username, 'create_task');
     res.redirect(req.body.redirect || '/client?tab=tasks');
   });
 
@@ -328,6 +340,15 @@ module.exports = function(db) {
       );
     } catch(e) {}
     res.redirect('/client/passwords');
+  });
+
+  // Leaderboard
+  router.get('/leaderboard', (req, res) => {
+    const { getLeaderboard, getRecentXP } = require('../lib/xp');
+    const leaders = getLeaderboard(db, 50);
+    leaders.forEach(l => { l.rank = getRank(l.total); });
+    const myXP = getRecentXP(db, req.session.user.full_name || req.session.user.username, 20);
+    res.render('client/leaderboard', { user: req.session.user, leaders, myXP, settings: getSettings(), page: 'leaderboard' });
   });
 
   router.get('/services', (req, res) => {

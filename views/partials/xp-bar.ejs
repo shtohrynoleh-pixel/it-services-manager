@@ -1,0 +1,30 @@
+<% if (typeof user !== 'undefined' && user && typeof userRank !== 'undefined' && userRank) { %>
+<style>
+.xp-bar{display:flex;align-items:center;gap:8px;padding:8px 16px;border-top:1px solid var(--border);font-size:11px;}
+.xp-rank-icon{font-size:18px;}
+.xp-info{flex:1;min-width:0;}
+.xp-rank-name{font-weight:800;font-size:11px;color:<%= userRank.color %>;}
+.xp-progress{height:4px;background:#e2e8f0;border-radius:4px;margin-top:3px;overflow:hidden;}
+.xp-progress-fill{height:100%;border-radius:4px;background:<%= userRank.color %>;transition:width 0.5s;}
+.xp-total{font-size:10px;color:var(--muted);font-weight:700;}
+/* XP popup toast */
+.xp-toast{position:fixed;top:80px;right:24px;z-index:2000;padding:12px 20px;border-radius:12px;background:linear-gradient(135deg,#0891b2,#06b6d4);color:#fff;font-size:13px;font-weight:800;box-shadow:0 8px 32px rgba(8,145,178,0.3);display:none;animation:xpIn 0.4s ease;}
+.xp-toast.show{display:flex;align-items:center;gap:8px;}
+.xp-toast .xp-amt{font-size:18px;font-weight:900;color:#fef08a;}
+@keyframes xpIn{from{transform:translateX(100px) scale(0.8);opacity:0;}to{transform:translateX(0) scale(1);opacity:1;}}
+@keyframes xpOut{from{opacity:1;transform:translateY(0);}to{opacity:0;transform:translateY(-30px);}}
+</style>
+<div class="xp-toast" id="xpToast"></div>
+<script>
+window.showXP = function(amount, label) {
+  var toast = document.getElementById('xpToast');
+  toast.innerHTML = '<span class="xp-amt">+' + amount + ' XP</span> ' + (label || '');
+  toast.classList.add('show');
+  setTimeout(function(){ toast.style.animation = 'xpOut 0.4s ease forwards'; }, 2500);
+  setTimeout(function(){ toast.classList.remove('show'); toast.style.animation = ''; }, 2900);
+};
+<% if (typeof xpAwarded !== 'undefined' && xpAwarded) { %>
+setTimeout(function(){ showXP(<%= xpAwarded.xp %>, '<%= xpAwarded.label %>'); }, 500);
+<% } %>
+</script>
+<% } %>

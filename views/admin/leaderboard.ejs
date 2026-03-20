@@ -1,0 +1,104 @@
+<%- include('../partials/head') %>
+<style>
+.lb-podium{display:flex;gap:12px;justify-content:center;align-items:flex-end;margin-bottom:32px;flex-wrap:wrap;}
+.lb-pod{text-align:center;padding:20px;border-radius:14px;background:var(--card);border:1px solid var(--border);min-width:140px;}
+.lb-pod.gold{border-color:#f59e0b;background:linear-gradient(180deg,#fffbeb,#fff);order:2;}
+.lb-pod.silver{border-color:#94a3b8;order:1;}
+.lb-pod.bronze{border-color:#f97316;order:3;}
+.lb-pod-rank{font-size:32px;margin-bottom:4px;}
+.lb-pod-name{font-size:14px;font-weight:800;margin-bottom:2px;}
+.lb-pod-xp{font-size:20px;font-weight:900;color:var(--primary);}
+.lb-pod-badge{font-size:11px;font-weight:700;margin-top:4px;}
+.lb-row{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #f1f5f9;transition:background 0.1s;}
+.lb-row:hover{background:#f0f9ff;}
+.lb-pos{width:28px;height:28px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:var(--muted);flex-shrink:0;}
+.lb-name{flex:1;font-weight:700;font-size:13px;}
+.lb-rank-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;}
+.lb-xp{font-size:14px;font-weight:900;color:var(--primary);}
+.my-xp-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:12px;}
+.my-xp-amount{font-weight:900;color:var(--primary);min-width:50px;}
+.my-xp-action{flex:1;font-weight:600;}
+.my-xp-time{color:var(--muted);font-size:10px;}
+</style>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><i class="ti ti-trophy"></i> Leaderboard</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <!-- My rank -->
+      <div class="card" style="text-align:center;margin-bottom:20px;background:linear-gradient(135deg,#f0fdfa,#ecfeff);">
+        <div style="font-size:48px;"><%= userRank.icon %></div>
+        <div style="font-size:20px;font-weight:900;color:<%= userRank.color %>;"><%= userRank.name %></div>
+        <div style="font-size:32px;font-weight:900;color:var(--primary);margin:4px 0;"><%= userRank.totalXp %> XP</div>
+        <div style="max-width:300px;margin:8px auto 0;">
+          <div style="height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
+            <div style="height:100%;width:<%= userRank.progress %>%;background:<%= userRank.color %>;border-radius:4px;"></div>
+          </div>
+          <% if (userRank.nextRank) { %>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px;"><%= userRank.nextRank.min - userRank.totalXp %> XP to <strong><%= userRank.nextRank.icon %> <%= userRank.nextRank.name %></strong></div>
+          <% } else { %>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px;">Maximum rank reached!</div>
+          <% } %>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <!-- Leaderboard -->
+        <div class="card" style="flex:1;min-width:300px;">
+          <h3><i class="ti ti-trophy"></i> Top Players</h3>
+          <% if (leaders.length >= 3) { %>
+            <div class="lb-podium">
+              <div class="lb-pod silver"><div class="lb-pod-rank">🥈</div><div class="lb-pod-name"><%= leaders[1].username %></div><div class="lb-pod-xp"><%= leaders[1].total %></div><div class="lb-pod-badge" style="color:<%= leaders[1].rank.color %>;"><%= leaders[1].rank.icon %> <%= leaders[1].rank.name %></div></div>
+              <div class="lb-pod gold"><div class="lb-pod-rank">🥇</div><div class="lb-pod-name"><%= leaders[0].username %></div><div class="lb-pod-xp"><%= leaders[0].total %></div><div class="lb-pod-badge" style="color:<%= leaders[0].rank.color %>;"><%= leaders[0].rank.icon %> <%= leaders[0].rank.name %></div></div>
+              <div class="lb-pod bronze"><div class="lb-pod-rank">🥉</div><div class="lb-pod-name"><%= leaders[2].username %></div><div class="lb-pod-xp"><%= leaders[2].total %></div><div class="lb-pod-badge" style="color:<%= leaders[2].rank.color %>;"><%= leaders[2].rank.icon %> <%= leaders[2].rank.name %></div></div>
+            </div>
+          <% } %>
+          <% leaders.forEach((l, i) => { %>
+            <div class="lb-row">
+              <div class="lb-pos" style="<%= i < 3 ? 'background:' + l.rank.color + ';color:#fff;' : '' %>"><%= i + 1 %></div>
+              <div class="lb-name"><%= l.username %></div>
+              <span class="lb-rank-badge" style="background:<%= l.rank.color %>15;color:<%= l.rank.color %>;"><%= l.rank.icon %> <%= l.rank.name %></span>
+              <div class="lb-xp"><%= l.total %> XP</div>
+            </div>
+          <% }) %>
+          <% if (leaders.length === 0) { %>
+            <div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;">No activity yet. Start using the platform to earn XP!</div>
+          <% } %>
+        </div>
+
+        <!-- My recent XP -->
+        <div class="card" style="width:320px;flex-shrink:0;">
+          <h3><i class="ti ti-sparkles"></i> My Recent XP</h3>
+          <% if (myXP.length === 0) { %>
+            <div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">No XP earned yet. Start by creating tasks, adding users, or uploading files!</div>
+          <% } else { %>
+            <% myXP.forEach(x => { %>
+              <div class="my-xp-item">
+                <div class="my-xp-amount">+<%= x.xp %></div>
+                <div class="my-xp-action"><%= x.description %></div>
+                <div class="my-xp-time"><%= x.created_at ? x.created_at.split('T')[0] : '' %></div>
+              </div>
+            <% }) %>
+          <% } %>
+
+          <!-- XP guide -->
+          <details style="margin-top:16px;"><summary style="cursor:pointer;font-size:11px;font-weight:700;color:var(--primary);">How to earn XP</summary>
+            <div style="margin-top:8px;font-size:11px;line-height:2;">
+              <strong>+30 XP</strong> — Create SOP or Policy<br>
+              <strong>+25 XP</strong> — Create project or flow<br>
+              <strong>+20 XP</strong> — Complete a task, import CSV<br>
+              <strong>+15 XP</strong> — Add server/monitor, acknowledge SOP, grant portal access<br>
+              <strong>+10 XP</strong> — Add user/subscription/asset/inventory/password/channel<br>
+              <strong>+5 XP</strong> — Create task, upload file, add contact, daily login<br>
+              <strong>+1 XP</strong> — Send chat message
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

@@ -21,6 +21,7 @@
           { id:'projects', icon:'ti ti-folder', label:'Projects', href:'/admin/projects', group:'work' },
           { id:'schedule', icon:'ti ti-calendar-event', label:'Schedule', href:'/admin/schedule', group:'work' },
           { id:'chat', icon:'ti ti-message-circle', label:'Chat', href:'/admin/chat', group:'work' },
+          { id:'leaderboard', icon:'ti ti-trophy', label:'Leaderboard', href:'/admin/leaderboard', group:'work' },
           { id:'policies', icon:'ti ti-shield-check', label:'Security Policies', href:'/admin/policies', group:'docs' },
           { id:'sops', icon:'ti ti-list-check', label:'SOPs', href:'/admin/sops', group:'docs' },
           { id:'flows', icon:'ti ti-git-branch', label:'Process Flows', href:'/admin/flows', group:'docs' },
@@ -88,6 +89,7 @@
       <div class="sb-section" data-group="info">
         <div class="sb-section-head" onclick="toggleGroup('info')"><span>Info & Settings</span><span class="sb-arrow">▾</span></div>
         <div class="sb-section-body">
+          <a class="sb-item <%= page === 'leaderboard' ? 'active' : '' %>" href="/client/leaderboard"><i class="ti ti-trophy" style="font-size:17px;width:20px;text-align:center;"></i> Leaderboard</a>
           <a class="sb-item <%= page === 'services' ? 'active' : '' %>" href="/client/services"><i class="ti ti-settings-cog" style="font-size:17px;width:20px;text-align:center;"></i> Available Services</a>
           <a class="sb-item <%= page === 'account' ? 'active' : '' %>" href="/client/account"><i class="ti ti-user-circle" style="font-size:17px;width:20px;text-align:center;"></i> My Account</a>
         </div>
@@ -95,6 +97,16 @@
     <% } %>
   </div>
   <div class="sb-footer">
+    <% if (typeof userRank !== 'undefined' && userRank) { %>
+    <a href="<%= user.role === 'admin' ? '/admin/leaderboard' : '/client/leaderboard' %>" class="xp-bar" style="text-decoration:none;color:inherit;">
+      <span class="xp-rank-icon"><%= userRank.icon %></span>
+      <div class="xp-info">
+        <div class="xp-rank-name" style="color:<%= userRank.color %>;"><%= userRank.name %></div>
+        <div class="xp-progress"><div class="xp-progress-fill" style="width:<%= userRank.progress %>%;background:<%= userRank.color %>;"></div></div>
+      </div>
+      <div class="xp-total"><%= userRank.totalXp %> XP</div>
+    </a>
+    <% } %>
     <a class="sb-item" href="/logout"><i class="ti ti-logout" style="font-size:17px;width:20px;text-align:center;"></i> Logout</a>
     <div style="font-size:10px;color:var(--muted);padding:8px 20px 0">Logged in as <strong><%= user.full_name || user.username %></strong></div>
   </div>
