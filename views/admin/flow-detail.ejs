@@ -1,123 +1,286 @@
 <%- include('../partials/head') %>
 <style>
-.flow-canvas{display:flex;flex-direction:column;align-items:center;gap:0;padding:20px 10px;}
-.flow-node{position:relative;text-align:center;padding:10px 20px;font-size:12px;font-weight:700;color:#fff;min-width:160px;max-width:280px;word-wrap:break-word;line-height:1.4;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
-.flow-node.start{background:#10b981;border-radius:24px;padding:12px 24px;}
-.flow-node.process{background:#0891b2;border-radius:10px;}
-.flow-node.decision{background:#f59e0b;color:#78350f;border-radius:4px;padding:16px 24px;clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:180px;}
-.flow-node.end{background:#ef4444;border-radius:24px;padding:12px 24px;}
-.flow-node .fn-type{font-size:8px;opacity:0.7;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;}
-.flow-node .fn-who{font-size:9px;opacity:0.8;margin-top:3px;}
-.flow-arrow{width:2px;height:24px;background:#334155;position:relative;margin:0 auto;}
-.flow-arrow::after{content:"";position:absolute;bottom:-3px;left:50%;transform:translateX(-50%);border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #334155;}
-.flow-desc{font-size:10px;font-weight:400;color:rgba(255,255,255,0.85);margin-top:3px;max-width:200px;}
-.flow-decision .fn-desc{max-width:100px;font-size:9px;}
-.flow-branch{display:flex;gap:16px;font-size:10px;font-weight:700;color:#64748b;margin:4px 0;}
-.flow-branch span{padding:2px 8px;border-radius:4px;}
-.flow-branch .yes{background:#d1fae5;color:#065f46;}
-.flow-branch .no{background:#fee2e2;color:#991b1b;}
+/* FLOWCHART CANVAS */
+.fc-canvas{background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:32px 20px;min-height:200px;position:relative;overflow:auto;}
+.fc-swimlanes{display:flex;gap:0;min-width:100%;}
+.fc-lane{flex:1;min-width:200px;padding:12px 8px;border-right:1px dashed #e2e8f0;position:relative;}
+.fc-lane:last-child{border-right:none;}
+.fc-lane-header{text-align:center;font-size:11px;font-weight:800;color:var(--primary);text-transform:uppercase;letter-spacing:1px;padding:8px;background:rgba(8,145,178,0.06);border-radius:8px;margin-bottom:16px;}
+.fc-flow{display:flex;flex-direction:column;align-items:center;gap:0;}
+
+/* NODES */
+.fc-node{position:relative;text-align:center;min-width:140px;max-width:260px;cursor:pointer;transition:all 0.15s;margin:0 auto;}
+.fc-node:hover{transform:scale(1.03);z-index:2;}
+.fc-node-inner{padding:12px 18px;font-size:12px;font-weight:700;color:#fff;line-height:1.4;box-shadow:0 2px 8px rgba(0,0,0,0.1);position:relative;}
+.fc-node-inner .fc-badge{position:absolute;top:-6px;right:-6px;font-size:8px;padding:2px 6px;border-radius:4px;background:#fff;color:#475569;font-weight:800;box-shadow:0 1px 4px rgba(0,0,0,0.1);}
+
+/* Node types */
+.fc-start .fc-node-inner{background:linear-gradient(135deg,#10b981,#059669);border-radius:24px;}
+.fc-end .fc-node-inner{background:linear-gradient(135deg,#ef4444,#dc2626);border-radius:24px;}
+.fc-process .fc-node-inner{background:linear-gradient(135deg,#0891b2,#0e7490);border-radius:10px;}
+.fc-decision .fc-node-inner{background:linear-gradient(135deg,#f59e0b,#d97706);color:#78350f;border-radius:4px;transform:rotate(45deg);padding:20px;min-width:100px;min-height:100px;display:flex;align-items:center;justify-content:center;}
+.fc-decision .fc-node-text{transform:rotate(-45deg);max-width:90px;font-size:11px;}
+.fc-input .fc-node-inner{background:linear-gradient(135deg,#8b5cf6,#7c3aed);border-radius:10px;border-left:4px solid #6d28d9;}
+.fc-output .fc-node-inner{background:linear-gradient(135deg,#06b6d4,#0891b2);border-radius:10px;border-right:4px solid #0e7490;}
+.fc-delay .fc-node-inner{background:linear-gradient(135deg,#94a3b8,#64748b);border-radius:0 24px 24px 0;}
+.fc-subprocess .fc-node-inner{background:linear-gradient(135deg,#0891b2,#0e7490);border-radius:10px;border:3px double rgba(255,255,255,0.4);}
+.fc-document .fc-node-inner{background:linear-gradient(135deg,#f97316,#ea580c);border-radius:10px 10px 0 0;padding-bottom:18px;}
+.fc-database .fc-node-inner{background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:10px;}
+
+.fc-desc{font-size:10px;font-weight:400;opacity:0.85;margin-top:3px;line-height:1.3;}
+.fc-who{font-size:9px;opacity:0.75;margin-top:4px;}
+.fc-dur{font-size:8px;opacity:0.6;margin-top:2px;}
+
+/* ARROWS */
+.fc-arrow{display:flex;flex-direction:column;align-items:center;margin:0;}
+.fc-arrow-line{width:2px;height:20px;background:#475569;}
+.fc-arrow-head{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #475569;}
+.fc-branch{display:flex;gap:8px;justify-content:center;margin:2px 0 4px;}
+.fc-branch span{padding:2px 10px;border-radius:4px;font-size:10px;font-weight:800;}
+.fc-branch .yes{background:#d1fae5;color:#065f46;}
+.fc-branch .no{background:#fee2e2;color:#991b1b;}
+
+/* NODE LIST */
+.nd-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:8px;transition:all 0.12s;}
+.nd-card:hover{border-color:var(--primary);box-shadow:0 2px 8px rgba(8,145,178,0.06);}
+.nd-header{display:flex;align-items:center;gap:10px;}
+.nd-num{width:30px;height:30px;border-radius:8px;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;flex-shrink:0;}
+.nd-info{flex:1;min-width:0;}
+.nd-label{font-size:13px;font-weight:800;}
+.nd-meta{font-size:11px;color:var(--muted);margin-top:1px;}
+.nd-actions{display:flex;gap:4px;flex-shrink:0;}
+
+/* COLOR MAP */
+.nc-start{background:#10b981;} .nc-end{background:#ef4444;} .nc-process{background:#0891b2;}
+.nc-decision{background:#f59e0b;} .nc-input{background:#8b5cf6;} .nc-output{background:#06b6d4;}
+.nc-delay{background:#94a3b8;} .nc-subprocess{background:#0891b2;} .nc-document{background:#f97316;} .nc-database{background:#6366f1;}
 </style>
 <div class="app-wrap">
   <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
   <div class="main">
     <div class="topbar">
-      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/flows" style="opacity:0.4;text-decoration:none;">🔄</a> → <%= flow.title %></h2></div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <h2><a href="/admin/flows" style="opacity:0.4;text-decoration:none;"><i class="ti ti-git-branch"></i></a> → <%= flow.title %></h2>
+      </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span class="badge <%= flow.status === 'published' ? 'paid' : 'draft' %>"><%= flow.status %></span>
-        <% if (flow.is_template) { %><span class="badge prospect">Template</span><% } %>
+        <span class="badge <%= flow.status === 'published' ? 'active' : 'draft' %>"><%= flow.status %></span>
         <%- include('../partials/notif-bell') %>
       </div>
     </div>
     <div class="content">
-      <!-- Flow Info -->
-      <div class="card">
-        <h3>🔄 Flow Details</h3>
-        <details>
-          <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">Edit Details</summary>
-          <form method="POST" action="/admin/flows/<%= flow.id %>/edit" style="margin-top:8px;">
-            <div class="form-group"><label>Title</label><input type="text" name="title" value="<%= flow.title %>" required></div>
-            <div class="form-group"><label>Description</label><textarea name="description" rows="2"><%= flow.description || '' %></textarea></div>
-            <div class="form-group"><label>Trigger Event</label><input type="text" name="trigger_event" value="<%= flow.trigger_event || '' %>"></div>
+      <!-- Tabs -->
+      <div class="tabs">
+        <a class="tab active" href="#" onclick="showFlowTab('chart')">Flowchart</a>
+        <a class="tab" href="#" onclick="showFlowTab('nodes')">Nodes (<%= nodes.length %>)</a>
+        <a class="tab" href="#" onclick="showFlowTab('settings')">Settings</a>
+      </div>
+
+      <!-- CHART TAB -->
+      <div id="ftab-chart">
+        <% if (flow.trigger_event) { %><div style="margin-bottom:12px;padding:8px 14px;background:var(--accent-light);border-radius:8px;font-size:12px;color:#92400e;"><i class="ti ti-bolt" style="margin-right:4px;"></i> Trigger: <strong><%= flow.trigger_event %></strong></div><% } %>
+
+        <div class="fc-canvas">
+          <% if (nodes.length === 0) { %>
+            <div style="text-align:center;padding:40px;color:var(--muted);">
+              <i class="ti ti-git-branch" style="font-size:48px;display:block;margin-bottom:12px;"></i>
+              <div style="font-weight:700;margin-bottom:4px;">No nodes yet</div>
+              <div style="font-size:12px;">Switch to the Nodes tab to start building your flow.</div>
+            </div>
+          <% } else { %>
+            <%
+              var lanes = [...new Set(nodes.map(n => n.swimlane).filter(Boolean))];
+              var hasLanes = lanes.length > 0;
+            %>
+            <% if (hasLanes) { %>
+              <!-- Swimlane view -->
+              <div class="fc-swimlanes">
+                <% lanes.forEach(lane => { %>
+                  <div class="fc-lane">
+                    <div class="fc-lane-header"><%= lane %></div>
+                    <div class="fc-flow">
+                      <% nodes.filter(n => n.swimlane === lane).forEach((nd, i, arr) => { %>
+                        <% if (i > 0) { %><div class="fc-arrow"><div class="fc-arrow-line"></div><div class="fc-arrow-head"></div></div><% } %>
+                        <div class="fc-node fc-<%= nd.type %>" onclick="document.getElementById('editNode-<%= nd.id %>').classList.add('open')"><div class="fc-node-inner" <% if (nd.color) { %>style="background:<%= nd.color %>"<% } %>><% if (nd.type==='decision') { %><div class="fc-node-text"><%= nd.label %></div><% } else { %><%= nd.label %><% if (nd.description) { %><div class="fc-desc"><%= nd.description %></div><% } %><% } %><% if (nd.responsible) { %><div class="fc-who"><%= nd.responsible %></div><% } %></div></div>
+                      <% }) %>
+                    </div>
+                  </div>
+                <% }) %>
+                <% var noLane = nodes.filter(n => !n.swimlane); %>
+                <% if (noLane.length > 0) { %>
+                  <div class="fc-lane">
+                    <div class="fc-lane-header">General</div>
+                    <div class="fc-flow">
+                      <% noLane.forEach((nd, i) => { %>
+                        <% if (i > 0) { %><div class="fc-arrow"><div class="fc-arrow-line"></div><div class="fc-arrow-head"></div></div><% } %>
+                        <div class="fc-node fc-<%= nd.type %>" onclick="document.getElementById('editNode-<%= nd.id %>').classList.add('open')"><div class="fc-node-inner" <% if (nd.color) { %>style="background:<%= nd.color %>"<% } %>><% if (nd.type==='decision') { %><div class="fc-node-text"><%= nd.label %></div><% } else { %><%= nd.label %><% if (nd.description) { %><div class="fc-desc"><%= nd.description %></div><% } %><% } %><% if (nd.responsible) { %><div class="fc-who"><%= nd.responsible %></div><% } %></div></div>
+                      <% }) %>
+                    </div>
+                  </div>
+                <% } %>
+              </div>
+            <% } else { %>
+              <!-- Standard flow -->
+              <div class="fc-flow">
+                <% nodes.forEach((nd, i) => { %>
+                  <% if (i > 0) { %>
+                    <div class="fc-arrow"><div class="fc-arrow-line"></div><div class="fc-arrow-head"></div></div>
+                    <% var prev = nodes[i-1]; if (prev.type === 'decision') { %>
+                      <div class="fc-branch"><span class="yes"><i class="ti ti-check" style="font-size:10px;"></i> <%= prev.yes_label || 'Yes' %></span><span class="no"><i class="ti ti-x" style="font-size:10px;"></i> <%= prev.no_label || 'No' %></span></div>
+                    <% } %>
+                  <% } %>
+                  <div class="fc-node fc-<%= nd.type %>" onclick="document.getElementById('editNode-<%= nd.id %>').classList.add('open')" title="Click to edit">
+                    <div class="fc-node-inner" <% if (nd.color) { %>style="background:<%= nd.color %>"<% } %>>
+                      <% if (nd.duration) { %><span class="fc-badge"><i class="ti ti-clock" style="font-size:8px;"></i> <%= nd.duration %></span><% } %>
+                      <% if (nd.type === 'decision') { %>
+                        <div class="fc-node-text"><%= nd.label %></div>
+                      <% } else { %>
+                        <%= nd.label %>
+                        <% if (nd.description) { %><div class="fc-desc"><%= nd.description %></div><% } %>
+                      <% } %>
+                      <% if (nd.responsible) { %><div class="fc-who"><i class="ti ti-user" style="font-size:9px;"></i> <%= nd.responsible %></div><% } %>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            <% } %>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- NODES TAB -->
+      <div id="ftab-nodes" style="display:none;">
+        <% nodes.forEach((nd, i) => { %>
+          <div class="nd-card">
+            <div class="nd-header">
+              <div class="nd-num nc-<%= nd.type %>"><%= i + 1 %></div>
+              <div class="nd-info">
+                <div class="nd-label"><%= nd.label %></div>
+                <div class="nd-meta">
+                  <%= nd.type %><% if (nd.responsible) { %> · <i class="ti ti-user" style="font-size:10px;"></i> <%= nd.responsible %><% } %><% if (nd.swimlane) { %> · <i class="ti ti-layout-columns" style="font-size:10px;"></i> <%= nd.swimlane %><% } %><% if (nd.duration) { %> · <i class="ti ti-clock" style="font-size:10px;"></i> <%= nd.duration %><% } %><% if (nd.type === 'decision') { %> · ✓ <%= nd.yes_label || 'Yes' %> / ✗ <%= nd.no_label || 'No' %><% } %>
+                </div>
+                <% if (nd.description) { %><div style="font-size:11px;color:#475569;margin-top:4px;"><%= nd.description %></div><% } %>
+                <% if (nd.notes) { %><div style="font-size:10px;color:var(--muted);margin-top:2px;font-style:italic;"><%= nd.notes %></div><% } %>
+              </div>
+              <div class="nd-actions">
+                <form method="POST" action="/admin/flows/<%= flow.id %>/nodes/<%= nd.id %>/move" style="display:inline;"><input type="hidden" name="direction" value="up"><button type="submit" class="btn-ghost" title="Move up" <%= i === 0 ? 'disabled' : '' %>>↑</button></form>
+                <form method="POST" action="/admin/flows/<%= flow.id %>/nodes/<%= nd.id %>/move" style="display:inline;"><input type="hidden" name="direction" value="down"><button type="submit" class="btn-ghost" title="Move down" <%= i === nodes.length-1 ? 'disabled' : '' %>>↓</button></form>
+                <button class="btn-ghost" onclick="document.getElementById('editNode-<%= nd.id %>').classList.add('open')" title="Edit" style="color:var(--primary);">✏️</button>
+                <form method="POST" action="/admin/flows/<%= flow.id %>/nodes/<%= nd.id %>/delete" style="display:inline;"><button type="submit" class="btn-ghost" onclick="return confirm('Delete?')" style="color:var(--danger);">🗑️</button></form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Edit modal -->
+          <div class="modal-bg" id="editNode-<%= nd.id %>" onclick="if(event.target===this)this.classList.remove('open')">
+            <div class="modal">
+              <h3>Edit Node #<%= i + 1 %></h3>
+              <form method="POST" action="/admin/flows/<%= flow.id %>/nodes/<%= nd.id %>/edit">
+                <input type="hidden" name="node_order" value="<%= nd.node_order %>">
+                <div class="form-row">
+                  <div class="form-group"><label>Type</label><select name="type"><% ['start','process','decision','subprocess','input','output','delay','document','database','end'].forEach(t => { %><option value="<%= t %>" <%= nd.type === t ? 'selected' : '' %>><%= t.charAt(0).toUpperCase() + t.slice(1) %></option><% }) %></select></div>
+                  <div class="form-group"><label>Label *</label><input type="text" name="label" value="<%= nd.label %>" required></div>
+                </div>
+                <div class="form-group"><label>Description</label><textarea name="description" rows="2"><%= nd.description || '' %></textarea></div>
+                <div class="form-row">
+                  <div class="form-group"><label>Responsible</label><input type="text" name="responsible" value="<%= nd.responsible || '' %>"></div>
+                  <div class="form-group"><label>Swimlane</label><input type="text" name="swimlane" value="<%= nd.swimlane || '' %>" placeholder="e.g. IT, HR, Employee"></div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group"><label>Duration</label><input type="text" name="duration" value="<%= nd.duration || '' %>" placeholder="e.g. 5 min, 1 hour, 1 day"></div>
+                  <div class="form-group"><label>Color (hex)</label><input type="color" name="color" value="<%= nd.color || (nd.type==='start'?'#10b981':nd.type==='end'?'#ef4444':nd.type==='decision'?'#f59e0b':'#0891b2') %>" style="height:38px;"></div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group"><label>Yes Label</label><input type="text" name="yes_label" value="<%= nd.yes_label || '' %>"></div>
+                  <div class="form-group"><label>No Label</label><input type="text" name="no_label" value="<%= nd.no_label || '' %>"></div>
+                </div>
+                <div class="form-group"><label>Notes</label><textarea name="notes" rows="2"><%= nd.notes || '' %></textarea></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('editNode-<%= nd.id %>').classList.remove('open')">Cancel</button></div>
+              </form>
+            </div>
+          </div>
+        <% }) %>
+
+        <!-- Add node form -->
+        <div class="card" style="margin-top:12px;">
+          <h3><i class="ti ti-plus"></i> Add Node</h3>
+          <form method="POST" action="/admin/flows/<%= flow.id %>/nodes">
             <div class="form-row">
-              <div class="form-group"><label>Category</label><select name="category"><% ['IT Operations','HR-IT','Security','Incident','Change Management','Onboarding','Other'].forEach(c => { %><option <%= flow.category === c ? 'selected' : '' %>><%= c %></option><% }) %></select></div>
+              <div class="form-group"><label>Type *</label><select name="type" id="newNodeType" onchange="toggleDecisionFields()">
+                <option value="start">Start</option>
+                <option value="process" selected>Process</option>
+                <option value="decision">Decision</option>
+                <option value="subprocess">Sub-process</option>
+                <option value="input">Input/Data</option>
+                <option value="output">Output</option>
+                <option value="delay">Delay/Wait</option>
+                <option value="document">Document</option>
+                <option value="database">Database</option>
+                <option value="end">End</option>
+              </select></div>
+              <div class="form-group"><label>Label *</label><input type="text" name="label" required placeholder="What happens here"></div>
+            </div>
+            <div class="form-group"><label>Description</label><textarea name="description" rows="2" placeholder="Details..."></textarea></div>
+            <div class="form-row">
+              <div class="form-group"><label>Responsible</label><input type="text" name="responsible" placeholder="IT, HR, Employee..."></div>
+              <div class="form-group"><label>Swimlane</label><input type="text" name="swimlane" placeholder="Group by department/role"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Duration</label><input type="text" name="duration" placeholder="5 min, 1 hour, 1 day..."></div>
+              <div class="form-group"><label>Color</label><input type="color" name="color" value="#0891b2" style="height:38px;"></div>
+            </div>
+            <div id="decisionFields" style="display:none;">
+              <div class="form-row">
+                <div class="form-group"><label>Yes Label</label><input type="text" name="yes_label" placeholder="Approved, Yes..."></div>
+                <div class="form-group"><label>No Label</label><input type="text" name="no_label" placeholder="Rejected, No..."></div>
+              </div>
+            </div>
+            <div class="form-group"><label>Notes</label><textarea name="notes" placeholder="Internal notes, links, references..."></textarea></div>
+            <button type="submit" class="btn btn-primary">Add Node</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- SETTINGS TAB -->
+      <div id="ftab-settings" style="display:none;">
+        <div class="card">
+          <h3>Flow Details</h3>
+          <form method="POST" action="/admin/flows/<%= flow.id %>/edit">
+            <div class="form-group"><label>Title</label><input type="text" name="title" value="<%= flow.title %>" required></div>
+            <div class="form-group"><label>Description</label><textarea name="description" rows="3"><%= flow.description || '' %></textarea></div>
+            <div class="form-group"><label>Trigger Event</label><input type="text" name="trigger_event" value="<%= flow.trigger_event || '' %>" placeholder="What starts this flow?"></div>
+            <div class="form-row">
+              <div class="form-group"><label>Category</label><select name="category"><% ['IT Operations','HR-IT','Security','Incident','Change Management','Onboarding','Sales','Finance','Other'].forEach(c => { %><option <%= flow.category === c ? 'selected' : '' %>><%= c %></option><% }) %></select></div>
               <div class="form-group"><label>Company</label><select name="company_id"><option value="">— Template —</option><% companies.forEach(c => { %><option value="<%= c.id %>" <%= flow.company_id === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %></select></div>
             </div>
             <div class="form-row">
               <div class="form-group"><label>Owner</label><input type="text" name="owner" value="<%= flow.owner || '' %>"></div>
               <div class="form-group"><label>Status</label><select name="status"><% ['draft','published','archived'].forEach(s => { %><option value="<%= s %>" <%= flow.status === s ? 'selected' : '' %>><%= s %></option><% }) %></select></div>
             </div>
-            <button type="submit" class="btn btn-sm btn-primary">Save</button>
+            <button type="submit" class="btn btn-primary">Save</button>
           </form>
-        </details>
-        <% if (flow.trigger_event) { %><div style="margin-top:8px;padding:8px 12px;background:var(--accent-light);border-radius:8px;font-size:12px;color:#92400e;">⚡ Trigger: <strong><%= flow.trigger_event %></strong></div><% } %>
-      </div>
-
-      <!-- Clone -->
-      <div class="card">
-        <h3>📦 Clone to Company</h3>
-        <form method="POST" action="/admin/flows/<%= flow.id %>/clone" style="display:flex;gap:8px;align-items:flex-end;">
-          <div class="form-group" style="flex:1;margin:0;"><select name="company_id"><option value="">— As template —</option><% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
-          <button type="submit" class="btn btn-sm btn-primary">Clone</button>
-        </form>
-      </div>
-
-      <!-- Visual Flowchart -->
-      <div class="card">
-        <h3>📊 Flowchart (<%= nodes.length %> nodes)</h3>
-        <% if (nodes.length === 0) { %>
-          <div style="font-size:12px;color:var(--muted);">No nodes yet — add the first node below.</div>
-        <% } else { %>
-          <div class="flow-canvas">
-            <% nodes.forEach((nd, i) => { %>
-              <% if (i > 0) { %>
-                <div class="flow-arrow"></div>
-                <% const prev = nodes[i-1]; if (prev.type === 'decision') { %>
-                  <div class="flow-branch"><span class="yes">✓ <%= prev.yes_label || 'Yes' %></span><span class="no">✗ <%= prev.no_label || 'No' %></span></div>
-                <% } %>
-              <% } %>
-              <div class="flow-node <%= nd.type %>">
-                <span class="fn-type"><%= nd.type %></span>
-                <%= nd.label %>
-                <% if (nd.description) { %><div class="flow-desc"><%= nd.description %></div><% } %>
-                <% if (nd.responsible) { %><div class="fn-who">👤 <%= nd.responsible %></div><% } %>
-              </div>
-            <% }) %>
-          </div>
-        <% } %>
-      </div>
-
-      <!-- Node List (editable) -->
-      <div class="card">
-        <h3>📝 Nodes</h3>
-        <% nodes.forEach((nd, i) => { %>
-          <div class="item-card" style="cursor:default;">
-            <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
-              <div style="width:28px;height:28px;border-radius:6px;background:<%= nd.type === 'start' ? '#10b981' : nd.type === 'end' ? '#ef4444' : nd.type === 'decision' ? '#f59e0b' : '#0891b2' %>;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;"><%= i+1 %></div>
-              <div><div class="ic-name"><%= nd.label %></div><div class="ic-sub"><%= nd.type %><% if (nd.responsible) { %> · 👤 <%= nd.responsible %><% } %><% if (nd.type === 'decision') { %> · ✓ <%= nd.yes_label || 'Yes' %> / ✗ <%= nd.no_label || 'No' %><% } %></div></div>
-            </div>
-            <form method="POST" action="/admin/flows/<%= flow.id %>/nodes/<%= nd.id %>/delete" style="flex-shrink:0;"><button type="submit" class="btn-ghost" onclick="return confirm('Delete node?')">🗑️</button></form>
-          </div>
-        <% }) %>
-
-        <details style="margin-top:12px;">
-          <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">+ Add Node</summary>
-          <form method="POST" action="/admin/flows/<%= flow.id %>/nodes" style="margin-top:8px;">
-            <div class="form-row">
-              <div class="form-group"><label>Type *</label><select name="type"><option value="start">🟢 Start</option><option value="process" selected>🔷 Process</option><option value="decision">🔶 Decision</option><option value="end">🔴 End</option></select></div>
-              <div class="form-group"><label>Label *</label><input type="text" name="label" required placeholder="What happens at this step"></div>
-            </div>
-            <div class="form-group"><label>Description</label><textarea name="description" placeholder="Details about this step..."></textarea></div>
-            <div class="form-row">
-              <div class="form-group"><label>Responsible</label><input type="text" name="responsible" placeholder="Who does this (e.g. IT, HR, Employee)"></div>
-              <div class="form-group"><label>Yes Label (for decisions)</label><input type="text" name="yes_label" placeholder="e.g. Approved, Yes, Fix found"></div>
-            </div>
-            <div class="form-group"><label>No Label (for decisions)</label><input type="text" name="no_label" placeholder="e.g. Rejected, No, Escalate"></div>
-            <button type="submit" class="btn btn-sm btn-primary">Add Node</button>
+        </div>
+        <div class="card">
+          <h3>Clone to Company</h3>
+          <form method="POST" action="/admin/flows/<%= flow.id %>/clone" style="display:flex;gap:8px;align-items:flex-end;">
+            <div class="form-group" style="flex:1;margin:0;"><select name="company_id"><option value="">— As template —</option><% companies.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+            <button type="submit" class="btn btn-sm btn-primary">Clone</button>
           </form>
-        </details>
+        </div>
+        <div style="margin-top:16px;"><form method="POST" action="/admin/flows/<%= flow.id %>/delete" onsubmit="return confirm('Delete this flow?')"><button type="submit" class="btn btn-sm btn-danger"><i class="ti ti-trash"></i> Delete Flow</button></form></div>
       </div>
 
-      <div style="margin-top:16px;"><form method="POST" action="/admin/flows/<%= flow.id %>/delete" onsubmit="return confirm('Delete this flow and all nodes?')"><button type="submit" class="btn btn-sm btn-danger">🗑️ Delete Flow</button></form></div>
+      <script>
+      function showFlowTab(name){
+        document.querySelectorAll('[id^="ftab-"]').forEach(el => el.style.display = 'none');
+        document.getElementById('ftab-' + name).style.display = '';
+        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+        event.target.closest('.tab').classList.add('active');
+      }
+      function toggleDecisionFields(){
+        document.getElementById('decisionFields').style.display = document.getElementById('newNodeType').value === 'decision' ? '' : 'none';
+      }
+      </script>
     </div>
   </div>
 </div>

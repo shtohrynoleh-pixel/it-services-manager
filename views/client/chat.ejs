@@ -224,7 +224,7 @@ function msgHtml(m) {
   var att = '';
   if (m.attachment) {
     if ((m.attachment_type||'').startsWith('image/')) {
-      att = '<img src="' + esc(m.attachment) + '" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:6px;cursor:pointer;" onclick="window.open(\'' + esc(m.attachment) + '\',\'_blank\')">';
+      att = '<img src="' + esc(m.attachment) + '" style="max-width:100%;max-height:300px;border-radius:8px;margin-top:6px;cursor:pointer;" onclick="openImgPreview(\'' + esc(m.attachment) + '\')">';
     } else {
       att = '<a href="' + esc(m.attachment) + '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(0,0,0,0.05);border-radius:6px;font-size:11px;margin-top:4px;text-decoration:none;color:inherit;">📎 ' + esc(m.attachment_name||'file') + '</a>';
     }
@@ -482,5 +482,16 @@ document.getElementById('msgInput').addEventListener('input', function() {
 
 loadChannels();
 setInterval(loadChannels, 15000);
+</script>
+<!-- Image lightbox -->
+<div id="imgPreview" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:none;align-items:center;justify-content:center;cursor:zoom-out;padding:20px;" onclick="if(event.target===this)closeImgPreview()">
+  <button onclick="closeImgPreview()" style="position:absolute;top:16px;right:20px;background:rgba(255,255,255,0.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:20px;cursor:pointer;">✕</button>
+  <a id="imgPreviewDl" href="#" download style="position:absolute;top:16px;right:64px;background:rgba(255,255,255,0.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;text-decoration:none;">📥</a>
+  <img id="imgPreviewSrc" src="" style="max-width:95%;max-height:90vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.4);object-fit:contain;">
+</div>
+<script>
+function openImgPreview(src){document.getElementById('imgPreviewSrc').src=src;document.getElementById('imgPreviewDl').href=src;document.getElementById('imgPreview').style.display='flex';}
+function closeImgPreview(){document.getElementById('imgPreview').style.display='none';document.getElementById('imgPreviewSrc').src='';}
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&document.getElementById('imgPreview').style.display==='flex')closeImgPreview();});
 </script>
 <%- include('../partials/foot') %>

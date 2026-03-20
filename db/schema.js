@@ -459,6 +459,11 @@ function initDB() {
       responsible TEXT,
       yes_label TEXT,
       no_label TEXT,
+      color TEXT,
+      swimlane TEXT,
+      duration TEXT,
+      notes TEXT,
+      connect_to INTEGER,
       FOREIGN KEY (flow_id) REFERENCES process_flows(id) ON DELETE CASCADE
     );
 
@@ -699,6 +704,15 @@ function initDB() {
   if (hasDepts.c === 0) {
     const di = db.prepare('INSERT INTO departments (name, description, sort_order) VALUES (?,?,?)');
     [['Executive','Leadership and ownership',1],['Operations','Dispatch, logistics, and daily operations',2],['Driving','CDL drivers and fleet operators',3],['Maintenance','Truck and equipment maintenance',4],['Accounting','Finance, billing, and payroll',5],['Safety','Safety compliance and training',6],['HR','Hiring, onboarding, and employee management',7],['Administration','Office support and front desk',8],['IT','Technology and systems',9],['Warehouse','Loading, unloading, and yard operations',10]].forEach(d => di.run(...d));
+  }
+
+  // Add flow_nodes columns if missing
+  try { db.prepare('SELECT color FROM flow_nodes LIMIT 1').get(); } catch(e) {
+    try { db.exec('ALTER TABLE flow_nodes ADD COLUMN color TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE flow_nodes ADD COLUMN swimlane TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE flow_nodes ADD COLUMN duration TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE flow_nodes ADD COLUMN notes TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE flow_nodes ADD COLUMN connect_to INTEGER'); } catch(e2) {}
   }
 
   // Add show_on_landing to services if missing

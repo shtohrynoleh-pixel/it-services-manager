@@ -1271,13 +1271,41 @@ module.exports = function(db) {
   });
 
   router.post('/flows/:id/nodes', (req, res) => {
-    const { type, label, description, responsible, yes_label, no_label } = req.body;
+    const { type, label, description, responsible, yes_label, no_label, color, swimlane, duration, notes } = req.body;
     const maxOrder = safeGet('SELECT MAX(node_order) as m FROM flow_nodes WHERE flow_id = ?', [req.params.id]);
     try {
-      db.prepare('INSERT INTO flow_nodes (flow_id, node_order, type, label, description, responsible, yes_label, no_label) VALUES (?,?,?,?,?,?,?,?)').run(
-        req.params.id, (maxOrder && maxOrder.m || 0) + 1, type || 'process', label, description, responsible, yes_label, no_label
+      db.prepare('INSERT INTO flow_nodes (flow_id, node_order, type, label, description, responsible, yes_label, no_label, color, swimlane, duration, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(
+        req.params.id, (maxOrder && maxOrder.m || 0) + 1, type || 'process', label, description, responsible, yes_label, no_label, color || null, swimlane || null, duration || null, notes || null
       );
     } catch(e) {}
+    res.redirect('/admin/flows/' + req.params.id);
+  });
+
+  // Edit node
+  router.post('/flows/:id/nodes/:nid/edit', (req, res) => {
+    const { type, label, description, responsible, yes_label, no_label, color, swimlane, duration, notes, node_order } = req.body;
+    try {
+      db.prepare('UPDATE flow_nodes SET type=?, label=?, description=?, responsible=?, yes_label=?, no_label=?, color=?, swimlane=?, duration=?, notes=?, node_order=? WHERE id=? AND flow_id=?').run(
+        type || 'process', label, description || null, responsible || null, yes_label || null, no_label || null, color || null, swimlane || null, duration || null, notes || null, parseInt(node_order) || 0, req.params.nid, req.params.id
+      );
+    } catch(e) {}
+    res.redirect('/admin/flows/' + req.params.id);
+  });
+
+  // Move node up/down
+  router.post('/flows/:id/nodes/:nid/move', (req, res) => {
+    const dir = req.body.direction;
+    const nodes = safeAll('SELECT * FROM flow_nodes WHERE flow_id = ? ORDER BY node_order', [req.params.id]);
+    const idx = nodes.findIndex(n => n.id === parseInt(req.params.nid));
+    if (idx >= 0) {
+      const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
+      if (swapIdx >= 0 && swapIdx < nodes.length) {
+        try {
+          db.prepare('UPDATE flow_nodes SET node_order = ? WHERE id = ?').run(nodes[swapIdx].node_order, nodes[idx].id);
+          db.prepare('UPDATE flow_nodes SET node_order = ? WHERE id = ?').run(nodes[idx].node_order, nodes[swapIdx].id);
+        } catch(e) {}
+      }
+    }
     res.redirect('/admin/flows/' + req.params.id);
   });
 
