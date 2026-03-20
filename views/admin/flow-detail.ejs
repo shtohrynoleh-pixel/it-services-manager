@@ -79,50 +79,7 @@
       <% if (flow.trigger_event) { %><div style="margin-bottom:12px;padding:8px 14px;background:var(--accent-light);border-radius:8px;font-size:12px;color:#92400e;"><i class="ti ti-bolt"></i> Trigger: <strong><%= flow.trigger_event %></strong></div><% } %>
 
       <div class="flow-builder">
-        <!-- LEFT: Flowchart -->
-        <div class="flow-left">
-          <div class="fc-canvas">
-            <% if (nodes.length === 0) { %>
-              <div style="text-align:center;padding:40px;color:var(--muted);"><i class="ti ti-git-branch" style="font-size:40px;display:block;margin-bottom:8px;"></i><div style="font-weight:700;">Empty flow</div><div style="font-size:12px;">Add nodes from the panel on the right.</div></div>
-            <% } else { %>
-              <div class="fc-flow">
-                <% nodes.forEach((nd, i) => { %>
-                  <% if (i > 0) { %>
-                    <div class="fc-arrow"><div class="fc-arrow-line"></div><div class="fc-arrow-tip"></div></div>
-                    <% var prev = nodes[i-1]; if (prev.type === 'decision') { %>
-                      <div class="fc-branch"><span class="fc-yes"><%= prev.yes_label || 'Yes' %></span><span class="fc-no"><%= prev.no_label || 'No' %></span></div>
-                    <% } %>
-                  <% } %>
-
-                  <% var bgClass = 'bg-' + nd.type; var customBg = nd.color ? 'style="background:'+nd.color+'"' : ''; %>
-
-                  <div class="fc-node" onclick="document.getElementById('editNode-<%= nd.id %>').classList.add('open')">
-                    <% if (nd.type === 'start' || nd.type === 'end') { %>
-                      <div class="fn-pill <%= bgClass %>" <%= customBg %>><%= nd.label %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %></div>
-
-                    <% } else if (nd.type === 'decision') { %>
-                      <div class="fn-diamond-wrap">
-                        <div class="fn-diamond">
-                          <div class="fn-diamond-bg <%= bgClass %>" <%= customBg %>></div>
-                          <div class="fn-diamond-text"><%= nd.label %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %></div>
-                          <% if (nd.duration) { %><span class="fn-dur"><%= nd.duration %></span><% } %>
-                        </div>
-                      </div>
-
-                    <% } else if (nd.type === 'subprocess') { %>
-                      <div class="fn-sub <%= bgClass %>" style="position:relative;<%= nd.color ? 'background:'+nd.color : '' %>"><%= nd.label %><% if (nd.description) { %><div class="fn-desc"><%= nd.description %></div><% } %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %><% if (nd.duration) { %><span class="fn-dur"><%= nd.duration %></span><% } %></div>
-
-                    <% } else { %>
-                      <div class="fn-rect <%= bgClass %>" style="position:relative;<%= nd.color ? 'background:'+nd.color : '' %>"><%= nd.label %><% if (nd.description) { %><div class="fn-desc"><%= nd.description %></div><% } %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %><% if (nd.duration) { %><span class="fn-dur"><%= nd.duration %></span><% } %></div>
-                    <% } %>
-                  </div>
-                <% }) %>
-              </div>
-            <% } %>
-          </div>
-        </div>
-
-        <!-- RIGHT: Node list + Add -->
+        <!-- LEFT: Node list + Add -->
         <div class="flow-right">
           <div style="font-size:13px;font-weight:800;margin-bottom:8px;">Nodes (<%= nodes.length %>)</div>
 
@@ -172,6 +129,49 @@
               <div class="form-row"><div class="form-group"><label>Swimlane</label><input type="text" name="swimlane" placeholder="Department"></div><div class="form-group"><label>Color</label><input type="color" name="color" value="#0891b2" style="height:34px;"></div></div>
               <button type="submit" class="btn btn-primary btn-sm" style="width:100%;justify-content:center;">Add Node</button>
             </form>
+          </div>
+        </div>
+
+        <!-- RIGHT: Flowchart -->
+        <div class="flow-left">
+          <div class="fc-canvas">
+            <% if (nodes.length === 0) { %>
+              <div style="text-align:center;padding:40px;color:var(--muted);"><i class="ti ti-git-branch" style="font-size:40px;display:block;margin-bottom:8px;"></i><div style="font-weight:700;">Empty flow</div><div style="font-size:12px;">Add nodes from the panel on the right.</div></div>
+            <% } else { %>
+              <div class="fc-flow">
+                <% nodes.forEach((nd, i) => { %>
+                  <% if (i > 0) { %>
+                    <div class="fc-arrow"><div class="fc-arrow-line"></div><div class="fc-arrow-tip"></div></div>
+                    <% var prev = nodes[i-1]; if (prev.type === 'decision') { %>
+                      <div class="fc-branch"><span class="fc-yes"><%= prev.yes_label || 'Yes' %></span><span class="fc-no"><%= prev.no_label || 'No' %></span></div>
+                    <% } %>
+                  <% } %>
+
+                  <% var bgClass = 'bg-' + nd.type; var customBg = nd.color ? 'style="background:'+nd.color+'"' : ''; %>
+
+                  <div class="fc-node" onclick="document.getElementById('editNode-<%= nd.id %>').classList.add('open')">
+                    <% if (nd.type === 'start' || nd.type === 'end') { %>
+                      <div class="fn-pill <%= bgClass %>" <%= customBg %>><%= nd.label %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %></div>
+
+                    <% } else if (nd.type === 'decision') { %>
+                      <div class="fn-diamond-wrap">
+                        <div class="fn-diamond">
+                          <div class="fn-diamond-bg <%= bgClass %>" <%= customBg %>></div>
+                          <div class="fn-diamond-text"><%= nd.label %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %></div>
+                          <% if (nd.duration) { %><span class="fn-dur"><%= nd.duration %></span><% } %>
+                        </div>
+                      </div>
+
+                    <% } else if (nd.type === 'subprocess') { %>
+                      <div class="fn-sub <%= bgClass %>" style="position:relative;<%= nd.color ? 'background:'+nd.color : '' %>"><%= nd.label %><% if (nd.description) { %><div class="fn-desc"><%= nd.description %></div><% } %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %><% if (nd.duration) { %><span class="fn-dur"><%= nd.duration %></span><% } %></div>
+
+                    <% } else { %>
+                      <div class="fn-rect <%= bgClass %>" style="position:relative;<%= nd.color ? 'background:'+nd.color : '' %>"><%= nd.label %><% if (nd.description) { %><div class="fn-desc"><%= nd.description %></div><% } %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %><% if (nd.duration) { %><span class="fn-dur"><%= nd.duration %></span><% } %></div>
+                    <% } %>
+                  </div>
+                <% }) %>
+              </div>
+            <% } %>
           </div>
         </div>
       </div>
