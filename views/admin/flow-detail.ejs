@@ -1,65 +1,61 @@
 <%- include('../partials/head') %>
 <style>
-/* FLOW BUILDER - side by side */
 .flow-builder{display:flex;gap:16px;min-height:500px;}
-.flow-left{flex:1;min-width:0;}
-.flow-right{width:340px;flex-shrink:0;overflow-y:auto;max-height:calc(100vh - 160px);}
-
-/* CANVAS */
+.flow-left{width:320px;flex-shrink:0;overflow-y:auto;max-height:calc(100vh - 160px);}
+.flow-right{flex:1;min-width:0;}
 .fc-canvas{background:#f8fafc;border:1px solid var(--border);border-radius:12px;padding:24px;overflow:auto;min-height:400px;}
 .fc-flow{display:flex;flex-direction:column;align-items:center;gap:0;}
-
-/* ARROWS */
+/* Arrows */
 .fc-arrow{display:flex;flex-direction:column;align-items:center;}
 .fc-arrow-line{width:2px;height:16px;background:#94a3b8;}
 .fc-arrow-tip{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #94a3b8;}
+/* Branch labels */
 .fc-branch{display:flex;gap:6px;margin:4px 0;}
 .fc-branch span{padding:2px 10px;border-radius:4px;font-size:10px;font-weight:800;}
-.fc-yes{background:#d1fae5;color:#065f46;}
-.fc-no{background:#fee2e2;color:#991b1b;}
-
-/* NODE SHAPES */
+.fc-yes{background:#d1fae5;color:#065f46;}.fc-no{background:#fee2e2;color:#991b1b;}
+/* Decision split - two columns */
+.fc-split{display:flex;gap:24px;margin:4px 0;position:relative;}
+.fc-split::before{content:'';position:absolute;top:0;left:50%;width:1px;height:100%;background:#e2e8f0;}
+.fc-split-col{flex:1;display:flex;flex-direction:column;align-items:center;}
+.fc-split-label{font-size:10px;font-weight:800;padding:3px 12px;border-radius:4px;margin-bottom:4px;}
+.fc-goto{padding:6px 14px;border-radius:8px;font-size:10px;font-weight:700;border:2px dashed;text-align:center;color:var(--muted);}
+.fc-goto-yes{border-color:#10b981;color:#065f46;background:#f0fdf4;}
+.fc-goto-no{border-color:#ef4444;color:#991b1b;background:#fef2f2;}
+.fc-goto i{font-size:12px;}
+/* Nodes */
 .fc-node{cursor:pointer;transition:transform 0.12s;margin:2px 0;}
 .fc-node:hover{transform:scale(1.04);z-index:2;}
 .fn-pill{padding:10px 24px;border-radius:24px;color:#fff;font-size:12px;font-weight:700;text-align:center;min-width:120px;max-width:240px;}
-.fn-rect{padding:10px 20px;border-radius:8px;color:#fff;font-size:12px;font-weight:700;text-align:center;min-width:140px;max-width:260px;}
-.fn-diamond-wrap{padding:16px 0;}
-.fn-diamond{width:120px;height:120px;position:relative;margin:0 auto;}
+.fn-rect{padding:10px 20px;border-radius:8px;color:#fff;font-size:12px;font-weight:700;text-align:center;min-width:140px;max-width:260px;position:relative;}
+.fn-diamond-wrap{padding:12px 0;}
+.fn-diamond{width:110px;height:110px;position:relative;margin:0 auto;}
 .fn-diamond-bg{position:absolute;inset:0;transform:rotate(45deg);border-radius:6px;}
 .fn-diamond-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-weight:700;text-align:center;padding:8px;z-index:1;color:#fff;line-height:1.3;}
-.fn-sub{padding:10px 20px;border-radius:8px;color:#fff;font-size:12px;font-weight:700;text-align:center;min-width:140px;max-width:260px;border:2px solid rgba(255,255,255,0.4);}
-.fn-desc{font-size:10px;font-weight:400;opacity:0.8;margin-top:2px;line-height:1.2;}
-.fn-who{font-size:9px;opacity:0.7;margin-top:3px;}
+.fn-sub{padding:10px 20px;border-radius:8px;color:#fff;font-size:12px;font-weight:700;text-align:center;min-width:140px;max-width:260px;border:2px solid rgba(255,255,255,0.4);position:relative;}
+.fn-desc{font-size:10px;font-weight:400;opacity:0.8;margin-top:2px;}.fn-who{font-size:9px;opacity:0.7;margin-top:3px;}
 .fn-dur{position:absolute;top:-8px;right:-8px;background:#fff;color:#475569;font-size:8px;font-weight:800;padding:2px 6px;border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,0.1);}
-
-/* Colors */
+.fn-id{position:absolute;top:-8px;left:-8px;background:#1e293b;color:#fff;font-size:8px;font-weight:800;padding:2px 6px;border-radius:4px;}
 .bg-start{background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 2px 8px rgba(16,185,129,0.3);}
 .bg-end{background:linear-gradient(135deg,#ef4444,#dc2626);box-shadow:0 2px 8px rgba(239,68,68,0.3);}
 .bg-process{background:linear-gradient(135deg,#0891b2,#0e7490);box-shadow:0 2px 8px rgba(8,145,178,0.3);}
 .bg-decision{background:linear-gradient(135deg,#f59e0b,#d97706);box-shadow:0 2px 8px rgba(245,158,11,0.3);}
-.bg-subprocess{background:linear-gradient(135deg,#0891b2,#0e7490);box-shadow:0 2px 8px rgba(8,145,178,0.3);}
-.bg-input{background:linear-gradient(135deg,#8b5cf6,#7c3aed);box-shadow:0 2px 8px rgba(139,92,246,0.3);}
-.bg-output{background:linear-gradient(135deg,#06b6d4,#0891b2);box-shadow:0 2px 8px rgba(6,182,212,0.3);}
-.bg-delay{background:linear-gradient(135deg,#94a3b8,#64748b);box-shadow:0 2px 8px rgba(148,163,184,0.3);}
-.bg-document{background:linear-gradient(135deg,#f97316,#ea580c);box-shadow:0 2px 8px rgba(249,115,22,0.3);}
-.bg-database{background:linear-gradient(135deg,#6366f1,#4f46e5);box-shadow:0 2px 8px rgba(99,102,241,0.3);}
-
-/* RIGHT PANEL - Node list + add */
-.nd-item{padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:#fff;display:flex;align-items:center;gap:8px;cursor:pointer;transition:all 0.12s;font-size:12px;}
+.bg-subprocess{background:linear-gradient(135deg,#0891b2,#0e7490);}
+.bg-input{background:linear-gradient(135deg,#8b5cf6,#7c3aed);}
+.bg-output{background:linear-gradient(135deg,#06b6d4,#0891b2);}
+.bg-delay{background:linear-gradient(135deg,#94a3b8,#64748b);}
+.bg-document{background:linear-gradient(135deg,#f97316,#ea580c);}
+.bg-database{background:linear-gradient(135deg,#6366f1,#4f46e5);}
+/* Node list */
+.nd-item{padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:5px;background:#fff;display:flex;align-items:center;gap:6px;cursor:pointer;transition:all 0.12s;font-size:11px;}
 .nd-item:hover{border-color:var(--primary);background:#f0fdfa;}
 .nd-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
 .nd-item-info{flex:1;min-width:0;}
 .nd-item-label{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.nd-item-meta{font-size:10px;color:var(--muted);}
-.nd-item-actions{display:flex;gap:2px;flex-shrink:0;}
-.nd-item-actions button,.nd-item-actions form{display:inline;}
-.nd-item-actions button{background:none;border:none;cursor:pointer;font-size:11px;padding:2px 4px;color:var(--muted);border-radius:4px;}
+.nd-item-meta{font-size:9px;color:var(--muted);}
+.nd-item-actions{display:flex;gap:1px;flex-shrink:0;}
+.nd-item-actions button{background:none;border:none;cursor:pointer;font-size:10px;padding:2px 3px;color:var(--muted);border-radius:4px;}
 .nd-item-actions button:hover{background:var(--bg);color:var(--primary);}
-
-@media(max-width:900px){
-  .flow-builder{flex-direction:column;}
-  .flow-right{width:100%;max-height:none;}
-}
+@media(max-width:900px){.flow-builder{flex-direction:column;}.flow-left{width:100%;max-height:none;}}
 </style>
 <div class="app-wrap">
   <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
@@ -79,34 +75,38 @@
       <% if (flow.trigger_event) { %><div style="margin-bottom:12px;padding:8px 14px;background:var(--accent-light);border-radius:8px;font-size:12px;color:#92400e;"><i class="ti ti-bolt"></i> Trigger: <strong><%= flow.trigger_event %></strong></div><% } %>
 
       <div class="flow-builder">
-        <!-- LEFT: Node list + Add -->
-        <div class="flow-right">
-          <div style="font-size:13px;font-weight:800;margin-bottom:8px;">Nodes (<%= nodes.length %>)</div>
-
+        <!-- LEFT: Nodes -->
+        <div class="flow-left">
+          <div style="font-size:12px;font-weight:800;margin-bottom:6px;">Nodes (<%= nodes.length %>)</div>
           <% nodes.forEach((nd, i) => { var dotColors = {start:'#10b981',end:'#ef4444',process:'#0891b2',decision:'#f59e0b',subprocess:'#0891b2',input:'#8b5cf6',output:'#06b6d4',delay:'#94a3b8',document:'#f97316',database:'#6366f1'}; %>
             <div class="nd-item" onclick="document.getElementById('editNode-<%= nd.id %>').classList.add('open')">
               <div class="nd-dot" style="background:<%= nd.color || dotColors[nd.type] || '#0891b2' %>;"></div>
               <div class="nd-item-info">
-                <div class="nd-item-label"><%= nd.label %></div>
-                <div class="nd-item-meta"><%= nd.type %><%= nd.responsible ? ' · '+nd.responsible : '' %><%= nd.duration ? ' · '+nd.duration : '' %></div>
+                <div class="nd-item-label">#<%= i+1 %> <%= nd.label %></div>
+                <div class="nd-item-meta"><%= nd.type %><%= nd.responsible ? ' · '+nd.responsible : '' %><%= nd.type === 'decision' ? ' → Yes:#'+(nd.yes_connect ? nodes.findIndex(n=>n.id===nd.yes_connect)+1 : 'next')+' No:#'+(nd.no_connect ? nodes.findIndex(n=>n.id===nd.no_connect)+1 : 'next') : '' %></div>
               </div>
               <div class="nd-item-actions" onclick="event.stopPropagation()">
-                <form method="POST" action="/admin/flows/<%= flow.id %>/nodes/<%= nd.id %>/move"><input type="hidden" name="direction" value="up"><button type="submit" title="Up" <%= i===0?'disabled':'' %>>↑</button></form>
-                <form method="POST" action="/admin/flows/<%= flow.id %>/nodes/<%= nd.id %>/move"><input type="hidden" name="direction" value="down"><button type="submit" title="Down" <%= i===nodes.length-1?'disabled':'' %>>↓</button></form>
-                <form method="POST" action="/admin/flows/<%= flow.id %>/nodes/<%= nd.id %>/delete"><button type="submit" onclick="return confirm('Delete?')" title="Delete" style="color:var(--danger);">×</button></form>
+                <form method="POST" action="/admin/flows/<%= flow.id %>/nodes/<%= nd.id %>/move"><input type="hidden" name="direction" value="up"><button type="submit" <%= i===0?'disabled':'' %>>↑</button></form>
+                <form method="POST" action="/admin/flows/<%= flow.id %>/nodes/<%= nd.id %>/move"><input type="hidden" name="direction" value="down"><button type="submit" <%= i===nodes.length-1?'disabled':'' %>>↓</button></form>
+                <form method="POST" action="/admin/flows/<%= flow.id %>/nodes/<%= nd.id %>/delete"><button type="submit" onclick="return confirm('Delete?')" style="color:var(--danger);">×</button></form>
               </div>
             </div>
-
             <!-- Edit modal -->
             <div class="modal-bg" id="editNode-<%= nd.id %>" onclick="if(event.target===this)this.classList.remove('open')">
               <div class="modal">
-                <h3>Edit Node</h3>
+                <h3>Edit Node #<%= i+1 %></h3>
                 <form method="POST" action="/admin/flows/<%= flow.id %>/nodes/<%= nd.id %>/edit">
                   <input type="hidden" name="node_order" value="<%= nd.node_order %>">
-                  <div class="form-row"><div class="form-group"><label>Type</label><select name="type"><% ['start','process','decision','subprocess','input','output','delay','document','database','end'].forEach(t => { %><option value="<%= t %>" <%= nd.type===t?'selected':'' %>><%= t %></option><% }) %></select></div><div class="form-group"><label>Label *</label><input type="text" name="label" value="<%= nd.label %>" required></div></div>
+                  <div class="form-row"><div class="form-group"><label>Type</label><select name="type" onchange="this.form.querySelector('.dec-fields').style.display=this.value==='decision'?'':'none'"><% ['start','process','decision','subprocess','input','output','delay','document','database','end'].forEach(t => { %><option value="<%= t %>" <%= nd.type===t?'selected':'' %>><%= t %></option><% }) %></select></div><div class="form-group"><label>Label *</label><input type="text" name="label" value="<%= nd.label %>" required></div></div>
                   <div class="form-group"><label>Description</label><textarea name="description" rows="2"><%= nd.description || '' %></textarea></div>
-                  <div class="form-row"><div class="form-group"><label>Responsible</label><input type="text" name="responsible" value="<%= nd.responsible || '' %>"></div><div class="form-group"><label>Duration</label><input type="text" name="duration" value="<%= nd.duration || '' %>" placeholder="5 min, 1 hour"></div></div>
-                  <div class="form-row"><div class="form-group"><label>Yes Branch</label><input type="text" name="yes_label" value="<%= nd.yes_label || '' %>"></div><div class="form-group"><label>No Branch</label><input type="text" name="no_label" value="<%= nd.no_label || '' %>"></div></div>
+                  <div class="form-row"><div class="form-group"><label>Responsible</label><input type="text" name="responsible" value="<%= nd.responsible || '' %>"></div><div class="form-group"><label>Duration</label><input type="text" name="duration" value="<%= nd.duration || '' %>"></div></div>
+                  <div class="dec-fields" style="<%= nd.type === 'decision' ? '' : 'display:none;' %>">
+                    <div class="form-row"><div class="form-group"><label>Yes Label</label><input type="text" name="yes_label" value="<%= nd.yes_label || '' %>" placeholder="Approved"></div><div class="form-group"><label>No Label</label><input type="text" name="no_label" value="<%= nd.no_label || '' %>" placeholder="Rejected"></div></div>
+                    <div class="form-row">
+                      <div class="form-group"><label>Yes → Go to Node</label><select name="yes_connect"><option value="">Next node (default)</option><% nodes.forEach((n,ni) => { if(n.id !== nd.id) { %><option value="<%= n.id %>" <%= nd.yes_connect === n.id ? 'selected' : '' %>>#<%= ni+1 %> — <%= n.label %></option><% } }) %></select></div>
+                      <div class="form-group"><label>No → Go to Node</label><select name="no_connect"><option value="">Next node (default)</option><% nodes.forEach((n,ni) => { if(n.id !== nd.id) { %><option value="<%= n.id %>" <%= nd.no_connect === n.id ? 'selected' : '' %>>#<%= ni+1 %> — <%= n.label %></option><% } }) %></select></div>
+                    </div>
+                  </div>
                   <div class="form-row"><div class="form-group"><label>Swimlane</label><input type="text" name="swimlane" value="<%= nd.swimlane || '' %>"></div><div class="form-group"><label>Color</label><input type="color" name="color" value="<%= nd.color || '#0891b2' %>" style="height:36px;"></div></div>
                   <div class="form-group"><label>Notes</label><textarea name="notes" rows="2"><%= nd.notes || '' %></textarea></div>
                   <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('editNode-<%= nd.id %>').classList.remove('open')">Cancel</button></div>
@@ -114,10 +114,9 @@
               </div>
             </div>
           <% }) %>
-
-          <!-- ADD NODE -->
-          <div style="margin-top:12px;padding:14px;border:2px dashed var(--border);border-radius:10px;background:#fff;">
-            <div style="font-size:12px;font-weight:800;margin-bottom:10px;">+ Add Node</div>
+          <!-- Add node -->
+          <div style="margin-top:10px;padding:12px;border:2px dashed var(--border);border-radius:10px;background:#fff;">
+            <div style="font-size:11px;font-weight:800;margin-bottom:8px;">+ Add Node</div>
             <form method="POST" action="/admin/flows/<%= flow.id %>/nodes">
               <div class="form-group"><label>Type</label><select name="type" id="addType" onchange="document.getElementById('addDecFields').style.display=this.value==='decision'?'':'none'"><option value="start">Start</option><option value="process" selected>Process</option><option value="decision">Decision</option><option value="subprocess">Sub-process</option><option value="input">Input</option><option value="output">Output</option><option value="delay">Delay</option><option value="document">Document</option><option value="database">Database</option><option value="end">End</option></select></div>
               <div class="form-group"><label>Label *</label><input type="text" name="label" required placeholder="Step name"></div>
@@ -126,49 +125,76 @@
               <div id="addDecFields" style="display:none;">
                 <div class="form-row"><div class="form-group"><label>Yes →</label><input type="text" name="yes_label" placeholder="Approved"></div><div class="form-group"><label>No →</label><input type="text" name="no_label" placeholder="Rejected"></div></div>
               </div>
-              <div class="form-row"><div class="form-group"><label>Swimlane</label><input type="text" name="swimlane" placeholder="Department"></div><div class="form-group"><label>Color</label><input type="color" name="color" value="#0891b2" style="height:34px;"></div></div>
-              <button type="submit" class="btn btn-primary btn-sm" style="width:100%;justify-content:center;">Add Node</button>
+              <div class="form-row"><div class="form-group"><label>Swimlane</label><input type="text" name="swimlane" placeholder="Dept"></div><div class="form-group"><label>Color</label><input type="color" name="color" value="#0891b2" style="height:32px;"></div></div>
+              <button type="submit" class="btn btn-primary btn-sm" style="width:100%;justify-content:center;">Add</button>
             </form>
           </div>
         </div>
 
         <!-- RIGHT: Flowchart -->
-        <div class="flow-left">
+        <div class="flow-right">
           <div class="fc-canvas">
             <% if (nodes.length === 0) { %>
-              <div style="text-align:center;padding:40px;color:var(--muted);"><i class="ti ti-git-branch" style="font-size:40px;display:block;margin-bottom:8px;"></i><div style="font-weight:700;">Empty flow</div><div style="font-size:12px;">Add nodes from the panel on the right.</div></div>
+              <div style="text-align:center;padding:40px;color:var(--muted);"><i class="ti ti-git-branch" style="font-size:40px;display:block;margin-bottom:8px;"></i><div style="font-weight:700;">Empty flow</div><div style="font-size:12px;">Add nodes from the left panel.</div></div>
             <% } else { %>
               <div class="fc-flow">
-                <% nodes.forEach((nd, i) => { %>
-                  <% if (i > 0) { %>
-                    <div class="fc-arrow"><div class="fc-arrow-line"></div><div class="fc-arrow-tip"></div></div>
-                    <% var prev = nodes[i-1]; if (prev.type === 'decision') { %>
-                      <div class="fc-branch"><span class="fc-yes"><%= prev.yes_label || 'Yes' %></span><span class="fc-no"><%= prev.no_label || 'No' %></span></div>
-                    <% } %>
-                  <% } %>
-
-                  <% var bgClass = 'bg-' + nd.type; var customBg = nd.color ? 'style="background:'+nd.color+'"' : ''; %>
-
+                <%
+                  // Render function for a node
+                  function renderNode(nd, idx) {
+                    var bgClass = 'bg-' + nd.type;
+                    var customStyle = nd.color ? 'background:'+nd.color : '';
+                %>
                   <div class="fc-node" onclick="document.getElementById('editNode-<%= nd.id %>').classList.add('open')">
                     <% if (nd.type === 'start' || nd.type === 'end') { %>
-                      <div class="fn-pill <%= bgClass %>" <%= customBg %>><%= nd.label %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %></div>
-
+                      <div class="fn-pill <%= bgClass %>" style="position:relative;<%= customStyle %>"><span class="fn-id">#<%= idx+1 %></span><%= nd.label %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %></div>
                     <% } else if (nd.type === 'decision') { %>
-                      <div class="fn-diamond-wrap">
-                        <div class="fn-diamond">
-                          <div class="fn-diamond-bg <%= bgClass %>" <%= customBg %>></div>
-                          <div class="fn-diamond-text"><%= nd.label %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %></div>
-                          <% if (nd.duration) { %><span class="fn-dur"><%= nd.duration %></span><% } %>
-                        </div>
-                      </div>
-
+                      <div class="fn-diamond-wrap"><div class="fn-diamond"><div class="fn-diamond-bg <%= bgClass %>" style="<%= customStyle %>"></div><div class="fn-diamond-text"><%= nd.label %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %></div><span class="fn-id">#<%= idx+1 %></span><% if (nd.duration) { %><span class="fn-dur"><%= nd.duration %></span><% } %></div></div>
                     <% } else if (nd.type === 'subprocess') { %>
-                      <div class="fn-sub <%= bgClass %>" style="position:relative;<%= nd.color ? 'background:'+nd.color : '' %>"><%= nd.label %><% if (nd.description) { %><div class="fn-desc"><%= nd.description %></div><% } %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %><% if (nd.duration) { %><span class="fn-dur"><%= nd.duration %></span><% } %></div>
-
+                      <div class="fn-sub <%= bgClass %>" style="<%= customStyle %>"><span class="fn-id">#<%= idx+1 %></span><%= nd.label %><% if (nd.description) { %><div class="fn-desc"><%= nd.description %></div><% } %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %><% if (nd.duration) { %><span class="fn-dur"><%= nd.duration %></span><% } %></div>
                     <% } else { %>
-                      <div class="fn-rect <%= bgClass %>" style="position:relative;<%= nd.color ? 'background:'+nd.color : '' %>"><%= nd.label %><% if (nd.description) { %><div class="fn-desc"><%= nd.description %></div><% } %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %><% if (nd.duration) { %><span class="fn-dur"><%= nd.duration %></span><% } %></div>
+                      <div class="fn-rect <%= bgClass %>" style="<%= customStyle %>"><span class="fn-id">#<%= idx+1 %></span><%= nd.label %><% if (nd.description) { %><div class="fn-desc"><%= nd.description %></div><% } %><% if (nd.responsible) { %><div class="fn-who"><%= nd.responsible %></div><% } %><% if (nd.duration) { %><span class="fn-dur"><%= nd.duration %></span><% } %></div>
                     <% } %>
                   </div>
+                <% } %>
+
+                <% nodes.forEach((nd, i) => { %>
+                  <% if (i > 0 && nodes[i-1].type !== 'decision') { %>
+                    <div class="fc-arrow"><div class="fc-arrow-line"></div><div class="fc-arrow-tip"></div></div>
+                  <% } %>
+
+                  <% if (i > 0 && nodes[i-1].type === 'decision') { %>
+                    <%
+                      var dec = nodes[i-1];
+                      var yesTarget = dec.yes_connect ? nodes.find(n => n.id === dec.yes_connect) : null;
+                      var noTarget = dec.no_connect ? nodes.find(n => n.id === dec.no_connect) : null;
+                      var yesIdx = yesTarget ? nodes.indexOf(yesTarget) : -1;
+                      var noIdx = noTarget ? nodes.indexOf(noTarget) : -1;
+                    %>
+                    <!-- Decision split -->
+                    <div class="fc-split">
+                      <div class="fc-split-col">
+                        <div class="fc-split-label fc-yes"><%= dec.yes_label || 'Yes' %></div>
+                        <div class="fc-arrow"><div class="fc-arrow-line" style="background:#10b981;"></div><div class="fc-arrow-tip" style="border-top-color:#10b981;"></div></div>
+                        <% if (yesTarget) { %>
+                          <div class="fc-goto fc-goto-yes"><i class="ti ti-corner-down-right"></i> Go to #<%= yesIdx+1 %>: <%= yesTarget.label %></div>
+                        <% } else { %>
+                          <div class="fc-goto fc-goto-yes"><i class="ti ti-arrow-down"></i> Continue</div>
+                        <% } %>
+                      </div>
+                      <div class="fc-split-col">
+                        <div class="fc-split-label fc-no"><%= dec.no_label || 'No' %></div>
+                        <div class="fc-arrow"><div class="fc-arrow-line" style="background:#ef4444;"></div><div class="fc-arrow-tip" style="border-top-color:#ef4444;"></div></div>
+                        <% if (noTarget) { %>
+                          <div class="fc-goto fc-goto-no"><i class="ti ti-corner-down-left"></i> Go to #<%= noIdx+1 %>: <%= noTarget.label %></div>
+                        <% } else { %>
+                          <div class="fc-goto fc-goto-no"><i class="ti ti-arrow-down"></i> Continue</div>
+                        <% } %>
+                      </div>
+                    </div>
+                    <div class="fc-arrow"><div class="fc-arrow-line"></div><div class="fc-arrow-tip"></div></div>
+                  <% } %>
+
+                  <% renderNode(nd, i); %>
                 <% }) %>
               </div>
             <% } %>
@@ -176,7 +202,7 @@
         </div>
       </div>
 
-      <!-- SETTINGS MODAL -->
+      <!-- Settings modal -->
       <div class="modal-bg" id="flowSettings" onclick="if(event.target===this)this.classList.remove('open')">
         <div class="modal">
           <h3>Flow Settings</h3>
@@ -189,8 +215,8 @@
             <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('flowSettings').classList.remove('open')">Cancel</button></div>
           </form>
           <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:8px;">
-            <form method="POST" action="/admin/flows/<%= flow.id %>/clone" style="display:flex;gap:6px;flex:1;"><select name="company_id" style="flex:1;padding:6px;font-size:12px;border:1px solid var(--border);border-radius:6px;"><option value="">Clone as template</option><% companies.forEach(c => { %><option value="<%= c.id %>">→ <%= c.name %></option><% }) %></select><button type="submit" class="btn btn-sm">Clone</button></form>
-            <form method="POST" action="/admin/flows/<%= flow.id %>/delete" onsubmit="return confirm('Delete this flow?')"><button type="submit" class="btn btn-sm btn-danger"><i class="ti ti-trash"></i></button></form>
+            <form method="POST" action="/admin/flows/<%= flow.id %>/clone" style="display:flex;gap:6px;flex:1;"><select name="company_id" style="flex:1;padding:6px;font-size:11px;border:1px solid var(--border);border-radius:6px;"><option value="">Clone as template</option><% companies.forEach(c => { %><option value="<%= c.id %>">→ <%= c.name %></option><% }) %></select><button type="submit" class="btn btn-sm">Clone</button></form>
+            <form method="POST" action="/admin/flows/<%= flow.id %>/delete" onsubmit="return confirm('Delete?')"><button type="submit" class="btn btn-sm btn-danger"><i class="ti ti-trash"></i></button></form>
           </div>
         </div>
       </div>

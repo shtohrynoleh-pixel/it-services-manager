@@ -124,6 +124,11 @@ module.exports = function(db) {
     const username = req.session.user.full_name || req.session.user.username;
     const totalXp = getUserXP(db, username);
     res.locals.userRank = getRank(totalXp);
+    // XP flash from session
+    if (req.session.xpFlash) {
+      res.locals.xpFlash = req.session.xpFlash;
+      delete req.session.xpFlash;
+    }
     checkDailyLogin(db, username);
     next();
   });
@@ -191,13 +196,13 @@ module.exports = function(db) {
     db.prepare('INSERT INTO tasks (title, description, company_id, related_table, related_id, priority, due_date, assigned_to, status) VALUES (?,?,?,?,?,?,?,?,?)').run(
       title, description, company_id || null, related_table || null, related_id || null, priority || 'medium', due_date || null, assigned_to || null, status || 'todo'
     );
-    awardXP(db, xpUser(req), 'create_task');
+    awardXP(db, xpUser(req), 'create_task', null, req);
     res.redirect(req.body.redirect || '/admin/tasks');
   });
 
   router.post('/tasks/:id/status', (req, res) => {
     db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run(req.body.status, req.params.id);
-    if (req.body.status === 'done') awardXP(db, xpUser(req), 'complete_task');
+    if (req.body.status === 'done') awardXP(db, xpUser(req), 'complete_task', null, req);
     res.redirect(req.body.redirect || '/admin/tasks');
   });
 
@@ -653,7 +658,7 @@ module.exports = function(db) {
     db.prepare(`INSERT INTO ${table} (${cols.join(',')}) VALUES (${placeholders})`).run(...vals);
     // Award XP
     const xpMap = {contacts:'add_contact',company_users:'add_user',servers:'add_server',subscriptions:'add_subscription',assets:'add_asset',inventory:'add_inventory'};
-    if (xpMap[table]) awardXP(db, xpUser(req), xpMap[table]);
+    if (xpMap[table]) awardXP(db, xpUser(req), xpMap[table], null, req);
     res.redirect('/admin/companies/' + req.params.id + '?tab=' + table.replace('company_', ''));
   });
 
@@ -1304,10 +1309,10 @@ module.exports = function(db) {
 
   // Edit node
   router.post('/flows/:id/nodes/:nid/edit', (req, res) => {
-    const { type, label, description, responsible, yes_label, no_label, color, swimlane, duration, notes, node_order } = req.body;
+    const { type, label, description, responsible, yes_label, no_label, color, swimlane, duration, notes, node_order, yes_connect, no_connect } = req.body;
     try {
-      db.prepare('UPDATE flow_nodes SET type=?, label=?, description=?, responsible=?, yes_label=?, no_label=?, color=?, swimlane=?, duration=?, notes=?, node_order=? WHERE id=? AND flow_id=?').run(
-        type || 'process', label, description || null, responsible || null, yes_label || null, no_label || null, color || null, swimlane || null, duration || null, notes || null, parseInt(node_order) || 0, req.params.nid, req.params.id
+      db.prepare('UPDATE flow_nodes SET type=?, label=?, description=?, responsible=?, yes_label=?, no_label=?, color=?, swimlane=?, duration=?, notes=?, node_order=?, yes_connect=?, no_connect=? WHERE id=? AND flow_id=?').run(
+        type || 'process', label, description || null, responsible || null, yes_label || null, no_label || null, color || null, swimlane || null, duration || null, notes || null, parseInt(node_order) || 0, yes_connect ? parseInt(yes_connect) : null, no_connect ? parseInt(no_connect) : null, req.params.nid, req.params.id
       );
     } catch(e) {}
     res.redirect('/admin/flows/' + req.params.id);

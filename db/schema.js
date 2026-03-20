@@ -464,6 +464,8 @@ function initDB() {
       duration TEXT,
       notes TEXT,
       connect_to INTEGER,
+      yes_connect INTEGER,
+      no_connect INTEGER,
       FOREIGN KEY (flow_id) REFERENCES process_flows(id) ON DELETE CASCADE
     );
 
@@ -723,6 +725,8 @@ function initDB() {
     try { db.exec('ALTER TABLE flow_nodes ADD COLUMN duration TEXT'); } catch(e2) {}
     try { db.exec('ALTER TABLE flow_nodes ADD COLUMN notes TEXT'); } catch(e2) {}
     try { db.exec('ALTER TABLE flow_nodes ADD COLUMN connect_to INTEGER'); } catch(e2) {}
+    try { db.exec('ALTER TABLE flow_nodes ADD COLUMN yes_connect INTEGER'); } catch(e2) {}
+    try { db.exec('ALTER TABLE flow_nodes ADD COLUMN no_connect INTEGER'); } catch(e2) {}
   }
 
   // Add show_on_landing to services if missing

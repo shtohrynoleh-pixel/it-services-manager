@@ -13,6 +13,10 @@ module.exports = function(db) {
     const username = req.session.user.full_name || req.session.user.username;
     const totalXp = getUserXP(db, username);
     res.locals.userRank = getRank(totalXp);
+    if (req.session.xpFlash) {
+      res.locals.xpFlash = req.session.xpFlash;
+      delete req.session.xpFlash;
+    }
     checkDailyLogin(db, username);
     next();
   });
@@ -59,7 +63,7 @@ module.exports = function(db) {
         cid, name, title || null, email || null, phone || null, department || null, role || null, email_account || null
       );
     } catch(e) {}
-    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_user');
+    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_user', null, req);
     res.redirect('/client?tab=users');
   });
 
@@ -72,7 +76,7 @@ module.exports = function(db) {
         cid, name, type || null, ip || null, os || null, purpose || null, location || null, notes || null
       );
     } catch(e) {}
-    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_server');
+    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_server', null, req);
     res.redirect('/client?tab=servers');
   });
 
@@ -85,7 +89,7 @@ module.exports = function(db) {
         cid, name, vendor || null, type || null, parseInt(seats) || 1, parseFloat(cost_per_unit) || 0, billing_cycle || 'Monthly', renewal_date || null, notes || null
       );
     } catch(e) {}
-    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_subscription');
+    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_subscription', null, req);
     res.redirect('/client?tab=subscriptions');
   });
 
@@ -98,7 +102,7 @@ module.exports = function(db) {
         cid, name, type || null, provider || null, expires_at || null, login_url || null, notes || null
       );
     } catch(e) {}
-    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_asset');
+    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_asset', null, req);
     res.redirect('/client?tab=assets');
   });
 
@@ -111,7 +115,7 @@ module.exports = function(db) {
         cid, name, type || null, manufacturer || null, model || null, serial_number || null, parseInt(quantity) || 1, parseFloat(cost) || 0, condition || 'New', notes || null
       );
     } catch(e) {}
-    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_inventory');
+    awardXP(db, req.session.user.full_name || req.session.user.username, 'add_inventory', null, req);
     res.redirect('/client?tab=inventory');
   });
 
@@ -125,7 +129,7 @@ module.exports = function(db) {
         title, description || '', cid, priority || 'medium'
       );
     } catch(e) {}
-    awardXP(db, req.session.user.full_name || req.session.user.username, 'create_task');
+    awardXP(db, req.session.user.full_name || req.session.user.username, 'create_task', null, req);
     res.redirect(req.body.redirect || '/client?tab=tasks');
   });
 
