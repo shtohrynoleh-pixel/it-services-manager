@@ -1,0 +1,36 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/client/policies" style="opacity:0.4;text-decoration:none;">🛡️</a> → <%= policy.title %></h2></div>
+    </div>
+    <div class="content">
+      <div class="card">
+        <h3><%= policy.title %></h3>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;"><%= policy.category %> · v<%= policy.version %></div>
+        <% if (policy.description) { %><p style="font-size:13px;color:var(--muted);margin-bottom:16px;"><%= policy.description %></p><% } %>
+        <div style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:20px;white-space:pre-wrap;font-size:13px;line-height:1.8;"><%= policy.content || 'No content.' %></div>
+      </div>
+
+      <!-- Acknowledgment -->
+      <div class="card">
+        <% if (myAck) { %>
+          <div style="text-align:center;padding:12px;">
+            <div style="font-size:32px;margin-bottom:8px;">✅</div>
+            <div style="font-weight:700;color:var(--success);">You acknowledged this policy</div>
+            <div style="font-size:12px;color:var(--muted);"><%= myAck.acknowledged_at %></div>
+          </div>
+        <% } else { %>
+          <form method="POST" action="/client/policies/<%= policy.id %>/acknowledge" style="text-align:center;padding:12px;">
+            <p style="font-size:13px;margin-bottom:12px;">I have read, understood, and agree to follow this security policy.</p>
+            <button type="submit" class="btn btn-primary">✅ I Acknowledge</button>
+          </form>
+        <% } %>
+      </div>
+
+      <a href="/client/policies" class="btn btn-sm">← Back to Policies</a>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

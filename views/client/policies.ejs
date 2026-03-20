@@ -1,0 +1,25 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>🛡️ Security Policies</h2></div>
+    </div>
+    <div class="content">
+      <% if (policies.length === 0) { %>
+        <div class="empty"><span class="e-icon">🛡️</span><div class="e-text">No policies available</div></div>
+      <% } else { %>
+        <% policies.forEach(p => { %>
+          <a href="/client/policies/<%= p.id %>" class="item-card" style="text-decoration:none;color:inherit;">
+            <div class="ic-main">
+              <div class="ic-name"><%= p.title %></div>
+              <div class="ic-sub"><%= p.category || '' %> · v<%= p.version %></div>
+            </div>
+            <span class="badge active">Read</span>
+          </a>
+        <% }) %>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

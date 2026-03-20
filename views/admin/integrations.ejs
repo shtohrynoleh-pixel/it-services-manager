@@ -134,8 +134,9 @@
         <div class="intg-field">
           <div class="intg-field-label">Webhook URL</div>
           <div style="display:flex;align-items:center;gap:8px;">
-            <code style="flex:1;background:#e2e8f0;padding:8px 12px;border-radius:6px;font-size:12px;word-break:break-all;" id="webhookUrl">POST https://YOUR-SERVER:3000/api/webhook/alert</code>
-            <button class="btn btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('webhookUrl').textContent)">📋 Copy</button>
+            <code style="flex:1;background:#e2e8f0;padding:8px 12px;border-radius:6px;font-size:12px;word-break:break-all;" id="webhookUrl"></code>
+            <button class="btn btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('webhookUrl').dataset.url)">📋 Copy</button>
+            <script>document.getElementById('webhookUrl').textContent='POST '+location.origin+'/api/webhook/alert';document.getElementById('webhookUrl').dataset.url=location.origin+'/api/webhook/alert';</script>
           </div>
           <div class="intg-field-hint">Point your external monitoring tools to this URL</div>
         </div>
@@ -184,9 +185,9 @@ Content-Type: application/json
             <div class="intg-field" style="display:flex;align-items:center;gap:8px;">
               <div style="flex:1;">
                 <div class="intg-field-label"><%= co ? co.name : 'Company #' + coId %></div>
-                <code style="font-size:11px;word-break:break-all;">POST /api/webhook/company/<%= key %></code>
+                <code style="font-size:11px;word-break:break-all;" class="wh-url" data-path="/api/webhook/company/<%= key %>"></code>
               </div>
-              <button class="btn btn-sm" onclick="navigator.clipboard.writeText(location.origin+'/api/webhook/company/<%= key %>')">📋</button>
+              <button class="btn btn-sm" onclick="navigator.clipboard.writeText(location.origin+'/api/webhook/company/<%= key %>');this.textContent='Copied!';setTimeout(()=>this.textContent='📋',1500)">📋</button>
               <form method="POST" action="/admin/integrations/webhook-delete" style="display:inline;">
                 <input type="hidden" name="key" value="<%= key %>">
                 <button type="submit" class="btn-ghost" onclick="return confirm('Delete this webhook?')">🗑️</button>
@@ -229,5 +230,6 @@ Content-Type: application/json
 </div>
 <script>
 function togglePw(id){var el=document.getElementById(id);if(el.type==='password'){el.type='text';el.nextElementSibling.textContent='Hide';}else{el.type='password';el.nextElementSibling.textContent='Show';}}
+document.querySelectorAll('.wh-url').forEach(function(el){el.textContent='POST '+location.origin+el.dataset.path;});
 </script>
 <%- include('../partials/foot') %>

@@ -140,5 +140,68 @@ function switchNotifTab(name){
   var el=document.getElementById('notif-'+name);
   if(el)el.classList.add('active');
 }
+
+// === LIVE NOTIFICATION POLLING ===
+(function(){
+  var lastCount = <%= notifications.count %>;
+  var lastClientCount = <%= notifications.clientTasks.length %>;
+
+  function pollNotifications(){
+    fetch('/admin/api/notifications').then(r=>r.json()).then(function(n){
+      // Update badge
+      var badge = document.querySelector('.notif-btn .notif-badge');
+      if(n.count > 0){
+        if(!badge){
+          badge = document.createElement('span');
+          badge.className = 'notif-badge';
+          document.querySelector('.notif-btn').appendChild(badge);
+        }
+        badge.textContent = n.count > 99 ? '99+' : n.count;
+      } else if(badge){
+        badge.textContent = '0';
+      }
+
+      // New items detected — show toast
+      if(n.count > lastCount || n.clientTasks.length > lastClientCount){
+        var newClient = n.clientTasks.length - lastClientCount;
+        var newTotal = n.count - lastCount;
+        if(newClient > 0){
+          showNotifToast('📥 ' + newClient + ' new client request' + (newClient>1?'s':''), 'client');
+        } else if(newTotal > 0){
+          showNotifToast('🔔 ' + newTotal + ' new notification' + (newTotal>1?'s':''), 'task');
+        }
+        // Pulse the bell
+        var btn = document.querySelector('.notif-btn');
+        if(btn){btn.style.animation='notifPulse 0.6s ease';setTimeout(function(){btn.style.animation='';},700);}
+      }
+
+      lastCount = n.count;
+      lastClientCount = n.clientTasks.length;
+    }).catch(function(){});
+  }
+
+  // Toast notification
+  function showNotifToast(msg, type){
+    var toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;top:20px;right:20px;z-index:2000;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:700;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,0.15);cursor:pointer;animation:notifSlideIn 0.3s ease;max-width:320px;';
+    toast.style.background = type === 'client' ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'linear-gradient(135deg,#0891b2,#0e7490)';
+    toast.textContent = msg;
+    toast.onclick = function(){
+      document.getElementById('notifDrop').classList.add('open');
+      toast.remove();
+    };
+    document.body.appendChild(toast);
+    setTimeout(function(){ if(toast.parentNode) toast.style.animation='notifSlideOut 0.3s ease forwards'; }, 5000);
+    setTimeout(function(){ if(toast.parentNode) toast.remove(); }, 5300);
+  }
+
+  // Poll every 10 seconds
+  setInterval(pollNotifications, 10000);
+})();
 </script>
+<style>
+@keyframes notifPulse{0%{transform:scale(1);}50%{transform:scale(1.3);}100%{transform:scale(1);}}
+@keyframes notifSlideIn{from{transform:translateX(100px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+@keyframes notifSlideOut{from{opacity:1;transform:translateY(0);}to{opacity:0;transform:translateY(-20px);}}
+</style>
 <% } %>

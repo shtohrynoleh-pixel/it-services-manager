@@ -104,6 +104,11 @@ module.exports = function(db) {
     next();
   });
 
+  // Notification API (for live polling)
+  router.get('/api/notifications', (req, res) => {
+    res.json(getNotifications());
+  });
+
   // Safe query helper — returns [] if table doesn't exist
   const safeAll = (sql, params) => { try { return params ? db.prepare(sql).all(...(Array.isArray(params)?params:[params])) : db.prepare(sql).all(); } catch(e) { return []; } };
   const safeGet = (sql, params) => { try { return params ? db.prepare(sql).get(...(Array.isArray(params)?params:[params])) : db.prepare(sql).get(); } catch(e) { return null; } };

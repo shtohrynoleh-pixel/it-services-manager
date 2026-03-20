@@ -75,6 +75,15 @@
           <a class="sb-item <%= page === 'chat' ? 'active' : '' %>" href="/client/chat"><span class="icon">💬</span> Chat</a>
         </div>
       </div>
+      <div class="sb-section" data-group="work">
+        <div class="sb-section-head" onclick="toggleGroup('work')"><span>Work</span><span class="sb-arrow">▾</span></div>
+        <div class="sb-section-body">
+          <a class="sb-item <%= page === 'projects' ? 'active' : '' %>" href="/client/projects"><span class="icon">📁</span> Projects</a>
+          <a class="sb-item <%= page === 'sops' ? 'active' : '' %>" href="/client/sops"><span class="icon">📋</span> SOPs</a>
+          <a class="sb-item <%= page === 'policies' ? 'active' : '' %>" href="/client/policies"><span class="icon">🛡️</span> Policies</a>
+          <a class="sb-item <%= page === 'passwords' ? 'active' : '' %>" href="/client/passwords"><span class="icon">🔑</span> Passwords</a>
+        </div>
+      </div>
       <div class="sb-section" data-group="info">
         <div class="sb-section-head" onclick="toggleGroup('info')"><span>Info</span><span class="sb-arrow">▾</span></div>
         <div class="sb-section-body">

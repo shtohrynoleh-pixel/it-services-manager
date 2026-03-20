@@ -298,7 +298,7 @@ module.exports = function(db) {
 
   // Serve chat files
   router.get('/files/:filename', (req, res) => {
-    const filePath = path.join(uploadDir, req.params.filename);
+    const filePath = path.resolve(uploadDir, req.params.filename);
     if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
     res.sendFile(filePath);
   });

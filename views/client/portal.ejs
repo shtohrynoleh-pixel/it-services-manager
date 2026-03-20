@@ -137,9 +137,12 @@
             </div>
           <% } %>
         <% } else if (cfg) { %>
-          <h3 style="margin-bottom:16px;"><%= cfg.title %></h3>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+            <h3 style="margin:0;"><%= cfg.title %></h3>
+            <button class="btn btn-primary btn-sm" onclick="document.getElementById('clientAddModal').classList.add('open')">+ Add</button>
+          </div>
           <% if (cfg.items.length === 0) { %>
-            <div class="empty"><span class="e-icon">📭</span><div class="e-text">No <%= tab %> recorded</div></div>
+            <div class="empty"><span class="e-icon">📭</span><div class="e-text">No <%= tab %> recorded</div><button class="btn btn-primary btn-sm" onclick="document.getElementById('clientAddModal').classList.add('open')">+ Add First</button></div>
           <% } else { %>
             <div class="card" style="overflow-x:auto;">
               <table class="tbl">
@@ -152,6 +155,40 @@
               </table>
             </div>
           <% } %>
+
+          <!-- Client Add Modal -->
+          <div class="modal-bg" id="clientAddModal" onclick="if(event.target===this)this.classList.remove('open')">
+            <div class="modal">
+              <h3>Add <%= tab.charAt(0).toUpperCase() + tab.slice(1) %></h3>
+              <form method="POST" action="/client/<%= tab === 'users' ? 'users' : tab %>">
+                <% if (tab === 'users') { %>
+                  <div class="form-row"><div class="form-group"><label>Full Name *</label><input type="text" name="name" required></div><div class="form-group"><label>Job Title</label><input type="text" name="title"></div></div>
+                  <div class="form-row"><div class="form-group"><label>Personal Email</label><input type="email" name="email"></div><div class="form-group"><label>Phone</label><input type="text" name="phone"></div></div>
+                  <div class="form-row"><div class="form-group"><label>Department</label><select name="department"><option value="">—</option><% (depts||[]).forEach(d => { %><option><%= d.name %></option><% }) %></select></div><div class="form-group"><label>Role</label><select name="role"><option value="">—</option><% (roles||[]).forEach(r => { %><option><%= r.name %></option><% }) %></select></div></div>
+                  <div class="form-group"><label>Company Email</label><input type="email" name="email_account"></div>
+                <% } else if (tab === 'servers') { %>
+                  <div class="form-row"><div class="form-group"><label>Name *</label><input type="text" name="name" required></div><div class="form-group"><label>Type</label><select name="type"><option>Physical</option><option>Virtual</option><option>Cloud</option></select></div></div>
+                  <div class="form-row"><div class="form-group"><label>IP</label><input type="text" name="ip"></div><div class="form-group"><label>OS</label><input type="text" name="os"></div></div>
+                  <div class="form-group"><label>Purpose</label><input type="text" name="purpose"></div>
+                <% } else if (tab === 'subscriptions') { %>
+                  <div class="form-row"><div class="form-group"><label>Name *</label><input type="text" name="name" required></div><div class="form-group"><label>Vendor</label><input type="text" name="vendor"></div></div>
+                  <div class="form-row"><div class="form-group"><label>Seats</label><input type="number" name="seats" value="1"></div><div class="form-group"><label>Cost/Unit</label><input type="number" name="cost_per_unit" step="0.01"></div></div>
+                  <div class="form-row"><div class="form-group"><label>Billing</label><select name="billing_cycle"><option>Monthly</option><option>Yearly</option></select></div><div class="form-group"><label>Renewal Date</label><input type="date" name="renewal_date"></div></div>
+                <% } else if (tab === 'assets') { %>
+                  <div class="form-row"><div class="form-group"><label>Name *</label><input type="text" name="name" required></div><div class="form-group"><label>Type</label><select name="type"><option>Domain</option><option>Website</option><option>SSL Certificate</option><option>Email Account</option><option>Cloud Account</option><option>Social Media</option><option>Other</option></select></div></div>
+                  <div class="form-row"><div class="form-group"><label>Provider</label><input type="text" name="provider"></div><div class="form-group"><label>Expires</label><input type="date" name="expires_at"></div></div>
+                  <div class="form-group"><label>Login URL</label><input type="text" name="login_url"></div>
+                <% } else if (tab === 'inventory') { %>
+                  <div class="form-row"><div class="form-group"><label>Name *</label><input type="text" name="name" required></div><div class="form-group"><label>Type</label><select name="type"><option>Desktop</option><option>Laptop</option><option>Printer</option><option>Router</option><option>Switch</option><option>Phone</option><option>Other</option></select></div></div>
+                  <div class="form-row"><div class="form-group"><label>Manufacturer</label><input type="text" name="manufacturer"></div><div class="form-group"><label>Model</label><input type="text" name="model"></div></div>
+                  <div class="form-row"><div class="form-group"><label>Serial #</label><input type="text" name="serial_number"></div><div class="form-group"><label>Condition</label><select name="condition"><option>New</option><option>Good</option><option>Fair</option></select></div></div>
+                  <div class="form-row"><div class="form-group"><label>Qty</label><input type="number" name="quantity" value="1"></div><div class="form-group"><label>Cost ($)</label><input type="number" name="cost" step="0.01"></div></div>
+                <% } %>
+                <div class="form-group"><label>Notes</label><textarea name="notes"></textarea></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('clientAddModal').classList.remove('open')">Cancel</button></div>
+              </form>
+            </div>
+          </div>
         <% } %>
       <% } %>
     </div>
