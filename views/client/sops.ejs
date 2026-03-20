@@ -3,11 +3,12 @@
   <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
   <div class="main">
     <div class="topbar">
-      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>📋 Standard Operating Procedures</h2></div>
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><i class="ti ti-list-check"></i> SOPs</h2></div>
+      <button class="btn btn-primary btn-sm" onclick="document.getElementById('addSopModal').classList.add('open')">+ New SOP</button>
     </div>
     <div class="content">
       <% if (sops.length === 0) { %>
-        <div class="empty"><span class="e-icon">📋</span><div class="e-text">No SOPs available</div></div>
+        <div class="empty"><span class="e-icon"><i class="ti ti-list-check" style="font-size:40px;"></i></span><div class="e-text">No SOPs available</div></div>
       <% } else { %>
         <% sops.forEach(s => { %>
           <a href="/client/sops/<%= s.id %>" class="item-card" style="text-decoration:none;color:inherit;">
@@ -15,10 +16,23 @@
               <div class="ic-name"><%= s.title %></div>
               <div class="ic-sub"><%= s.category || '' %><%= s.department ? ' · ' + s.department : '' %> · v<%= s.version %></div>
             </div>
-            <span class="badge active">View</span>
+            <span class="badge <%= s.status === 'published' ? 'active' : 'draft' %>"><%= s.status %></span>
           </a>
         <% }) %>
       <% } %>
+
+      <div class="modal-bg" id="addSopModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal">
+          <h3>Suggest New SOP</h3>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Create a draft SOP. Your IT admin will review and publish it.</p>
+          <form method="POST" action="/client/sops">
+            <div class="form-group"><label>Title *</label><input type="text" name="title" required placeholder="e.g. How to Reset VPN Password"></div>
+            <div class="form-group"><label>Category</label><select name="category"><option>General</option><option>IT Operations</option><option>Security</option><option>HR-IT</option><option>Backup</option><option>Server</option></select></div>
+            <div class="form-group"><label>Description</label><textarea name="description" placeholder="What this SOP covers..."></textarea></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Submit Draft</button><button type="button" class="btn" onclick="document.getElementById('addSopModal').classList.remove('open')">Cancel</button></div>
+          </form>
+        </div>
+      </div>
     </div>
   </div>
 </div>

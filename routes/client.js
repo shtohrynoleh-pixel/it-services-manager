@@ -258,6 +258,78 @@ module.exports = function(db) {
     res.redirect('/client/account');
   });
 
+  // === CSV EXPORT (client can export their own data) ===
+  router.get('/export/:table', (req, res) => {
+    const cid = req.session.user.company_id;
+    const tableMap = {
+      users: { fields: ['name','title','email','phone','department','role','email_account'], dbTable: 'company_users' },
+      servers: { fields: ['name','type','ip','os','purpose','location'], dbTable: 'servers' },
+      subscriptions: { fields: ['name','vendor','type','seats','cost_per_unit','billing_cycle','renewal_date'], dbTable: 'subscriptions' },
+      assets: { fields: ['name','type','provider','expires_at','login_url'], dbTable: 'assets' },
+      inventory: { fields: ['name','type','manufacturer','model','serial_number','quantity','cost','condition','assigned_to'], dbTable: 'inventory' }
+    };
+    const cfg = tableMap[req.params.table];
+    if (!cfg) return res.status(404).send('Unknown table');
+    const rows = safeAll('SELECT * FROM ' + cfg.dbTable + ' WHERE company_id = ? ORDER BY name', [cid]);
+    const escape = (v) => { const s = String(v == null ? '' : v); return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const csv = [cfg.fields.join(','), ...rows.map(r => cfg.fields.map(f => escape(r[f])).join(','))].join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=' + req.params.table + '-export.csv');
+    res.send(csv);
+  });
+
+  // === CREATE PROJECT (client) ===
+  router.post('/projects', (req, res) => {
+    const cid = req.session.user.company_id;
+    const { name, description, due_date } = req.body;
+    if (!name) return res.redirect('/client/projects');
+    try {
+      db.prepare('INSERT INTO projects (name, description, company_id, status, due_date) VALUES (?,?,?,?,?)').run(
+        name, description || null, cid, 'planning', due_date || null
+      );
+    } catch(e) {}
+    res.redirect('/client/projects');
+  });
+
+  // === CREATE SOP (client — draft, needs admin approval) ===
+  router.post('/sops', (req, res) => {
+    const cid = req.session.user.company_id;
+    const { title, category, description, content } = req.body;
+    if (!title) return res.redirect('/client/sops');
+    try {
+      db.prepare('INSERT INTO sops (title, category, description, company_id, status, owner) VALUES (?,?,?,?,?,?)').run(
+        title, category || 'General', description || null, cid, 'draft', req.session.user.full_name || req.session.user.username
+      );
+    } catch(e) {}
+    res.redirect('/client/sops');
+  });
+
+  // === CREATE POLICY (client — draft) ===
+  router.post('/policies', (req, res) => {
+    const cid = req.session.user.company_id;
+    const { title, category, description, content } = req.body;
+    if (!title) return res.redirect('/client/policies');
+    try {
+      db.prepare('INSERT INTO security_policies (title, category, description, content, company_id, status, requires_ack, created_by) VALUES (?,?,?,?,?,?,?,?)').run(
+        title, category || 'General', description || null, content || null, cid, 'draft', 1, req.session.user.full_name || req.session.user.username
+      );
+    } catch(e) {}
+    res.redirect('/client/policies');
+  });
+
+  // === CREATE PASSWORD ENTRY (client — shared with company) ===
+  router.post('/passwords', (req, res) => {
+    const cid = req.session.user.company_id;
+    const { title, username, password_val, url, category, notes } = req.body;
+    if (!title) return res.redirect('/client/passwords');
+    try {
+      db.prepare('INSERT INTO password_vault (title, username, password_enc, url, category, company_id, notes, share_type, created_by) VALUES (?,?,?,?,?,?,?,?,?)').run(
+        title, username || null, password_val || null, url || null, category || 'General', cid, notes || null, 'department', req.session.user.full_name || req.session.user.username
+      );
+    } catch(e) {}
+    res.redirect('/client/passwords');
+  });
+
   router.get('/services', (req, res) => {
     const services = safeAll('SELECT * FROM services WHERE is_public = 1 AND is_active = 1 ORDER BY name');
     res.render('client/services', { user: req.session.user, services, settings: getSettings(), page: 'services' });

@@ -67,14 +67,17 @@
         <% } %>
 
       <% } else if (tab === 'tasks') { %>
-        <!-- Client can submit tasks -->
+        <!-- Support ticket form -->
         <div class="card">
-          <h3>📋 Submit a Request</h3>
+          <h3><i class="ti ti-ticket"></i> Submit Support Ticket</h3>
           <form method="POST" action="/client/tasks">
-            <div class="form-group"><label>What do you need? *</label><input type="text" name="title" required placeholder="e.g. Reset password for John, Add new email account..."></div>
-            <div class="form-group"><label>Details</label><textarea name="description" placeholder="Any additional details, urgency, specific instructions..."></textarea></div>
-            <div class="form-group"><label>Priority</label><select name="priority"><option value="low">Low — when you get a chance</option><option value="medium" selected>Medium — within a day or two</option><option value="high">High — need this today</option><option value="urgent">Urgent — business is impacted</option></select></div>
-            <button type="submit" class="btn btn-primary">Submit Request</button>
+            <div class="form-group"><label>Subject *</label><input type="text" name="title" required placeholder="e.g. Can't access email, Need new computer setup..."></div>
+            <div class="form-group"><label>Description</label><textarea name="description" rows="4" placeholder="Describe the issue or request in detail. Include any error messages, affected users, and when it started..."></textarea></div>
+            <div class="form-row">
+              <div class="form-group"><label>Priority</label><select name="priority"><option value="low">Low — when convenient</option><option value="medium" selected>Medium — within 1-2 days</option><option value="high">High — need this today</option><option value="urgent">Urgent — business impacted now</option></select></div>
+              <div class="form-group"><label>Category</label><select name="related_table"><option value="">General</option><option value="email">Email Issue</option><option value="password">Password Reset</option><option value="hardware">Hardware Problem</option><option value="software">Software Issue</option><option value="network">Network/Internet</option><option value="printer">Printer Issue</option><option value="new-setup">New Setup Request</option><option value="security">Security Concern</option><option value="other">Other</option></select></div>
+            </div>
+            <button type="submit" class="btn btn-primary"><i class="ti ti-send"></i> Submit Ticket</button>
           </form>
         </div>
 
@@ -139,7 +142,10 @@
         <% } else if (cfg) { %>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
             <h3 style="margin:0;"><%= cfg.title %></h3>
-            <button class="btn btn-primary btn-sm" onclick="document.getElementById('clientAddModal').classList.add('open')">+ Add</button>
+            <div style="display:flex;gap:6px;">
+              <a href="/client/export/<%= tab %>" class="btn btn-sm"><i class="ti ti-download"></i> Export CSV</a>
+              <button class="btn btn-primary btn-sm" onclick="document.getElementById('clientAddModal').classList.add('open')">+ Add</button>
+            </div>
           </div>
           <% if (cfg.items.length === 0) { %>
             <div class="empty"><span class="e-icon">📭</span><div class="e-text">No <%= tab %> recorded</div><button class="btn btn-primary btn-sm" onclick="document.getElementById('clientAddModal').classList.add('open')">+ Add First</button></div>

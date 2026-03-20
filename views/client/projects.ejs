@@ -3,11 +3,12 @@
   <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
   <div class="main">
     <div class="topbar">
-      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>📁 Projects</h2></div>
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><i class="ti ti-folder"></i> Projects</h2></div>
+      <button class="btn btn-primary btn-sm" onclick="document.getElementById('addProjectModal').classList.add('open')">+ New Project</button>
     </div>
     <div class="content">
       <% if (projects.length === 0) { %>
-        <div class="empty"><span class="e-icon">📁</span><div class="e-text">No projects yet</div></div>
+        <div class="empty"><span class="e-icon"><i class="ti ti-folder" style="font-size:40px;"></i></span><div class="e-text">No projects yet</div><button class="btn btn-primary btn-sm" onclick="document.getElementById('addProjectModal').classList.add('open')">+ Create First Project</button></div>
       <% } else { %>
         <% projects.forEach(p => {
           const pct = p.taskTotal > 0 ? Math.round(p.taskDone / p.taskTotal * 100) : 0;
@@ -34,6 +35,18 @@
           </div>
         <% }) %>
       <% } %>
+
+      <div class="modal-bg" id="addProjectModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal">
+          <h3>New Project</h3>
+          <form method="POST" action="/client/projects">
+            <div class="form-group"><label>Project Name *</label><input type="text" name="name" required placeholder="e.g. Office Network Upgrade"></div>
+            <div class="form-group"><label>Description</label><textarea name="description" placeholder="What needs to be done..."></textarea></div>
+            <div class="form-group"><label>Target Date</label><input type="date" name="due_date"></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Create</button><button type="button" class="btn" onclick="document.getElementById('addProjectModal').classList.remove('open')">Cancel</button></div>
+          </form>
+        </div>
+      </div>
     </div>
   </div>
 </div>
