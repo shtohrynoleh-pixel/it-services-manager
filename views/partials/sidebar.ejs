@@ -86,9 +86,10 @@
         </div>
       </div>
       <div class="sb-section" data-group="info">
-        <div class="sb-section-head" onclick="toggleGroup('info')"><span>Info</span><span class="sb-arrow">▾</span></div>
+        <div class="sb-section-head" onclick="toggleGroup('info')"><span>Info & Settings</span><span class="sb-arrow">▾</span></div>
         <div class="sb-section-body">
           <a class="sb-item <%= page === 'services' ? 'active' : '' %>" href="/client/services"><span class="icon">⚙️</span> Available Services</a>
+          <a class="sb-item <%= page === 'account' ? 'active' : '' %>" href="/client/account"><span class="icon">👤</span> My Account</a>
         </div>
       </div>
     <% } %>

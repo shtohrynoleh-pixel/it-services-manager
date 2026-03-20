@@ -186,6 +186,78 @@ module.exports = function(db) {
     res.redirect('/client/policies/' + req.params.id);
   });
 
+  // === MY ACCOUNT (profile + 2FA) ===
+  router.get('/account', (req, res) => {
+    const currentUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.user.id);
+    const has2fa = !!(currentUser && currentUser.totp_enabled);
+    res.render('client/account', { user: req.session.user, currentUser, has2fa, settings: getSettings(), page: 'account' });
+  });
+
+  router.post('/account/profile', (req, res) => {
+    const { full_name, email, phone } = req.body;
+    try {
+      db.prepare('UPDATE users SET full_name = ?, email = ?, phone = ? WHERE id = ?').run(
+        full_name || null, email || null, phone || null, req.session.user.id
+      );
+      req.session.user.full_name = full_name || req.session.user.username;
+    } catch(e) {}
+    res.redirect('/client/account');
+  });
+
+  router.post('/account/password', (req, res) => {
+    const { current_password, new_password } = req.body;
+    if (!new_password || new_password.length < 4) return res.redirect('/client/account');
+    const currentUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.user.id);
+    const bcrypt = require('bcryptjs');
+    if (!bcrypt.compareSync(current_password, currentUser.password)) return res.redirect('/client/account');
+    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(bcrypt.hashSync(new_password, 10), req.session.user.id);
+    res.redirect('/client/account');
+  });
+
+  // Client 2FA setup
+  router.get('/account/2fa-setup', (req, res) => {
+    const speakeasy = require('speakeasy');
+    const QRCode = require('qrcode');
+    const currentUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.user.id);
+    const isEnabled = !!(currentUser && currentUser.totp_enabled);
+
+    if (isEnabled) {
+      return res.render('client/2fa-setup', { user: req.session.user, isEnabled: true, qrDataUrl: null, secret: null, error: req.query.error || null, settings: getSettings(), page: 'account' });
+    }
+
+    let secret = currentUser.totp_secret;
+    if (!secret) {
+      const gen = speakeasy.generateSecret({ length: 20 });
+      secret = gen.base32;
+      db.prepare('UPDATE users SET totp_secret = ? WHERE id = ?').run(secret, req.session.user.id);
+    }
+
+    const otpUrl = 'otpauth://totp/ITServices:' + encodeURIComponent(req.session.user.username) + '?secret=' + secret + '&issuer=ITServices&algorithm=SHA1&digits=6&period=30';
+    QRCode.toDataURL(otpUrl, (err, url) => {
+      res.render('client/2fa-setup', { user: req.session.user, isEnabled: false, qrDataUrl: url, secret, error: req.query.error || null, settings: getSettings(), page: 'account' });
+    });
+  });
+
+  router.post('/account/2fa-enable', (req, res) => {
+    const speakeasy = require('speakeasy');
+    const currentUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.user.id);
+    if (!currentUser || !currentUser.totp_secret) return res.redirect('/client/account');
+    const verified = speakeasy.totp.verify({ secret: currentUser.totp_secret, encoding: 'base32', token: req.body.token, window: 1 });
+    if (!verified) return res.redirect('/client/account/2fa-setup?error=Invalid+code');
+    db.prepare('UPDATE users SET totp_enabled = 1 WHERE id = ?').run(req.session.user.id);
+    res.redirect('/client/account');
+  });
+
+  router.post('/account/2fa-disable', (req, res) => {
+    const speakeasy = require('speakeasy');
+    const currentUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.user.id);
+    if (!currentUser || !currentUser.totp_secret) return res.redirect('/client/account');
+    const verified = speakeasy.totp.verify({ secret: currentUser.totp_secret, encoding: 'base32', token: req.body.token, window: 1 });
+    if (!verified) return res.redirect('/client/account/2fa-setup?error=Invalid+code');
+    db.prepare('UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?').run(req.session.user.id);
+    res.redirect('/client/account');
+  });
+
   router.get('/services', (req, res) => {
     const services = safeAll('SELECT * FROM services WHERE is_public = 1 AND is_active = 1 ORDER BY name');
     res.render('client/services', { user: req.session.user, services, settings: getSettings(), page: 'services' });

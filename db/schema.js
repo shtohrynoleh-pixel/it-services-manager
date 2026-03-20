@@ -701,6 +701,11 @@ function initDB() {
     [['Executive','Leadership and ownership',1],['Operations','Dispatch, logistics, and daily operations',2],['Driving','CDL drivers and fleet operators',3],['Maintenance','Truck and equipment maintenance',4],['Accounting','Finance, billing, and payroll',5],['Safety','Safety compliance and training',6],['HR','Hiring, onboarding, and employee management',7],['Administration','Office support and front desk',8],['IT','Technology and systems',9],['Warehouse','Loading, unloading, and yard operations',10]].forEach(d => di.run(...d));
   }
 
+  // Add storage_quota to companies if missing (in MB)
+  try { db.prepare('SELECT storage_quota FROM companies LIMIT 1').get(); } catch(e) {
+    try { db.exec('ALTER TABLE companies ADD COLUMN storage_quota INTEGER DEFAULT 500'); } catch(e2) {}
+  }
+
   // Add is_super column to users if missing
   try { db.prepare('SELECT is_super FROM users LIMIT 1').get(); } catch(e) {
     try { db.exec('ALTER TABLE users ADD COLUMN is_super INTEGER DEFAULT 0'); } catch(e2) {}

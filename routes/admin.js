@@ -416,7 +416,11 @@ module.exports = function(db) {
     const totalFiles = safeGet('SELECT COUNT(*) as c FROM company_files WHERE company_id = ?', [company.id]);
     const totalFolders = safeGet('SELECT COUNT(*) as c FROM file_folders WHERE company_id = ?', [company.id]);
     const totalSize = safeGet('SELECT SUM(size) as s FROM company_files WHERE company_id = ?', [company.id]);
-    res.render(V('company-files'), { user: req.session.user, company, folders, files, currentFolder, folderId, breadcrumbs, folderAccess, companyUsers, totalFiles: totalFiles.c, totalFolders: totalFolders.c, totalSize: totalSize.s || 0, settings: getSettings(), page: 'companies' });
+    const allFolders = safeAll('SELECT * FROM file_folders WHERE company_id = ? ORDER BY name', [company.id]);
+    const storageQuota = (company.storage_quota || 500) * 1024 * 1024; // MB to bytes
+    const usedBytes = totalSize.s || 0;
+    const usedPct = storageQuota > 0 ? Math.round(usedBytes / storageQuota * 100) : 0;
+    res.render(V('company-files'), { user: req.session.user, company, folders, files, currentFolder, folderId, breadcrumbs, folderAccess, companyUsers, allFolders, totalFiles: totalFiles.c, totalFolders: totalFolders.c, totalSize: usedBytes, storageQuota, usedPct, settings: getSettings(), page: 'companies' });
   });
 
   // Create folder
@@ -549,6 +553,12 @@ module.exports = function(db) {
     const { logo_url } = req.body;
     db.prepare('UPDATE companies SET logo = ? WHERE id = ?').run(logo_url || null, req.params.id);
     res.redirect('/admin/companies/' + req.params.id + '?tab=overview');
+  });
+
+  router.post('/companies/:id/storage-quota', (req, res) => {
+    const { storage_quota } = req.body;
+    try { db.prepare('UPDATE companies SET storage_quota = ? WHERE id = ?').run(parseInt(storage_quota) || 500, req.params.id); } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.id + '/files');
   });
 
   // Generic CRUD for company sub-items
@@ -714,10 +724,11 @@ module.exports = function(db) {
 
   // === SETTINGS ===
   router.get('/settings', (req, res) => {
-    const currentUser = safeGet('SELECT totp_enabled, email FROM users WHERE id = ?', [req.session.user.id]);
+    const currentUser = safeGet('SELECT totp_enabled, email, phone FROM users WHERE id = ?', [req.session.user.id]);
     const has2fa = !!(currentUser && currentUser.totp_enabled);
     const adminEmail = currentUser ? currentUser.email || '' : '';
-    res.render(V('settings'), { user: req.session.user, has2fa, adminEmail, settings: getSettings(), page: 'settings' });
+    const adminPhone = currentUser ? currentUser.phone || '' : '';
+    res.render(V('settings'), { user: req.session.user, has2fa, adminEmail, adminPhone, settings: getSettings(), page: 'settings' });
   });
 
   router.post('/settings', (req, res) => {
@@ -732,11 +743,14 @@ module.exports = function(db) {
   });
 
   router.post('/settings/profile', (req, res) => {
-    const { full_name, email } = req.body;
+    const { username, full_name, email, phone } = req.body;
     try {
-      db.prepare('UPDATE users SET full_name = ?, email = ? WHERE id = ?').run(full_name || null, email || null, req.session.user.id);
+      db.prepare('UPDATE users SET username = ?, full_name = ?, email = ?, phone = ? WHERE id = ?').run(
+        username || req.session.user.username, full_name || null, email || null, phone || null, req.session.user.id
+      );
+      req.session.user.username = username || req.session.user.username;
       req.session.user.full_name = full_name || req.session.user.username;
-    } catch(e) {}
+    } catch(e) { console.error('Profile update error:', e.message); }
     res.redirect('/admin/settings');
   });
 

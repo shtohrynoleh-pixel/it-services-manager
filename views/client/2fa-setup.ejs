@@ -1,0 +1,64 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>🔐 Two-Factor Authentication</h2></div>
+    </div>
+    <div class="content">
+
+      <% if (isEnabled) { %>
+        <div class="card" style="text-align:center;">
+          <div style="font-size:48px;margin-bottom:12px;">✅</div>
+          <h3 style="color:var(--success);margin-bottom:8px;">2FA is Enabled</h3>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:20px;">Your account is protected with two-factor authentication.</p>
+          <% if (error) { %><div style="background:var(--danger-light);color:#991b1b;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:16px;"><%= error %></div><% } %>
+          <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:12px;padding:20px;margin-bottom:16px;">
+            <div style="font-weight:700;font-size:14px;color:#991b1b;margin-bottom:8px;">Disable 2FA</div>
+            <p style="font-size:12px;color:#991b1b;margin-bottom:12px;">Enter your current 6-digit code to disable.</p>
+            <form method="POST" action="/client/account/2fa-disable" style="display:flex;gap:8px;align-items:flex-end;justify-content:center;">
+              <input type="text" name="token" required placeholder="000000" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" style="width:140px;padding:10px;font-size:18px;font-weight:900;text-align:center;letter-spacing:6px;font-family:monospace;">
+              <button type="submit" class="btn btn-sm btn-danger">Disable</button>
+            </form>
+          </div>
+          <a href="/client/account" class="btn btn-sm">← Back to Account</a>
+        </div>
+
+      <% } else { %>
+        <div class="card">
+          <h3>📱 Set Up Authenticator</h3>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Scan the QR code with Google Authenticator, Authy, or any TOTP app.</p>
+
+          <div style="text-align:center;margin:16px 0;">
+            <% if (qrDataUrl) { %>
+              <img src="<%= qrDataUrl %>" alt="QR Code" style="width:200px;height:200px;border:4px solid var(--border);border-radius:12px;">
+            <% } %>
+          </div>
+
+          <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:16px;">
+            Can't scan? Enter manually:<br>
+            <code style="display:inline-block;margin-top:6px;padding:8px 14px;background:#1e293b;color:#22d3ee;border-radius:8px;font-size:13px;letter-spacing:2px;font-weight:700;user-select:all;"><%= secret %></code>
+          </div>
+
+          <% if (error) { %><div style="background:var(--danger-light);color:#991b1b;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:12px;"><%= error %></div><% } %>
+
+          <form method="POST" action="/client/account/2fa-enable" style="display:flex;gap:8px;align-items:flex-end;justify-content:center;">
+            <input type="text" name="token" required autofocus placeholder="000000" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" style="width:160px;padding:12px;font-size:22px;font-weight:900;text-align:center;letter-spacing:8px;font-family:monospace;">
+            <button type="submit" class="btn btn-primary">✅ Enable 2FA</button>
+          </form>
+        </div>
+
+        <div class="card" style="background:var(--accent-light);border-color:var(--accent);">
+          <h3 style="color:#92400e;">⚠️ Important</h3>
+          <div style="font-size:12px;color:#92400e;line-height:1.7;">
+            <strong>Save your secret key.</strong> If you lose access to your authenticator app, you'll need this key to recover your account.<br>
+            Secret: <code style="background:#fff;padding:2px 8px;border-radius:4px;font-weight:700;"><%= secret %></code>
+          </div>
+        </div>
+
+        <a href="/client/account" class="btn btn-sm">← Back to Account</a>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>
