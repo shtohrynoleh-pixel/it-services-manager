@@ -288,6 +288,7 @@ module.exports = function(db) {
     db.prepare('INSERT INTO projects (name, description, company_id, status, start_date, due_date, budget) VALUES (?,?,?,?,?,?,?)').run(
       name, description, company_id || null, status || 'planning', start_date || null, due_date || null, parseFloat(budget) || 0
     );
+    awardXP(db, xpUser(req), 'create_project', null, req);
     res.redirect('/admin/projects');
   });
 
@@ -508,6 +509,7 @@ module.exports = function(db) {
       db.prepare('INSERT INTO company_files (company_id, folder_id, filename, original_name, size, mime_type, uploaded_by) VALUES (?,?,?,?,?,?,?)').run(
         req.params.cid, folderId, req.file.filename, req.file.originalname, req.file.size, req.file.mimetype, req.session.user.full_name || 'admin'
       );
+      awardXP(db, xpUser(req), 'upload_file', null, req);
     } catch(e) {}
     res.redirect('/admin/companies/' + req.params.cid + '/files' + (folderId ? '?folder=' + folderId : ''));
   });
@@ -559,6 +561,7 @@ module.exports = function(db) {
       db.prepare('INSERT INTO inventory_locations (company_id, name, type, address, parent_id, notes) VALUES (?,?,?,?,?,?)').run(
         req.params.cid, name, type || 'office', address || null, parent_id || null, notes || null
       );
+      awardXP(db, xpUser(req), 'add_location', null, req);
     } catch(e) {}
     res.redirect('/admin/companies/' + req.params.cid + '?tab=inventory');
   });
@@ -595,6 +598,7 @@ module.exports = function(db) {
         cu ? (cu.email_account || cu.email) : null,
         cu ? cu.phone : null
       );
+      awardXP(db, xpUser(req), 'grant_portal', null, req);
     } catch(e) { console.error('Grant portal access error:', e.message); }
     res.redirect('/admin/companies/' + req.params.id + '?tab=overview');
   });
@@ -721,6 +725,7 @@ module.exports = function(db) {
     const invNum = 'INV-' + Date.now().toString(36).toUpperCase();
     const result = db.prepare('INSERT INTO invoices (company_id, invoice_number, date, due_date, subtotal, total, status) VALUES (?,?,?,?,?,?,?)').run(company_id, invNum, date, due_date, total, total, status || 'sent');
     db.prepare('INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, total) VALUES (?,?,1,?,?)').run(result.lastInsertRowid, description, total, total);
+    awardXP(db, xpUser(req), 'create_invoice', null, req);
     res.redirect(req.body.redirect || '/admin/billing');
   });
 
@@ -953,6 +958,7 @@ module.exports = function(db) {
         company_id ? parseInt(company_id) : null, name, type || 'server', target, check_type || 'ping', parseInt(interval_min) || 5, alert_email || null, notes || null
       );
     } catch(e) { console.error('Monitor create error:', e.message); }
+    awardXP(db, xpUser(req), 'add_monitor', null, req);
     res.redirect('/admin/monitoring');
   });
 
@@ -1158,6 +1164,7 @@ module.exports = function(db) {
         title, sop_number, category, department, target_role, description, purpose, company_id || null, owner, status || 'draft'
       );
     } catch(e) { console.error('SOP create:', e.message); }
+    awardXP(db, xpUser(req), 'create_sop', null, req);
     res.redirect('/admin/sops');
   });
 
@@ -1275,6 +1282,7 @@ module.exports = function(db) {
         title, category, description, trigger_event, company_id || null, owner, status || 'draft'
       );
     } catch(e) {}
+    awardXP(db, xpUser(req), 'create_flow', null, req);
     res.redirect('/admin/flows');
   });
 
@@ -1304,6 +1312,7 @@ module.exports = function(db) {
         req.params.id, (maxOrder && maxOrder.m || 0) + 1, type || 'process', label, description, responsible, yes_label, no_label, color || null, swimlane || null, duration || null, notes || null
       );
     } catch(e) {}
+    awardXP(db, xpUser(req), 'add_flow_node', null, req);
     res.redirect('/admin/flows/' + req.params.id);
   });
 
@@ -1636,6 +1645,7 @@ module.exports = function(db) {
       });
       insertMany(rows);
       fs.unlinkSync(req.file.path);
+      if (imported > 0) awardXP(db, xpUser(req), 'csv_import', 'Imported ' + imported + ' records', req);
       res.redirect('/admin/companies/' + cid + '?tab=' + table + '&imported=' + imported);
     } catch(e) {
       console.error('CSV import error:', e.message);
@@ -1673,6 +1683,7 @@ module.exports = function(db) {
         title, category || 'general', description, content, company_id || null, status || 'draft', requires_ack ? 1 : 0, req.session.user.full_name || 'admin'
       );
     } catch(e) {}
+    awardXP(db, xpUser(req), 'create_policy', null, req);
     res.redirect('/admin/policies');
   });
 
@@ -1749,6 +1760,7 @@ module.exports = function(db) {
         title, username, password_val, url, category || 'general', company_id || null, notes, share_type || 'private', share_dept || null, shared_with || null, req.session.user.full_name || 'admin'
       );
     } catch(e) {}
+    awardXP(db, xpUser(req), 'add_password', null, req);
     res.redirect('/admin/vault');
   });
 
