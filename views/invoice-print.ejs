@@ -48,8 +48,10 @@ tbody td{padding:12px 14px;border-bottom:1px solid #f1f5f9;font-size:13px;}
 <div class="invoice">
   <div class="header">
     <div class="brand">
+      <% if (settings.business_logo) { %><img src="<%= settings.business_logo %>" style="max-height:50px;margin-bottom:8px;"><br><% } %>
       <h1><%= settings.business_name || 'IT Services Pro' %></h1>
       <p><%= settings.business_email || '' %><%= settings.business_phone ? ' · ' + settings.business_phone : '' %></p>
+      <% if (settings.business_address) { %><p><%= settings.business_address %></p><% } %>
     </div>
     <div class="inv-meta">
       <div class="inv-num"><%= invoice.invoice_number %></div>
@@ -67,7 +69,7 @@ tbody td{padding:12px 14px;border-bottom:1px solid #f1f5f9;font-size:13px;}
     <div class="party">
       <div class="party-label">From</div>
       <div class="party-name"><%= settings.business_name || 'IT Services Pro' %></div>
-      <div class="party-addr"><%= settings.business_email || '' %><br><%= settings.business_phone || '' %></div>
+      <div class="party-addr"><%= settings.business_address || '' %><br><%= settings.business_email || '' %><%= settings.business_phone ? '<br>' + settings.business_phone : '' %></div>
     </div>
     <div class="party">
       <div class="party-label">Bill To</div>

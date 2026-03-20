@@ -114,7 +114,7 @@ module.exports = function(db) {
         title, description || '', cid, priority || 'medium'
       );
     } catch(e) {}
-    res.redirect('/client?tab=tasks');
+    res.redirect(req.body.redirect || '/client?tab=tasks');
   });
 
   // === PROJECTS (view only) ===

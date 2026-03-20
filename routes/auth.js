@@ -5,47 +5,61 @@ const router = express.Router();
 
 module.exports = function(db) {
 
+  const getSettings = () => {
+    const s = {};
+    try { db.prepare('SELECT key, value FROM settings').all().forEach(r => { s[r.key] = r.value; }); } catch(e) {}
+    return s;
+  };
+
   router.get('/login', (req, res) => {
     if (req.session.user) {
-      if (req.session.user.role === 'admin') return res.redirect('/admin');
+      if (req.session.user.role === 'admin' || req.session.user.role === 'company_admin') return res.redirect('/admin');
       return res.redirect('/client');
     }
-    const companies = db.prepare('SELECT id, name FROM companies WHERE status = ? ORDER BY name').all('active');
-    res.render('login', { error: null, companies });
+    res.render('login', { error: null, settings: getSettings() });
   });
 
   router.post('/login', (req, res) => {
-    const { username, password, login_type, company_id } = req.body;
-    const companies = db.prepare('SELECT id, name FROM companies WHERE status = ? ORDER BY name').all('active');
+    const { username, password } = req.body;
+    const settings = getSettings();
 
-    if (login_type === 'admin') {
-      const user = db.prepare('SELECT * FROM users WHERE username = ? AND role = ?').get(username, 'admin');
-      if (!user || !bcrypt.compareSync(password, user.password)) {
-        return res.render('login', { error: 'Invalid admin credentials', companies });
-      }
-      // Check if 2FA is enabled
-      if (user.totp_enabled && user.totp_secret) {
-        // Store pending user in session, redirect to 2FA page
-        req.session.pending2fa = { id: user.id, username: user.username, role: 'admin', full_name: user.full_name, company_id: null };
+    if (!username || !password) {
+      return res.render('login', { error: 'Please enter username and password', settings });
+    }
+
+    // Try admin/super-admin first
+    const admin = db.prepare('SELECT * FROM users WHERE username = ? AND (role = ? OR role = ?)').get(username, 'admin', 'company_admin');
+    if (admin && bcrypt.compareSync(password, admin.password)) {
+      // Check 2FA
+      if (admin.totp_enabled && admin.totp_secret) {
+        req.session.pending2fa = { id: admin.id, username: admin.username, role: admin.role, full_name: admin.full_name, company_id: null, is_super: admin.is_super };
         return res.redirect('/2fa');
       }
-      req.session.user = { id: user.id, username: user.username, role: 'admin', full_name: user.full_name, company_id: null };
+      // Get assigned companies for company_admin
+      let assignedCompanies = null;
+      if (!admin.is_super && admin.role === 'company_admin') {
+        assignedCompanies = db.prepare('SELECT company_id FROM admin_companies WHERE user_id = ?').all(admin.id).map(r => r.company_id);
+      }
+      req.session.user = { id: admin.id, username: admin.username, role: 'admin', full_name: admin.full_name, company_id: null, is_super: admin.is_super || 0, assignedCompanies };
       return res.redirect('/admin');
     }
 
-    // Client login
-    if (!company_id) return res.render('login', { error: 'Please select a company', companies });
-    const user = db.prepare('SELECT * FROM users WHERE company_id = ? AND username = ? AND role = ? AND is_active = 1').get(parseInt(company_id), username, 'client');
-    if (!user || !bcrypt.compareSync(password, user.password)) {
-      return res.render('login', { error: 'Invalid client credentials', companies });
+    // Try client user (auto-detect company)
+    const client = db.prepare('SELECT * FROM users WHERE username = ? AND role = ? AND is_active = 1').get(username, 'client');
+    if (client && bcrypt.compareSync(password, client.password)) {
+      if (!client.company_id) {
+        return res.render('login', { error: 'Your account is not linked to a company. Contact your IT admin.', settings });
+      }
+      // Check 2FA
+      if (client.totp_enabled && client.totp_secret) {
+        req.session.pending2fa = { id: client.id, username: client.username, role: 'client', full_name: client.full_name, company_id: client.company_id };
+        return res.redirect('/2fa');
+      }
+      req.session.user = { id: client.id, username: client.username, role: 'client', full_name: client.full_name, company_id: client.company_id };
+      return res.redirect('/client');
     }
-    // Check if 2FA is enabled for client
-    if (user.totp_enabled && user.totp_secret) {
-      req.session.pending2fa = { id: user.id, username: user.username, role: 'client', full_name: user.full_name, company_id: user.company_id };
-      return res.redirect('/2fa');
-    }
-    req.session.user = { id: user.id, username: user.username, role: 'client', full_name: user.full_name, company_id: user.company_id };
-    return res.redirect('/client');
+
+    return res.render('login', { error: 'Invalid username or password', settings });
   });
 
   // 2FA verification page
@@ -67,15 +81,22 @@ module.exports = function(db) {
       secret: user.totp_secret,
       encoding: 'base32',
       token: token,
-      window: 1 // Allow 1 step tolerance (30 seconds)
+      window: 1
     });
     if (!verified) {
       return res.render('2fa-verify', { error: 'Invalid code. Try again.', username: pending.username });
     }
-    // 2FA passed — create session
-    req.session.user = { id: pending.id, username: pending.username, role: pending.role, full_name: pending.full_name, company_id: pending.company_id };
+    if (pending.role === 'admin' || pending.role === 'company_admin') {
+      let assignedCompanies = null;
+      if (!pending.is_super) {
+        assignedCompanies = db.prepare('SELECT company_id FROM admin_companies WHERE user_id = ?').all(pending.id).map(r => r.company_id);
+      }
+      req.session.user = { id: pending.id, username: pending.username, role: 'admin', full_name: pending.full_name, company_id: null, is_super: pending.is_super || 0, assignedCompanies };
+    } else {
+      req.session.user = { id: pending.id, username: pending.username, role: pending.role, full_name: pending.full_name, company_id: pending.company_id };
+    }
     delete req.session.pending2fa;
-    if (pending.role === 'admin') return res.redirect('/admin');
+    if (pending.role === 'admin' || pending.role === 'company_admin') return res.redirect('/admin');
     return res.redirect('/client');
   });
 

@@ -1,0 +1,150 @@
+<% if (typeof user !== 'undefined' && user) { %>
+<style>
+.qt-btn{background:none;border:none;font-size:20px;cursor:pointer;padding:6px;position:relative;}
+.qt-btn:hover{transform:scale(1.1);}
+.qt-modal-bg{position:fixed;inset:0;background:rgba(15,23,42,0.4);z-index:1100;display:none;align-items:center;justify-content:center;padding:20px;}
+.qt-modal-bg.open{display:flex;}
+.qt-modal{background:var(--card);border-radius:16px;box-shadow:0 24px 48px rgba(0,0,0,0.15);width:100%;max-width:500px;max-height:85vh;overflow-y:auto;padding:28px;}
+.qt-modal h3{font-size:17px;font-weight:800;margin-bottom:18px;display:flex;align-items:center;gap:8px;}
+.qt-success{text-align:center;padding:20px;}
+.qt-success .qt-check{font-size:48px;margin-bottom:12px;}
+</style>
+
+<button class="qt-btn" onclick="document.getElementById('qtModal').classList.add('open')" title="Quick Task">
+  🎫
+</button>
+
+<div class="qt-modal-bg" id="qtModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="qt-modal">
+    <div id="qtForm">
+      <h3>🎫 Quick Task</h3>
+      <form id="qtFormEl" onsubmit="return submitQuickTask(event)">
+        <div class="form-group">
+          <label>Title *</label>
+          <input type="text" id="qtTitle" required placeholder="What needs to be done?">
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="qtDesc" rows="3" placeholder="Details, steps, links..."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Priority</label>
+            <select id="qtPriority">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Due Date</label>
+            <input type="date" id="qtDue">
+          </div>
+        </div>
+        <% if (user.role === 'admin') { %>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Company</label>
+              <select id="qtCompany">
+                <option value="">— None —</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Assign To</label>
+              <select id="qtAssign">
+                <option value="">— Unassigned —</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          </div>
+        <% } %>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Create Task</button>
+          <button type="button" class="btn" onclick="document.getElementById('qtModal').classList.remove('open')">Cancel</button>
+        </div>
+      </form>
+    </div>
+    <div id="qtSuccess" style="display:none;">
+      <div class="qt-success">
+        <div class="qt-check">✅</div>
+        <h3 style="justify-content:center;">Task Created!</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Your task has been added successfully.</p>
+        <div style="display:flex;gap:8px;justify-content:center;">
+          <button class="btn btn-primary" onclick="resetQuickTask()">+ Another</button>
+          <button class="btn" onclick="document.getElementById('qtModal').classList.remove('open')">Close</button>
+          <a href="<%= user.role === 'admin' ? '/admin/tasks' : '/client?tab=tasks' %>" class="btn">View Tasks</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var isAdmin = <%= user.role === 'admin' ? 'true' : 'false' %>;
+  var apiBase = isAdmin ? '/admin' : '/client';
+
+  // Load companies for admin
+  if(isAdmin){
+    fetch('/admin/api/notifications').then(r=>r.json()).catch(()=>null);
+    // populate company dropdown from page if available
+    setTimeout(function(){
+      var sel=document.getElementById('qtCompany');
+      if(!sel)return;
+      fetch(apiBase+'/api/notifications').then(r=>r.json()).then(function(){
+        // try to get companies from existing page data
+      }).catch(()=>{});
+    },500);
+  }
+
+  window.submitQuickTask = function(e){
+    e.preventDefault();
+    var title=document.getElementById('qtTitle').value.trim();
+    if(!title)return false;
+
+    var body = {
+      title: title,
+      description: (document.getElementById('qtDesc')||{}).value||'',
+      priority: (document.getElementById('qtPriority')||{}).value||'medium',
+      due_date: (document.getElementById('qtDue')||{}).value||''
+    };
+
+    if(isAdmin){
+      body.company_id = (document.getElementById('qtCompany')||{}).value||'';
+      body.assigned_to = (document.getElementById('qtAssign')||{}).value||'';
+      body.status = 'todo';
+    }
+
+    // Submit via form POST (simplest, works with existing routes)
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = apiBase + '/tasks';
+    form.style.display = 'none';
+    Object.keys(body).forEach(function(k){
+      if(body[k]){
+        var inp=document.createElement('input');
+        inp.name=k; inp.value=body[k];
+        form.appendChild(inp);
+      }
+    });
+    // Add redirect back to current page
+    var redir = document.createElement('input');
+    redir.name = 'redirect';
+    redir.value = window.location.pathname + window.location.search;
+    form.appendChild(redir);
+    document.body.appendChild(form);
+    form.submit();
+    return false;
+  };
+
+  window.resetQuickTask = function(){
+    document.getElementById('qtTitle').value='';
+    document.getElementById('qtDesc').value='';
+    if(document.getElementById('qtDue'))document.getElementById('qtDue').value='';
+    document.getElementById('qtForm').style.display='';
+    document.getElementById('qtSuccess').style.display='none';
+  };
+})();
+</script>
+<% } %>

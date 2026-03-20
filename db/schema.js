@@ -45,6 +45,16 @@ function initDB() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    -- Admin-company assignments (which companies a company-admin can manage)
+    CREATE TABLE IF NOT EXISTS admin_companies (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      company_id INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+      UNIQUE(user_id, company_id)
+    );
+
     -- Company contacts
     CREATE TABLE IF NOT EXISTS contacts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -690,6 +700,13 @@ function initDB() {
     const di = db.prepare('INSERT INTO departments (name, description, sort_order) VALUES (?,?,?)');
     [['Executive','Leadership and ownership',1],['Operations','Dispatch, logistics, and daily operations',2],['Driving','CDL drivers and fleet operators',3],['Maintenance','Truck and equipment maintenance',4],['Accounting','Finance, billing, and payroll',5],['Safety','Safety compliance and training',6],['HR','Hiring, onboarding, and employee management',7],['Administration','Office support and front desk',8],['IT','Technology and systems',9],['Warehouse','Loading, unloading, and yard operations',10]].forEach(d => di.run(...d));
   }
+
+  // Add is_super column to users if missing
+  try { db.prepare('SELECT is_super FROM users LIMIT 1').get(); } catch(e) {
+    try { db.exec('ALTER TABLE users ADD COLUMN is_super INTEGER DEFAULT 0'); } catch(e2) {}
+  }
+  // Make first admin a super admin
+  try { db.prepare("UPDATE users SET is_super = 1 WHERE role = 'admin' AND id = (SELECT MIN(id) FROM users WHERE role = 'admin')").run(); } catch(e) {}
 
   // Add chat attachment columns if missing
   try { db.prepare('SELECT attachment FROM chat_messages LIMIT 1').get(); } catch(e) {

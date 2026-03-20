@@ -1,0 +1,97 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2>👑 Admin Management</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div class="card" style="background:linear-gradient(135deg,#ecfeff,#cffafe);border-color:var(--primary);margin-bottom:16px;">
+        <div style="font-size:13px;line-height:1.6;">
+          <strong>Super Admin</strong> — sees all companies, full access to everything.<br>
+          <strong>Company Admin</strong> — can only see and manage assigned companies. Cannot create other admins.
+        </div>
+      </div>
+
+      <!-- Existing admins -->
+      <% admins.forEach(a => { %>
+        <div class="card" style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+            <div>
+              <h3 style="margin-bottom:2px;font-size:14px;">
+                <%= a.full_name || a.username %>
+                <% if (a.is_super) { %><span class="badge" style="background:#fef3c7;color:#92400e;margin-left:4px;">Super Admin</span><% } else { %><span class="badge active">Company Admin</span><% } %>
+              </h3>
+              <div style="font-size:12px;color:var(--muted);">@<%= a.username %><%= a.email ? ' · ' + a.email : '' %></div>
+            </div>
+            <% if (!a.is_super && a.id !== user.id) { %>
+              <form method="POST" action="/admin/admins/<%= a.id %>/delete" onsubmit="return confirm('Delete this admin?')">
+                <button type="submit" class="btn btn-sm btn-danger">🗑️</button>
+              </form>
+            <% } %>
+          </div>
+
+          <% if (!a.is_super) { %>
+            <div style="margin-top:10px;">
+              <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">ASSIGNED COMPANIES:</div>
+              <% if (a.companies.length === 0) { %>
+                <div style="font-size:12px;color:var(--danger);">No companies assigned — this admin can't see anything!</div>
+              <% } else { %>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
+                  <% a.companies.forEach(c => { %>
+                    <span style="display:inline-block;padding:3px 10px;background:var(--primary-light);color:var(--primary-dark);border-radius:6px;font-size:11px;font-weight:600;">🏢 <%= c.name %></span>
+                  <% }) %>
+                </div>
+              <% } %>
+              <details><summary style="cursor:pointer;font-size:11px;font-weight:600;color:var(--primary);">Edit company assignments</summary>
+                <form method="POST" action="/admin/admins/<%= a.id %>/companies" style="margin-top:8px;">
+                  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+                    <% companies.forEach(c => { %>
+                      <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;">
+                        <input type="checkbox" name="company_ids" value="<%= c.id %>" <%= a.companies.find(ac => ac.company_id === c.id) ? 'checked' : '' %>>
+                        <%= c.name %>
+                      </label>
+                    <% }) %>
+                  </div>
+                  <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                </form>
+              </details>
+            </div>
+          <% } %>
+        </div>
+      <% }) %>
+
+      <!-- Add new admin -->
+      <div class="card">
+        <h3>+ Create Admin Account</h3>
+        <form method="POST" action="/admin/admins">
+          <div class="form-row">
+            <div class="form-group"><label>Username *</label><input type="text" name="username" required placeholder="e.g. john.admin"></div>
+            <div class="form-group"><label>Password *</label><input type="text" name="password" required placeholder="Min 4 characters"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Full Name</label><input type="text" name="full_name" placeholder="John Smith"></div>
+            <div class="form-group"><label>Email</label><input type="email" name="email" placeholder="john@company.com"></div>
+          </div>
+          <div class="form-check" style="margin-bottom:12px;">
+            <input type="checkbox" name="is_super" value="1" id="isSuperCheck" onchange="document.getElementById('companyPicker').style.display=this.checked?'none':''">
+            <label for="isSuperCheck">Super Admin (full access to everything)</label>
+          </div>
+          <div id="companyPicker">
+            <div class="form-group">
+              <label>Assign Companies</label>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;padding:10px;border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;">
+                <% companies.forEach(c => { %>
+                  <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" name="company_ids" value="<%= c.id %>"> <%= c.name %></label>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+          <div class="form-actions"><button type="submit" class="btn btn-primary">Create Admin</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

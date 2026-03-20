@@ -1,7 +1,7 @@
 <div class="sb-backdrop" id="sbBackdrop" onclick="closeSidebar()"></div>
 <div class="sidebar" id="sidebar">
   <div class="sb-brand">
-    <h1><span>🖥️</span> <%= settings.business_name || 'IT Services' %></h1>
+    <h1><% if (settings.business_logo) { %><img src="<%= settings.business_logo %>" style="height:24px;vertical-align:middle;margin-right:4px;border-radius:4px;"><% } else { %><span>🖥️</span><% } %> <%= settings.business_name || 'IT Services' %></h1>
     <p style="display:flex;justify-content:space-between;align-items:center;">
       <span><%= user.role === 'admin' ? 'Admin Panel' : 'Client Portal' %></span>
       <% if (user.role === 'admin') { %><button onclick="toggleEditMode()" id="editModeBtn" style="background:none;border:none;font-size:11px;cursor:pointer;color:var(--muted);padding:2px 6px;" title="Reorder menus">⚙️</button><% } %>
@@ -28,6 +28,7 @@
           { id:'chat', icon:'💬', label:'Chat', href:'/admin/chat', group:'work' },
           { id:'vault', icon:'🔑', label:'Password Vault', href:'/admin/vault', group:'system' },
           { id:'users-manage', icon:'🔐', label:'User Accounts', href:'/admin/users-manage', group:'system' },
+          { id:'admins', icon:'👑', label:'Admin Management', href:'/admin/admins', group:'system', superOnly:true },
           { id:'settings', icon:'🔧', label:'Settings', href:'/admin/settings', group:'system' },
           { id:'integrations', icon:'🔌', label:'Integrations', href:'/admin/integrations', group:'system' },
           { id:'roles', icon:'👤', label:'Roles', href:'/admin/roles', group:'system' },
@@ -43,7 +44,7 @@
       %>
 
       <% groups.forEach(g => { %>
-        <% const items = menuItems.filter(m => m.group === g.id); %>
+        <% const items = menuItems.filter(m => m.group === g.id && (!m.superOnly || (user.is_super))); %>
         <div class="sb-section" data-group="<%= g.id %>">
           <div class="sb-section-head" onclick="toggleGroup('<%= g.id %>')">
             <span><%= g.label %><span class="sb-section-count"><%= items.length %></span></span>

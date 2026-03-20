@@ -56,6 +56,25 @@ module.exports = function(db) {
   // View helper — ensures forward slashes on Windows
   const V = (name) => 'admin/' + name;
 
+  // Company access helper — filters companies by admin permissions
+  const getVisibleCompanyIds = (req) => {
+    const u = req.session.user;
+    if (u.is_super || !u.assignedCompanies) return null; // null = all
+    return u.assignedCompanies || [];
+  };
+
+  const filterCompanies = (companies, req) => {
+    const ids = getVisibleCompanyIds(req);
+    if (!ids) return companies; // super admin sees all
+    return companies.filter(c => ids.includes(c.id));
+  };
+
+  const canAccessCompany = (req, companyId) => {
+    const ids = getVisibleCompanyIds(req);
+    if (!ids) return true;
+    return ids.includes(parseInt(companyId));
+  };
+
   const getSettings = () => {
     const s = {};
     try { db.prepare('SELECT key, value FROM settings').all().forEach(r => { s[r.key] = r.value; }); } catch(e) {}
@@ -115,9 +134,11 @@ module.exports = function(db) {
 
   // === DASHBOARD ===
   router.get('/', (req, res) => {
-    const companies = safeAll('SELECT * FROM companies ORDER BY name');
+    const allCompanies = safeAll('SELECT * FROM companies ORDER BY name');
+    const companies = filterCompanies(allCompanies, req);
     const activeCount = companies.filter(c => c.status === 'active').length;
-    const invoices = safeAll('SELECT * FROM invoices ORDER BY date DESC');
+    const cids = companies.map(c => c.id);
+    const invoices = cids.length > 0 ? safeAll('SELECT * FROM invoices ORDER BY date DESC').filter(i => cids.includes(i.company_id)) : [];
     const unpaid = invoices.filter(i => i.status === 'sent' || i.status === 'overdue');
     const unpaidTotal = unpaid.reduce((s, i) => s + (i.total || 0), 0);
     let mrr = 0;
@@ -291,6 +312,7 @@ module.exports = function(db) {
     } catch(e) {
       companies = safeAll('SELECT c.*, 0 as user_count, 0 as server_count, 0 as sub_count, 0 as task_count FROM companies c ORDER BY c.name');
     }
+    companies = filterCompanies(companies, req);
     res.render(V('companies'), { user: req.session.user, companies, settings: getSettings(), page: 'companies' });
   });
 
@@ -311,6 +333,7 @@ module.exports = function(db) {
   router.get('/companies/:id', (req, res) => {
     const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.id);
     if (!company) return res.redirect('/admin/companies');
+    if (!canAccessCompany(req, company.id)) return res.redirect('/admin/companies');
     const tab = req.query.tab || 'overview';
     const contacts = safeAll('SELECT * FROM contacts WHERE company_id = ? ORDER BY is_primary DESC, name', [company.id]);
     const users = safeAll('SELECT * FROM company_users WHERE company_id = ? ORDER BY name', [company.id]);
@@ -691,16 +714,29 @@ module.exports = function(db) {
 
   // === SETTINGS ===
   router.get('/settings', (req, res) => {
-    const currentUser = safeGet('SELECT totp_enabled FROM users WHERE id = ?', [req.session.user.id]);
+    const currentUser = safeGet('SELECT totp_enabled, email FROM users WHERE id = ?', [req.session.user.id]);
     const has2fa = !!(currentUser && currentUser.totp_enabled);
-    res.render(V('settings'), { user: req.session.user, has2fa, settings: getSettings(), page: 'settings' });
+    const adminEmail = currentUser ? currentUser.email || '' : '';
+    res.render(V('settings'), { user: req.session.user, has2fa, adminEmail, settings: getSettings(), page: 'settings' });
   });
 
   router.post('/settings', (req, res) => {
-    const { business_name, business_email, business_phone } = req.body;
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('business_name', business_name);
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('business_email', business_email);
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('business_phone', business_phone);
+    const { business_name, business_email, business_phone, business_logo, business_address } = req.body;
+    const set = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+    set.run('business_name', business_name || '');
+    set.run('business_email', business_email || '');
+    set.run('business_phone', business_phone || '');
+    set.run('business_logo', business_logo || '');
+    set.run('business_address', business_address || '');
+    res.redirect('/admin/settings');
+  });
+
+  router.post('/settings/profile', (req, res) => {
+    const { full_name, email } = req.body;
+    try {
+      db.prepare('UPDATE users SET full_name = ?, email = ? WHERE id = ?').run(full_name || null, email || null, req.session.user.id);
+      req.session.user.full_name = full_name || req.session.user.username;
+    } catch(e) {}
     res.redirect('/admin/settings');
   });
 
@@ -1664,6 +1700,61 @@ module.exports = function(db) {
       );
     } catch(e) { console.error('Reset email error:', e.message); }
     res.redirect('/admin/users-manage');
+  });
+
+  // === ADMIN MANAGEMENT (super admin only) ===
+  router.get('/admins', (req, res) => {
+    if (!req.session.user.is_super) return res.redirect('/admin');
+    const admins = safeAll("SELECT * FROM users WHERE role IN ('admin','company_admin') ORDER BY is_super DESC, username");
+    admins.forEach(a => {
+      a.companies = safeAll('SELECT ac.company_id, c.name FROM admin_companies ac JOIN companies c ON ac.company_id = c.id WHERE ac.user_id = ?', [a.id]);
+    });
+    const companies = safeAll('SELECT id, name FROM companies ORDER BY name');
+    res.render(V('admins'), { user: req.session.user, admins, companies, settings: getSettings(), page: 'settings' });
+  });
+
+  router.post('/admins', (req, res) => {
+    if (!req.session.user.is_super) return res.redirect('/admin');
+    const { username, password, full_name, email, is_super, company_ids } = req.body;
+    if (!username || !password) return res.redirect('/admin/admins');
+    try {
+      const hash = bcrypt.hashSync(password, 10);
+      const role = is_super ? 'admin' : 'company_admin';
+      const r = db.prepare('INSERT INTO users (username, password, role, full_name, email, is_super, is_active) VALUES (?,?,?,?,?,?,1)').run(
+        username, hash, role, full_name || null, email || null, is_super ? 1 : 0
+      );
+      // Assign companies
+      if (!is_super && company_ids) {
+        const ids = Array.isArray(company_ids) ? company_ids : [company_ids];
+        ids.forEach(cid => {
+          try { db.prepare('INSERT INTO admin_companies (user_id, company_id) VALUES (?,?)').run(r.lastInsertRowid, parseInt(cid)); } catch(e) {}
+        });
+      }
+    } catch(e) { console.error('Create admin error:', e.message); }
+    res.redirect('/admin/admins');
+  });
+
+  router.post('/admins/:id/companies', (req, res) => {
+    if (!req.session.user.is_super) return res.redirect('/admin');
+    const { company_ids } = req.body;
+    db.prepare('DELETE FROM admin_companies WHERE user_id = ?').run(req.params.id);
+    if (company_ids) {
+      const ids = Array.isArray(company_ids) ? company_ids : [company_ids];
+      ids.forEach(cid => {
+        try { db.prepare('INSERT INTO admin_companies (user_id, company_id) VALUES (?,?)').run(req.params.id, parseInt(cid)); } catch(e) {}
+      });
+    }
+    res.redirect('/admin/admins');
+  });
+
+  router.post('/admins/:id/delete', (req, res) => {
+    if (!req.session.user.is_super) return res.redirect('/admin');
+    if (parseInt(req.params.id) === req.session.user.id) return res.redirect('/admin/admins'); // can't delete yourself
+    try {
+      db.prepare('DELETE FROM admin_companies WHERE user_id = ?').run(req.params.id);
+      db.prepare('DELETE FROM users WHERE id = ? AND role IN (?,?)').run(req.params.id, 'admin', 'company_admin');
+    } catch(e) {}
+    res.redirect('/admin/admins');
   });
 
   // === CHAT PAGE ===
