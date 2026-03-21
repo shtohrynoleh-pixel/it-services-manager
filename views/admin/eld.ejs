@@ -73,7 +73,13 @@
 
       <!-- Synced Vehicles -->
       <% if (eldVehicles.length > 0) { %>
-        <h3 style="margin-bottom:12px;"><i class="ti ti-truck"></i> Synced Vehicles (<%= eldVehicles.length %>)</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;"><i class="ti ti-truck"></i> Synced Vehicles (<%= eldVehicles.length %>)</h3>
+          <div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;">
+            <button id="viewCards" class="active" onclick="setEldView('cards')" style="padding:5px 10px;font-size:12px;cursor:pointer;border:none;background:var(--primary);color:#fff;">Cards</button>
+            <button id="viewTable" onclick="setEldView('table')" style="padding:5px 10px;font-size:12px;cursor:pointer;border:none;background:var(--card);color:var(--muted);">Table</button>
+          </div>
+        </div>
 
         <!-- Filter by source -->
         <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
@@ -113,6 +119,33 @@
             </div>
           <% }) %>
         </div>
+
+        <!-- TABLE VIEW -->
+        <div id="eldTable" style="display:none;overflow-x:auto;">
+          <table class="tbl">
+            <thead><tr><th>Name</th><th>Vehicle</th><th>VIN</th><th>Plate</th><th>Driver</th><th>Status</th><th>Location</th><th>Speed</th><th>Fuel</th><th>Odometer</th><th>Source</th></tr></thead>
+            <tbody>
+            <% eldVehicles.forEach(v => {
+              var provClass = v.provider === 'samsara' ? 'eld-samsara' : v.provider === 'motive' ? 'eld-motive' : 'eld-other';
+            %>
+              <tr class="eld-trow" data-provider="<%= v.provider %>" data-label="<%= v.integration_label || '' %>">
+                <td><strong><%= v.name || '—' %></strong></td>
+                <td><%= [v.year, v.make, v.model].filter(Boolean).join(' ') || '—' %></td>
+                <td style="font-size:10px;font-family:monospace;"><%= v.vin || '—' %></td>
+                <td><%= v.license_plate || '—' %></td>
+                <td><%= v.driver_name || '—' %></td>
+                <td><span class="badge <%= v.status==='active'||v.status==='en-route'?'active':v.status==='off'||v.status==='parked'?'inactive':'draft' %>"><%= v.status || '—' %></span></td>
+                <td style="font-size:10px;"><%= v.last_location || '—' %></td>
+                <td><% if (v.last_speed != null) { %><span style="color:<%= v.last_speed > 2 ? 'var(--success)' : 'var(--muted)' %>;font-weight:700;"><%= v.last_speed > 2 ? Math.round(v.last_speed) + ' mph' : 'Stopped' %></span><% } else { %>—<% } %></td>
+                <td><% if (v.fuel_pct != null) { %><span style="color:<%= v.fuel_pct > 25 ? 'var(--success)' : 'var(--danger)' %>;font-weight:700;"><%= v.fuel_pct %>%</span><% } else { %>—<% } %></td>
+                <td><%= v.odometer ? Math.round(v.odometer).toLocaleString() + ' mi' : '—' %></td>
+                <td><span class="eld-badge <%= provClass %>" style="font-size:8px;"><%= v.provider %></span><% if (v.integration_label) { %><br><span style="font-size:9px;color:var(--muted);"><%= v.integration_label %></span><% } %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        </div>
+
       <% } else if (integrations.length > 0) { %>
         <div class="empty"><span class="e-icon"><i class="ti ti-truck" style="font-size:40px;"></i></span><div class="e-text">No vehicles synced yet</div><div style="font-size:12px;color:var(--muted);">Click "Sync" on an API key above to pull vehicles.</div></div>
       <% } %>
@@ -121,12 +154,20 @@
 
       <script>
       function filterEld(provider, label) {
-        document.querySelectorAll('#eldGrid .v-card').forEach(function(c) {
+        document.querySelectorAll('#eldGrid .v-card, #eldTable .eld-trow').forEach(function(c) {
           var show = true;
           if (provider && c.dataset.provider !== provider) show = false;
           if (label && c.dataset.label !== label) show = false;
           c.style.display = show ? '' : 'none';
         });
+      }
+      function setEldView(v) {
+        document.getElementById('eldGrid').style.display = v === 'cards' ? '' : 'none';
+        document.getElementById('eldTable').style.display = v === 'table' ? '' : 'none';
+        document.getElementById('viewCards').style.background = v === 'cards' ? 'var(--primary)' : 'var(--card)';
+        document.getElementById('viewCards').style.color = v === 'cards' ? '#fff' : 'var(--muted)';
+        document.getElementById('viewTable').style.background = v === 'table' ? 'var(--primary)' : 'var(--card)';
+        document.getElementById('viewTable').style.color = v === 'table' ? '#fff' : 'var(--muted)';
       }
       </script>
     </div>

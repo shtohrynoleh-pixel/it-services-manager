@@ -653,7 +653,7 @@ module.exports = function(db) {
     const maintenance = safeAll('SELECT m.*, fv.unit_number as vehicle_unit, ft.unit_number as trailer_unit FROM fleet_maintenance m LEFT JOIN fleet_vehicles fv ON m.vehicle_id = fv.id LEFT JOIN fleet_trailers ft ON m.trailer_id = ft.id WHERE m.company_id = ? ORDER BY m.date DESC LIMIT 50', [company.id]);
     const fuel = safeAll('SELECT f.*, fv.unit_number as vehicle_unit FROM fleet_fuel f LEFT JOIN fleet_vehicles fv ON f.vehicle_id = fv.id WHERE f.company_id = ? ORDER BY f.date DESC LIMIT 50', [company.id]);
     const drivers = safeAll('SELECT id, name FROM company_users WHERE company_id = ? AND is_active = 1 ORDER BY name', [company.id]);
-    const eldVehicles = safeAll('SELECT ev.id, ev.name, ev.make, ev.model, ev.vin, ev.provider FROM eld_vehicles ev JOIN eld_integrations ei ON ev.integration_id = ei.id WHERE ev.company_id = ?', [company.id]);
+    const eldVehicles = safeAll('SELECT ev.*, ei.provider, ei.label as integration_label FROM eld_vehicles ev LEFT JOIN eld_integrations ei ON ev.integration_id = ei.id WHERE ev.company_id = ?', [company.id]);
     // Enrich fleet vehicles with ELD data
     vehicles.forEach(v => {
       if (v.eld_vehicle_id) {
