@@ -346,6 +346,109 @@ module.exports = function(db) {
     res.redirect('/client/passwords');
   });
 
+  // === DRIVER FUEL DASHBOARD ===
+  const safeGet = (sql, params) => { try { return params ? db.prepare(sql).get(...(Array.isArray(params)?params:[params])) : db.prepare(sql).get(); } catch(e) { return null; } };
+
+  // Helper: get driver's company_users ID
+  function getDriverId(req) {
+    const cid = req.session.user.company_id;
+    const name = req.session.user.full_name;
+    if (!name || !cid) return null;
+    const cu = safeGet('SELECT id FROM company_users WHERE company_id = ? AND name = ?', [cid, name]);
+    return cu ? cu.id : null;
+  }
+
+  router.get('/fuel', (req, res) => {
+    const cid = req.session.user.company_id;
+    const driverId = getDriverId(req);
+    if (!driverId) return res.render('client/fuel-dashboard', { user: req.session.user, error: 'Driver profile not found', settings: getSettings(), page: 'fuel', data: null });
+
+    const config = safeGet('SELECT * FROM fuel_config WHERE company_id = ?', [cid]) || {};
+    if (!config.enabled) return res.render('client/fuel-dashboard', { user: req.session.user, error: 'Fuel incentive program not active', settings: getSettings(), page: 'fuel', data: null });
+
+    // Current open/calculated period
+    const period = safeGet("SELECT * FROM fuel_payout_periods WHERE company_id = ? AND status IN ('open','calculated') ORDER BY period_start DESC LIMIT 1", [cid]);
+
+    // Driver's group + baseline
+    const driverGroup = safeGet('SELECT g.* FROM fuel_driver_group_map m JOIN fuel_groups g ON m.group_id = g.id WHERE m.company_id = ? AND m.driver_id = ?', [cid, driverId]);
+    const baseline = driverGroup ? safeGet('SELECT baseline_mpg FROM fuel_baseline_snapshots WHERE company_id = ? AND group_id = ? AND is_current = 1', [cid, driverGroup.id]) : null;
+    const baselineMpg = baseline ? baseline.baseline_mpg : (config.baseline_mpg || 0);
+
+    // Target
+    const { getEffectiveTarget } = require('../lib/fuel-baseline');
+    const today = new Date().toISOString().slice(0,10);
+    const target = getEffectiveTarget(db, cid, driverId, today);
+
+    // Current period measurements
+    let currentMpg = 0, currentMiles = 0, currentGallons = 0;
+    if (period) {
+      const agg = safeGet("SELECT SUM(miles) as miles, SUM(gallons) as gal FROM fuel_measurements_daily WHERE company_id = ? AND driver_id = ? AND date >= ? AND date <= ?", [cid, driverId, period.period_start, period.period_end]);
+      if (!agg || !agg.miles) {
+        // Try via vehicle
+        const vehicles = safeAll('SELECT id FROM fleet_vehicles WHERE company_id = ? AND driver_id = ?', [cid, driverId]);
+        if (vehicles.length > 0) {
+          const vids = vehicles.map(v => v.id);
+          const agg2 = safeGet("SELECT SUM(miles) as miles, SUM(gallons) as gal FROM fuel_measurements_daily WHERE company_id = ? AND vehicle_id IN (" + vids.join(',') + ") AND date >= ? AND date <= ?", [cid, period.period_start, period.period_end]);
+          if (agg2) { currentMiles = agg2.miles || 0; currentGallons = agg2.gal || 0; }
+        }
+      } else {
+        currentMiles = agg.miles || 0; currentGallons = agg.gal || 0;
+      }
+      if (currentGallons > 0) currentMpg = Math.round(currentMiles / currentGallons * 100) / 100;
+    }
+
+    // Projected payout
+    let projectedPayout = 0, projectedSavingsGal = 0;
+    if (baselineMpg > 0 && currentMpg > baselineMpg && currentMiles > 0) {
+      projectedSavingsGal = (currentMiles / baselineMpg) - (currentMiles / currentMpg);
+      const savingsUsd = projectedSavingsGal * (config.fuel_price_manual || 0);
+      projectedPayout = Math.round(savingsUsd * (config.split_driver_pct || 50) / 100 * 100) / 100;
+      // Add KPI bonus if meeting target
+      if (target.target_mpg && currentMpg >= target.target_mpg && target.kpi_bonus_usd) {
+        projectedPayout += Math.round(projectedSavingsGal * target.kpi_bonus_usd * 100) / 100;
+      }
+    }
+
+    // Existing ledger for this driver in current period
+    const ledgerEntry = period ? safeGet('SELECT * FROM fuel_payout_ledgers WHERE period_id = ? AND driver_id = ? AND company_id = ?', [period.id, driverId, cid]) : null;
+
+    res.render('client/fuel-dashboard', {
+      user: req.session.user, settings: getSettings(), page: 'fuel', error: null,
+      data: { config, period, driverGroup, baselineMpg, target, currentMpg, currentMiles, currentGallons, projectedPayout, projectedSavingsGal, ledgerEntry, driverId }
+    });
+  });
+
+  // Driver fuel history
+  router.get('/fuel/history', (req, res) => {
+    const cid = req.session.user.company_id;
+    const driverId = getDriverId(req);
+    if (!driverId) return res.render('client/fuel-history', { user: req.session.user, settings: getSettings(), page: 'fuel', ledgers: [] });
+
+    const ledgers = safeAll("SELECT l.*, p.period_start, p.period_end, p.status as period_status FROM fuel_payout_ledgers l JOIN fuel_payout_periods p ON l.period_id = p.id WHERE l.driver_id = ? AND l.company_id = ? ORDER BY p.period_start DESC", [driverId, cid]);
+    res.render('client/fuel-history', { user: req.session.user, settings: getSettings(), page: 'fuel', ledgers });
+  });
+
+  // What-if calculator
+  router.get('/fuel/calculator', (req, res) => {
+    const cid = req.session.user.company_id;
+    const config = safeGet('SELECT * FROM fuel_config WHERE company_id = ?', [cid]) || {};
+    const driverId = getDriverId(req);
+    const driverGroup = driverId ? safeGet('SELECT g.* FROM fuel_driver_group_map m JOIN fuel_groups g ON m.group_id = g.id WHERE m.company_id = ? AND m.driver_id = ?', [cid, driverId]) : null;
+    const baseline = driverGroup ? safeGet('SELECT baseline_mpg FROM fuel_baseline_snapshots WHERE company_id = ? AND group_id = ? AND is_current = 1', [cid, driverGroup.id]) : null;
+    const target = driverId ? require('../lib/fuel-baseline').getEffectiveTarget(db, cid, driverId, new Date().toISOString().slice(0,10)) : { target_mpg: null, kpi_bonus_usd: 0 };
+
+    res.render('client/fuel-calculator', {
+      user: req.session.user, settings: getSettings(), page: 'fuel',
+      defaults: {
+        baselineMpg: (baseline ? baseline.baseline_mpg : config.baseline_mpg) || 6.0,
+        targetMpg: target.target_mpg || 6.5,
+        fuelPrice: config.fuel_price_manual || 4.0,
+        driverPct: config.split_driver_pct || 50,
+        kpiBonus: target.kpi_bonus_usd || 0.10
+      }
+    });
+  });
+
   // Leaderboard
   router.get('/leaderboard', (req, res) => {
     const { getLeaderboard, getRecentXP } = require('../lib/xp');

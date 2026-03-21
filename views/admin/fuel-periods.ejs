@@ -1,0 +1,69 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>/fuel" style="opacity:0.4;text-decoration:none;"><i class="ti ti-gas-station"></i></a> → <i class="ti ti-calendar-stats"></i> Payout Periods</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <!-- Create period -->
+      <div class="card" style="margin-bottom:14px;">
+        <h3><i class="ti ti-plus"></i> Create Period</h3>
+        <form method="POST" action="/admin/companies/<%= company.id %>/fuel/periods" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+          <div class="form-group" style="margin:0;"><label>Start</label><input type="date" name="period_start" required value="<%= new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10) %>"></div>
+          <div class="form-group" style="margin:0;"><label>End</label><input type="date" name="period_end" required value="<%= new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0,10) %>"></div>
+          <button type="submit" class="btn btn-primary btn-sm">Create</button>
+        </form>
+      </div>
+
+      <!-- Period list -->
+      <% periods.forEach(p => {
+        var stColor = p.status==='open'?'#dbeafe':p.status==='calculated'?'#fef3c7':p.status==='approved'?'#d1fae5':'#f1f5f9';
+        var stText = p.status==='open'?'#1e40af':p.status==='calculated'?'#92400e':p.status==='approved'?'#065f46':'#475569';
+      %>
+        <div class="card" style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+            <div>
+              <h3 style="margin-bottom:2px;"><%= p.period_start %> → <%= p.period_end %></h3>
+              <span style="padding:3px 10px;border-radius:6px;font-size:10px;font-weight:800;text-transform:uppercase;background:<%= stColor %>;color:<%= stText %>;"><%= p.status %></span>
+              <span style="font-size:11px;color:var(--muted);margin-left:8px;"><%= p.total_drivers||0 %> drivers · <%= p.total_eligible||0 %> eligible</span>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:20px;font-weight:900;color:var(--success);">$<%= (p.total_driver_payout||0).toFixed(2) %></div>
+              <div style="font-size:10px;color:var(--muted);">driver payouts</div>
+            </div>
+          </div>
+          <% if (p.total_savings) { %>
+            <div class="metrics" style="margin-top:10px;">
+              <div class="metric"><div class="m-label">Savings</div><div class="m-val" style="font-size:14px;">$<%= (p.total_savings||0).toFixed(2) %></div></div>
+              <div class="metric"><div class="m-label">Co. Share</div><div class="m-val" style="font-size:14px;">$<%= (p.total_company_share||0).toFixed(2) %></div></div>
+              <div class="metric"><div class="m-label">KPI Bonus</div><div class="m-val" style="font-size:14px;">$<%= (p.total_kpi_bonus||0).toFixed(2) %></div></div>
+            </div>
+          <% } %>
+          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+            <% if (p.status === 'open') { %>
+              <form method="POST" action="/admin/companies/<%= company.id %>/fuel/periods/<%= p.id %>/calculate"><button type="submit" class="btn btn-primary btn-sm"><i class="ti ti-calculator"></i> Calculate</button></form>
+            <% } %>
+            <% if (p.status === 'calculated') { %>
+              <form method="POST" action="/admin/companies/<%= company.id %>/fuel/periods/<%= p.id %>/calculate"><button type="submit" class="btn btn-sm"><i class="ti ti-refresh"></i> Recalculate</button></form>
+              <form method="POST" action="/admin/companies/<%= company.id %>/fuel/periods/<%= p.id %>/approve" onsubmit="return confirm('Approve? Ledger becomes immutable.')"><button type="submit" class="btn btn-sm" style="background:var(--success);color:#fff;border-color:var(--success);"><i class="ti ti-check"></i> Approve</button></form>
+            <% } %>
+            <% if (p.status === 'approved') { %>
+              <form method="POST" action="/admin/companies/<%= company.id %>/fuel/periods/<%= p.id %>/close"><button type="submit" class="btn btn-sm"><i class="ti ti-lock"></i> Close</button></form>
+            <% } %>
+            <a href="/admin/companies/<%= company.id %>/fuel/ledger?period=<%= p.id %>" class="btn btn-sm"><i class="ti ti-list"></i> View Ledger</a>
+            <% if (p.status !== 'open') { %>
+              <a href="/admin/companies/<%= company.id %>/fuel/ledger/export?period=<%= p.id %>" class="btn btn-sm"><i class="ti ti-download"></i> CSV</a>
+            <% } %>
+          </div>
+          <% if (p.calculated_at) { %><div style="font-size:9px;color:var(--muted);margin-top:6px;">Calc: <%= p.calculated_at %> by <%= p.calculated_by||'' %><%= p.approved_at ? ' · Approved: ' + p.approved_at + ' by ' + (p.approved_by||'') : '' %><%= p.closed_at ? ' · Closed: ' + p.closed_at : '' %></div><% } %>
+        </div>
+      <% }) %>
+      <% if (periods.length === 0) { %><div class="empty"><span class="e-icon"><i class="ti ti-calendar-stats" style="font-size:40px;"></i></span><div class="e-text">No periods yet</div></div><% } %>
+
+      <div style="margin-top:16px;"><a href="/admin/companies/<%= company.id %>/fuel" class="btn btn-sm">← Back to Fuel</a></div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

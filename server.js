@@ -13,6 +13,10 @@ const PORT = process.env.PORT || 3000;
 
 const db = initDB();
 
+// Run migrations
+const { runMigrations } = require('./db/migrate');
+runMigrations(db);
+
 // Load integration settings from DB into env (DB overrides .env if set)
 try {
   const dbSettings = db.prepare('SELECT key, value FROM settings').all();
@@ -131,10 +135,29 @@ app.post('/contact', (req, res) => {
   res.render('landing', { services, settings, user: null, submitted: true });
 });
 
+// Motive webhook endpoint (no auth — accepts provider callbacks)
+app.post('/webhooks/motive', (req, res) => {
+  try {
+    const payload = req.body;
+    console.log('  📥 Motive webhook:', payload.event_type || 'unknown');
+    // Store raw payload for audit
+    try {
+      db.prepare('INSERT INTO fuel_audit_log (company_id, action, details, created_by) VALUES (?,?,?,?)').run(
+        null, 'motive_webhook', JSON.stringify(payload).substring(0, 2000), 'webhook'
+      );
+    } catch(e2) {}
+    res.json({ ok: true, received: true });
+  } catch(e) {
+    console.error('Motive webhook error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.use('/', require('./routes/auth')(db));
 app.use('/admin', require('./routes/admin')(db));
 app.use('/client', require('./routes/client')(db));
 app.use('/chat', require('./routes/chat')(db));
+app.use('/admin', require('./routes/fuel')(db));
 
 app.get('/', (req, res) => {
   if (req.session.user) {

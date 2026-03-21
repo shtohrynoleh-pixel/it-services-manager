@@ -1,0 +1,127 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>/fuel" style="opacity:0.4;text-decoration:none;"><i class="ti ti-gas-station"></i></a> → <i class="ti ti-chart-line"></i> Reports</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div class="tabs">
+        <a class="tab <%= tab==='fleet'?'active':'' %>" href="/admin/companies/<%= company.id %>/fuel/reports?tab=fleet"><i class="ti ti-chart-line"></i> Fleet Trend</a>
+        <a class="tab <%= tab==='groups'?'active':'' %>" href="/admin/companies/<%= company.id %>/fuel/reports?tab=groups"><i class="ti ti-category"></i> Group Trends</a>
+        <a class="tab <%= tab==='ranking'?'active':'' %>" href="/admin/companies/<%= company.id %>/fuel/reports?tab=ranking"><i class="ti ti-trophy"></i> Driver Ranking</a>
+        <a class="tab <%= tab==='freshness'?'active':'' %>" href="/admin/companies/<%= company.id %>/fuel/reports?tab=freshness"><i class="ti ti-activity"></i> Data Freshness</a>
+      </div>
+
+      <% if (tab === 'fleet') { %>
+        <!-- Fleet MPG Trend -->
+        <div class="card">
+          <h3><i class="ti ti-chart-line"></i> Fleet MPG by Month</h3>
+          <% if (fleetTrend.length === 0) { %><div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;">No data yet</div><% } else { %>
+            <!-- Simple bar chart -->
+            <div style="display:flex;align-items:flex-end;gap:6px;height:200px;padding:10px 0;border-bottom:1px solid var(--border);">
+              <% var maxMpg = Math.max(...fleetTrend.map(m => m.mpg || 0), 1); %>
+              <% fleetTrend.forEach(m => { var h = m.mpg > 0 ? Math.round(m.mpg / maxMpg * 160) : 0; %>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+                  <div style="font-size:10px;font-weight:800;color:var(--primary);"><%= m.mpg %></div>
+                  <div style="width:100%;max-width:40px;height:<%= h %>px;background:linear-gradient(180deg,#0891b2,#06b6d4);border-radius:4px 4px 0 0;min-height:4px;"></div>
+                  <div style="font-size:9px;color:var(--muted);"><%= m.month %></div>
+                </div>
+              <% }) %>
+            </div>
+            <table class="tbl" style="margin-top:12px;">
+              <thead><tr><th>Month</th><th>MPG</th><th>Miles</th><th>Gallons</th><th>Trucks</th></tr></thead>
+              <tbody>
+              <% fleetTrend.forEach(m => { %><tr><td><strong><%= m.month %></strong></td><td style="font-weight:900;color:var(--primary);"><%= m.mpg %></td><td><%= Math.round(m.miles).toLocaleString() %></td><td><%= m.gallons ? Math.round(m.gallons).toLocaleString() : '—' %></td><td><%= m.trucks %></td></tr><% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+
+      <% } else if (tab === 'groups') { %>
+        <!-- Group Trends -->
+        <% Object.keys(groupTrends).forEach(gName => { var data = groupTrends[gName]; %>
+          <div class="card" style="margin-bottom:12px;">
+            <h3><i class="ti ti-category"></i> <%= gName %></h3>
+            <div style="display:flex;align-items:flex-end;gap:6px;height:120px;padding:10px 0;border-bottom:1px solid var(--border);">
+              <% var gMax = Math.max(...data.map(d => d.mpg || 0), 1); %>
+              <% data.forEach(d => { var h = d.mpg > 0 ? Math.round(d.mpg / gMax * 100) : 0; %>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                  <div style="font-size:9px;font-weight:800;color:var(--primary);"><%= d.mpg %></div>
+                  <div style="width:100%;max-width:30px;height:<%= h %>px;background:var(--primary);border-radius:3px 3px 0 0;min-height:2px;"></div>
+                  <div style="font-size:8px;color:var(--muted);"><%= d.month %></div>
+                </div>
+              <% }) %>
+            </div>
+          </div>
+        <% }) %>
+        <% if (Object.keys(groupTrends).length === 0) { %><div class="card" style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">No group data — assign trucks to groups first.</div><% } %>
+
+      <% } else if (tab === 'ranking') { %>
+        <!-- Driver Ranking (last 30 days) -->
+        <% Object.keys(driverRankings).forEach(gName => { var drivers = driverRankings[gName]; %>
+          <div class="card" style="margin-bottom:12px;">
+            <h3><i class="ti ti-trophy"></i> <%= gName %> — Last 30 Days</h3>
+            <% if (drivers.length === 0) { %><div style="font-size:12px;color:var(--muted);">No data</div><% } else { %>
+              <% drivers.forEach((d, i) => { var group = groups.find(g => g.name === gName); var baseline = group ? group.baseline_mpg : 0; %>
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+                  <div style="width:28px;height:28px;border-radius:50%;background:<%= i < 3 ? 'var(--primary)' : 'var(--bg)' %>;color:<%= i < 3 ? '#fff' : 'var(--muted)' %>;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex-shrink:0;"><%= i+1 %></div>
+                  <div style="flex:1;font-weight:700;font-size:13px;"><%= d.name %></div>
+                  <div style="font-size:11px;color:var(--muted);"><%= Math.round(d.miles).toLocaleString() %> mi</div>
+                  <div style="font-size:16px;font-weight:900;color:<%= d.mpg > baseline ? 'var(--success)' : 'var(--danger)' %>;min-width:60px;text-align:right;"><%= d.mpg %> <span style="font-size:10px;font-weight:400;">MPG</span></div>
+                </div>
+              <% }) %>
+            <% } %>
+          </div>
+        <% }) %>
+
+      <% } else if (tab === 'freshness') { %>
+        <!-- Data Freshness -->
+        <div class="card" style="margin-bottom:12px;">
+          <h3><i class="ti ti-plug-connected"></i> Integration Status</h3>
+          <% integrations.forEach(intg => { var syncAge = intg.last_sync_at ? Math.round((Date.now() - new Date(intg.last_sync_at+'Z').getTime())/3600000) : null; %>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+              <div style="width:10px;height:10px;border-radius:50%;background:<%= intg.status === 'connected' ? 'var(--success)' : intg.status === 'error' ? 'var(--danger)' : 'var(--accent)' %>;flex-shrink:0;"></div>
+              <div style="flex:1;font-weight:700;font-size:12px;"><%= intg.provider %><%= intg.label ? ' — ' + intg.label : '' %></div>
+              <div style="font-size:11px;color:<%= syncAge !== null && syncAge < 24 ? 'var(--success)' : syncAge !== null && syncAge < 72 ? 'var(--accent)' : 'var(--danger)' %>;font-weight:700;">
+                <%= syncAge !== null ? (syncAge < 1 ? 'Just now' : syncAge + 'h ago') : 'Never synced' %>
+              </div>
+              <% if (intg.last_error) { %><div style="font-size:9px;color:var(--danger);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= intg.last_error %></div><% } %>
+            </div>
+          <% }) %>
+          <% if (integrations.length === 0) { %><div style="font-size:12px;color:var(--muted);">No integrations configured</div><% } %>
+        </div>
+
+        <% if (staleDrivers.length > 0) { %>
+          <div class="card" style="border-color:var(--danger);">
+            <h3 style="color:var(--danger);"><i class="ti ti-alert-triangle"></i> Stale Driver Data (<%= staleDrivers.length %>)</h3>
+            <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Drivers with no measurements in the last 3 days. Check vehicle assignments and integration sync.</p>
+            <table class="tbl">
+              <thead><tr><th>Driver</th><th>Last Data</th><th>Days Stale</th></tr></thead>
+              <tbody>
+              <% staleDrivers.forEach(d => { %>
+                <tr><td><strong><%= d.name %></strong></td><td><%= d.last_date || 'Never' %></td><td style="color:var(--danger);font-weight:700;"><%= d.days_stale || '∞' %></td></tr>
+              <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } else { %>
+          <div class="card" style="border-color:var(--success);"><div style="text-align:center;padding:16px;color:var(--success);font-weight:700;"><i class="ti ti-check"></i> All drivers have recent data</div></div>
+        <% } %>
+
+        <% if (ceilingLog.length > 0) { %>
+          <div class="card">
+            <h3><i class="ti ti-arrow-up-right"></i> Ceiling Switch Events</h3>
+            <% ceilingLog.forEach(cl => { %>
+              <div style="padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:11px;"><strong><%= cl.group_name || 'Group #'+cl.group_id %></strong> · +<%= cl.avg_mpg_delta %> MPG above baseline for <%= cl.consecutive_periods %> periods · <%= cl.old_billing_mode %> → <strong><%= cl.new_billing_mode %></strong> · <%= cl.triggered_at %></div>
+            <% }) %>
+          </div>
+        <% } %>
+      <% } %>
+
+      <div style="margin-top:16px;"><a href="/admin/companies/<%= company.id %>/fuel" class="btn btn-sm">← Back to Fuel</a></div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

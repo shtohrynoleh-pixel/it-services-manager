@@ -1,0 +1,85 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>/fuel" style="opacity:0.4;text-decoration:none;"><i class="ti ti-gas-station"></i></a> → <i class="ti ti-target"></i> Targets</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div style="padding:12px;background:#f0fdfa;border:1px solid #a7f3d0;border-radius:10px;margin-bottom:16px;font-size:12px;color:#065f46;line-height:1.6;">
+        <strong>Precedence:</strong> Driver Override > Group Policy > None<br>
+        If a driver has an active override, it takes priority over the group policy. If neither exists, no target applies.
+      </div>
+
+      <!-- GROUP POLICIES -->
+      <div class="card" style="margin-bottom:14px;">
+        <h3><i class="ti ti-category"></i> Group Target Policies</h3>
+        <% if (policies.length > 0) { %>
+          <table class="tbl" style="margin-bottom:14px;">
+            <thead><tr><th>Group</th><th>Target MPG</th><th>Bonus/gal</th><th>Penalty/gal</th><th>Effective</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            <% policies.forEach(p => { %>
+              <tr style="<%= p.is_active ? '' : 'opacity:0.4;' %>">
+                <td><strong><%= p.group_name || '—' %></strong></td>
+                <td style="font-weight:900;color:var(--primary);"><%= p.target_mpg %></td>
+                <td style="color:var(--success);">$<%= (p.kpi_bonus_usd||0).toFixed(2) %></td>
+                <td style="color:var(--danger);">$<%= (p.penalty_usd||0).toFixed(2) %></td>
+                <td style="font-size:10px;"><%= p.effective_from %><%= p.effective_to ? ' → ' + p.effective_to : ' → ongoing' %></td>
+                <td><span class="badge <%= p.is_active ? 'active' : 'inactive' %>"><%= p.is_active ? 'Active' : 'Inactive' %></span></td>
+                <td><% if (p.is_active) { %><form method="POST" action="/admin/companies/<%= company.id %>/fuel/targets/policy/<%= p.id %>/deactivate" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Deactivate?')" style="color:var(--danger);">×</button></form><% } %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+        <details><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--primary);">+ Add Group Policy</summary>
+          <form method="POST" action="/admin/companies/<%= company.id %>/fuel/targets/policy" style="margin-top:10px;">
+            <div class="form-row"><div class="form-group"><label>Group *</label><select name="group_id" required><option value="">—</option><% groups.forEach(g => { %><option value="<%= g.id %>"><%= g.name %> (baseline: <%= g.baseline_mpg %> MPG)</option><% }) %></select></div><div class="form-group"><label>Target MPG *</label><input type="number" name="target_mpg" step="0.01" required placeholder="e.g. 6.8"></div></div>
+            <div class="form-row"><div class="form-group"><label>Bonus per gallon saved ($)</label><input type="number" name="kpi_bonus_usd" step="0.01" value="0.10" placeholder="0.10"></div><div class="form-group"><label>Penalty per gallon over ($)</label><input type="number" name="penalty_usd" step="0.01" value="0" placeholder="0 = no penalty"></div></div>
+            <div class="form-row"><div class="form-group"><label>Effective From *</label><input type="date" name="effective_from" required value="<%= new Date().toISOString().slice(0,10) %>"></div><div class="form-group"><label>Effective To (blank = ongoing)</label><input type="date" name="effective_to"></div></div>
+            <div class="form-group"><label>Notes</label><input type="text" name="notes" placeholder="Reason for this target..."></div>
+            <button type="submit" class="btn btn-sm btn-primary">Create Policy</button>
+          </form>
+        </details>
+      </div>
+
+      <!-- DRIVER OVERRIDES -->
+      <div class="card">
+        <h3><i class="ti ti-user-edit"></i> Driver Overrides</h3>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">Override the group target for specific drivers — e.g., experienced drivers can have higher targets.</p>
+        <% if (overrides.length > 0) { %>
+          <table class="tbl" style="margin-bottom:14px;">
+            <thead><tr><th>Driver</th><th>Target MPG</th><th>Bonus/gal</th><th>Penalty/gal</th><th>Effective</th><th>Reason</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            <% overrides.forEach(o => { %>
+              <tr style="<%= o.is_active ? '' : 'opacity:0.4;' %>">
+                <td><strong><%= o.driver_name || '—' %></strong></td>
+                <td style="font-weight:900;color:var(--primary);"><%= o.target_mpg %></td>
+                <td style="color:var(--success);">$<%= (o.kpi_bonus_usd||0).toFixed(2) %></td>
+                <td style="color:var(--danger);">$<%= (o.penalty_usd||0).toFixed(2) %></td>
+                <td style="font-size:10px;"><%= o.effective_from %><%= o.effective_to ? ' → ' + o.effective_to : ' → ongoing' %></td>
+                <td style="font-size:10px;color:var(--muted);"><%= o.reason || '—' %></td>
+                <td><span class="badge <%= o.is_active ? 'active' : 'inactive' %>"><%= o.is_active ? 'Active' : 'Off' %></span></td>
+                <td><% if (o.is_active) { %><form method="POST" action="/admin/companies/<%= company.id %>/fuel/targets/override/<%= o.id %>/deactivate" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Deactivate?')" style="color:var(--danger);">×</button></form><% } %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+        <details><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--primary);">+ Add Driver Override</summary>
+          <form method="POST" action="/admin/companies/<%= company.id %>/fuel/targets/override" style="margin-top:10px;">
+            <div class="form-row"><div class="form-group"><label>Driver *</label><select name="driver_id" required><option value="">—</option><% drivers.forEach(d => { %><option value="<%= d.id %>"><%= d.name %></option><% }) %></select></div><div class="form-group"><label>Target MPG *</label><input type="number" name="target_mpg" step="0.01" required></div></div>
+            <div class="form-row"><div class="form-group"><label>Bonus/gal ($)</label><input type="number" name="kpi_bonus_usd" step="0.01" value="0.10"></div><div class="form-group"><label>Penalty/gal ($)</label><input type="number" name="penalty_usd" step="0.01" value="0"></div></div>
+            <div class="form-row"><div class="form-group"><label>Effective From *</label><input type="date" name="effective_from" required value="<%= new Date().toISOString().slice(0,10) %>"></div><div class="form-group"><label>Effective To</label><input type="date" name="effective_to"></div></div>
+            <div class="form-group"><label>Reason</label><input type="text" name="reason" placeholder="e.g. Experienced driver, new truck assignment"></div>
+            <button type="submit" class="btn btn-sm btn-primary">Create Override</button>
+          </form>
+        </details>
+      </div>
+
+      <div style="margin-top:16px;"><a href="/admin/companies/<%= company.id %>/fuel" class="btn btn-sm">← Back to Fuel</a></div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

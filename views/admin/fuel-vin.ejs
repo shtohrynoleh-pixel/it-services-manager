@@ -1,0 +1,120 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>/fuel" style="opacity:0.4;text-decoration:none;"><i class="ti ti-gas-station"></i></a> → <i class="ti ti-barcode"></i> VIN Decoder</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div class="card">
+        <h3><i class="ti ti-barcode"></i> Decode VIN</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Look up vehicle details using NHTSA database. Results are cached for instant repeat lookups.</p>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+          <!-- By truck -->
+          <div style="flex:1;min-width:250px;padding:14px;border:1px solid var(--border);border-radius:10px;">
+            <div style="font-size:12px;font-weight:800;margin-bottom:8px;">Decode from Fleet Truck</div>
+            <form method="POST" action="/admin/companies/<%= company.id %>/fuel/vin/decode" style="display:flex;gap:6px;">
+              <select name="truck_id" style="flex:1;padding:6px;font-size:12px;border:1px solid var(--border);border-radius:6px;">
+                <option value="">Select truck</option>
+                <% vehicles.filter(v => v.vin).forEach(v => { %><option value="<%= v.id %>">#<%= v.unit_number %> — VIN: ...<%= (v.vin||'').slice(-6) %></option><% }) %>
+              </select>
+              <button type="submit" class="btn btn-sm btn-primary">Decode</button>
+            </form>
+          </div>
+          <!-- Manual VIN -->
+          <div style="flex:1;min-width:250px;padding:14px;border:1px solid var(--border);border-radius:10px;">
+            <div style="font-size:12px;font-weight:800;margin-bottom:8px;">Enter VIN Manually</div>
+            <form method="POST" action="/admin/companies/<%= company.id %>/fuel/vin/decode?json=1" id="vinForm" onsubmit="return decodeManual(event)">
+              <div style="display:flex;gap:6px;">
+                <input type="text" name="vin" id="vinInput" placeholder="Enter 17-digit VIN" maxlength="17" style="flex:1;padding:6px 10px;font-size:13px;font-family:monospace;text-transform:uppercase;letter-spacing:1px;border:1px solid var(--border);border-radius:6px;" required>
+                <button type="submit" class="btn btn-sm btn-primary" id="vinBtn">Decode</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Decode result (AJAX) -->
+        <div id="vinResult" style="display:none;"></div>
+      </div>
+
+      <!-- Recent decodes -->
+      <% if (recentDecodes.length > 0) { %>
+      <div class="card">
+        <h3><i class="ti ti-history"></i> Recent Decodes (Cached)</h3>
+        <div style="overflow-x:auto;">
+        <table class="tbl">
+          <thead><tr><th>VIN</th><th>Year</th><th>Make</th><th>Model</th><th>Body</th><th>Fuel</th><th>Engine</th><th>GVWR</th></tr></thead>
+          <tbody>
+          <% recentDecodes.forEach(d => { %>
+            <tr>
+              <td style="font-family:monospace;font-size:10px;"><%= d.vin %></td>
+              <td><%= d.year || '—' %></td>
+              <td><strong><%= d.make || '—' %></strong></td>
+              <td><%= d.model || '—' %></td>
+              <td style="font-size:10px;"><%= d.body_class || '—' %></td>
+              <td style="font-size:10px;"><%= d.fuel_type || '—' %></td>
+              <td style="font-size:10px;"><%= d.engine || '—' %></td>
+              <td style="font-size:10px;"><%= d.gvwr || '—' %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+        </div>
+      </div>
+      <% } %>
+
+      <div style="margin-top:16px;"><a href="/admin/companies/<%= company.id %>/fuel" class="btn btn-sm">← Back to Fuel</a></div>
+
+      <script>
+      async function decodeManual(e) {
+        e.preventDefault();
+        var vin = document.getElementById('vinInput').value.trim().toUpperCase();
+        if (!vin || vin.length < 11) { alert('Enter a valid VIN (at least 11 characters)'); return false; }
+
+        var btn = document.getElementById('vinBtn');
+        btn.textContent = 'Decoding...';
+        btn.disabled = true;
+
+        try {
+          var res = await fetch('/admin/companies/<%= company.id %>/fuel/vin/decode?json=1', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ vin: vin })
+          });
+          var data = await res.json();
+          var el = document.getElementById('vinResult');
+
+          if (data.ok) {
+            var d = data.data;
+            el.innerHTML = '<div style="padding:16px;background:#f0fdfa;border:1px solid #a7f3d0;border-radius:10px;">' +
+              '<div style="font-size:12px;font-weight:800;margin-bottom:8px;color:var(--success);"><i class="ti ti-check"></i> VIN Decoded' + (data.cached ? ' (cached)' : '') + '</div>' +
+              '<div style="display:flex;flex-wrap:wrap;gap:16px;">' +
+              '<div><div style="font-size:9px;color:var(--muted);font-weight:700;">YEAR</div><div style="font-weight:800;font-size:16px;">' + (d.year||'—') + '</div></div>' +
+              '<div><div style="font-size:9px;color:var(--muted);font-weight:700;">MAKE</div><div style="font-weight:800;font-size:16px;">' + (d.make||'—') + '</div></div>' +
+              '<div><div style="font-size:9px;color:var(--muted);font-weight:700;">MODEL</div><div style="font-weight:800;font-size:16px;">' + (d.model||'—') + '</div></div>' +
+              '<div><div style="font-size:9px;color:var(--muted);font-weight:700;">BODY</div><div style="font-size:12px;">' + (d.body_class||'—') + '</div></div>' +
+              '<div><div style="font-size:9px;color:var(--muted);font-weight:700;">FUEL</div><div style="font-size:12px;">' + (d.fuel_type||'—') + '</div></div>' +
+              '<div><div style="font-size:9px;color:var(--muted);font-weight:700;">ENGINE</div><div style="font-size:12px;">' + (d.engine||'—') + '</div></div>' +
+              '<div><div style="font-size:9px;color:var(--muted);font-weight:700;">GVWR</div><div style="font-size:12px;">' + (d.gvwr||'—') + '</div></div>' +
+              '<div><div style="font-size:9px;color:var(--muted);font-weight:700;">DRIVE</div><div style="font-size:12px;">' + (d.drive_type||'—') + '</div></div>' +
+              '</div></div>';
+          } else {
+            el.innerHTML = '<div style="padding:12px;background:#fee2e2;border-radius:8px;color:#991b1b;font-size:12px;font-weight:700;"><i class="ti ti-alert-circle"></i> ' + (data.error||'Decode failed') + '</div>';
+          }
+          el.style.display = 'block';
+        } catch(err) {
+          document.getElementById('vinResult').innerHTML = '<div style="padding:12px;background:#fee2e2;border-radius:8px;color:#991b1b;font-size:12px;">Network error: ' + err.message + '</div>';
+          document.getElementById('vinResult').style.display = 'block';
+        }
+
+        btn.textContent = 'Decode';
+        btn.disabled = false;
+        return false;
+      }
+      </script>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

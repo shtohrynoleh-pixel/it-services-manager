@@ -1,0 +1,78 @@
+-- Payout periods (monthly cycles)
+CREATE TABLE IF NOT EXISTS fuel_payout_periods (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  company_id INTEGER NOT NULL,
+  period_start TEXT NOT NULL,
+  period_end TEXT NOT NULL,
+  status TEXT DEFAULT 'open',
+  config_snapshot TEXT,
+  total_drivers INTEGER DEFAULT 0,
+  total_eligible INTEGER DEFAULT 0,
+  total_driver_payout REAL DEFAULT 0,
+  total_company_share REAL DEFAULT 0,
+  total_platform_fee REAL DEFAULT 0,
+  total_kpi_bonus REAL DEFAULT 0,
+  total_savings REAL DEFAULT 0,
+  calculated_at TEXT,
+  calculated_by TEXT,
+  approved_at TEXT,
+  approved_by TEXT,
+  closed_at TEXT,
+  closed_by TEXT,
+  notes TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+  UNIQUE(company_id, period_start, period_end)
+);
+
+-- Payout ledger rows (one per driver per period — immutable after approval)
+CREATE TABLE IF NOT EXISTS fuel_payout_ledgers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  company_id INTEGER NOT NULL,
+  period_id INTEGER NOT NULL,
+  driver_id INTEGER NOT NULL,
+  driver_name TEXT,
+  group_id INTEGER,
+  group_name TEXT,
+  status TEXT DEFAULT 'pending',
+  total_miles REAL DEFAULT 0,
+  total_gallons REAL DEFAULT 0,
+  actual_mpg REAL DEFAULT 0,
+  mpg_method TEXT,
+  baseline_mpg REAL DEFAULT 0,
+  target_mpg REAL,
+  target_source TEXT,
+  kpi_bonus_usd REAL DEFAULT 0,
+  kpi_earned INTEGER DEFAULT 0,
+  savings_gallons REAL DEFAULT 0,
+  fuel_price REAL DEFAULT 0,
+  savings_usd REAL DEFAULT 0,
+  driver_share_pct REAL DEFAULT 0,
+  company_share_pct REAL DEFAULT 0,
+  platform_share_pct REAL DEFAULT 0,
+  driver_share_usd REAL DEFAULT 0,
+  company_share_usd REAL DEFAULT 0,
+  platform_fee_usd REAL DEFAULT 0,
+  driver_payout REAL DEFAULT 0,
+  explanation_json TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+  FOREIGN KEY (period_id) REFERENCES fuel_payout_periods(id) ON DELETE CASCADE,
+  FOREIGN KEY (driver_id) REFERENCES company_users(id) ON DELETE CASCADE
+);
+
+-- Payout adjustments (corrections applied to next open period)
+CREATE TABLE IF NOT EXISTS fuel_payout_adjustments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  company_id INTEGER NOT NULL,
+  source_period_id INTEGER,
+  target_period_id INTEGER,
+  driver_id INTEGER NOT NULL,
+  amount REAL NOT NULL,
+  reason TEXT NOT NULL,
+  status TEXT DEFAULT 'pending',
+  created_by TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+  FOREIGN KEY (driver_id) REFERENCES company_users(id) ON DELETE CASCADE
+)

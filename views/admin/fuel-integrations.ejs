@@ -1,0 +1,95 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>/fuel" style="opacity:0.4;text-decoration:none;"><i class="ti ti-gas-station"></i></a> → <i class="ti ti-plug-connected"></i> Fuel Integrations</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <!-- Existing integrations -->
+      <% integrations.forEach(intg => {
+        var statusColor = intg.status === 'connected' ? 'var(--success)' : intg.status === 'error' ? 'var(--danger)' : 'var(--accent)';
+      %>
+        <div class="card" style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div>
+              <h3 style="margin-bottom:2px;"><i class="ti ti-plug-connected" style="color:<%= statusColor %>;"></i> <%= intg.provider.toUpperCase() %><%= intg.label ? ' — ' + intg.label : '' %></h3>
+              <div style="font-size:11px;color:var(--muted);">
+                <span style="color:<%= statusColor %>;font-weight:700;"><%= intg.status %></span>
+                · <%= intg.assetCount %> assets (<%= intg.mappedCount %> mapped)
+                · <%= intg.measurementCount %> daily records
+                <% if (intg.last_sync_at) { %> · Synced: <%= intg.last_sync_at.replace('T',' ').substring(0,16) %><% } %>
+              </div>
+              <% if (intg.last_error) { %><div style="font-size:10px;color:var(--danger);margin-top:4px;"><%= intg.last_error %></div><% } %>
+            </div>
+            <form method="POST" action="/admin/companies/<%= company.id %>/fuel/integrations/<%= intg.id %>/delete" style="display:inline" onsubmit="return confirm('Delete integration and all data?')"><button type="submit" class="btn btn-sm btn-danger"><i class="ti ti-trash"></i></button></form>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+            <form method="POST" action="/admin/companies/<%= company.id %>/fuel/integrations/<%= intg.id %>/test"><button type="submit" class="btn btn-sm"><i class="ti ti-plug"></i> Test</button></form>
+            <form method="POST" action="/admin/companies/<%= company.id %>/fuel/integrations/<%= intg.id %>/sync-assets"><button type="submit" class="btn btn-sm"><i class="ti ti-refresh"></i> Sync Vehicles</button></form>
+            <form method="POST" action="/admin/companies/<%= company.id %>/fuel/integrations/<%= intg.id %>/backfill" style="display:flex;gap:4px;">
+              <select name="days" style="padding:4px 8px;font-size:11px;border:1px solid var(--border);border-radius:6px;">
+                <option value="7">7 days</option>
+                <option value="14">14 days</option>
+                <option value="30">30 days</option>
+                <option value="60" selected>60 days</option>
+                <option value="90">90 days</option>
+              </select>
+              <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-download"></i> Backfill</button>
+            </form>
+          </div>
+        </div>
+      <% }) %>
+
+      <!-- Unmapped assets -->
+      <% if (unmapped.length > 0) { %>
+        <div class="card" style="border-color:var(--accent);">
+          <h3 style="color:var(--accent);"><i class="ti ti-alert-triangle"></i> Unmapped Assets (<%= unmapped.length %>)</h3>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:10px;">These provider vehicles couldn't be auto-matched to your fleet. Map them manually to track fuel data.</p>
+          <% unmapped.forEach(u => { %>
+            <form method="POST" action="/admin/companies/<%= company.id %>/fuel/integrations/map-asset" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:11px;">
+              <input type="hidden" name="map_id" value="<%= u.id %>">
+              <div style="flex:1;">
+                <strong><%= u.provider_vehicle_name || u.provider_vehicle_id %></strong>
+                <span style="color:var(--muted);"><%= u.provider %></span>
+                <% if (u.provider_vin) { %><span style="font-family:monospace;font-size:9px;"> VIN: ...<%= u.provider_vin.slice(-6) %></span><% } %>
+              </div>
+              <select name="internal_vehicle_id" style="padding:4px;font-size:10px;border:1px solid var(--border);border-radius:4px;">
+                <option value="">— Select truck —</option>
+                <% vehicles.forEach(v => { %><option value="<%= v.id %>">#<%= v.unit_number %><%= v.vin ? ' VIN:...' + v.vin.slice(-6) : '' %></option><% }) %>
+              </select>
+              <button type="submit" class="btn btn-sm">Map</button>
+            </form>
+          <% }) %>
+        </div>
+      <% } %>
+
+      <!-- Add new integration -->
+      <div class="card">
+        <h3><i class="ti ti-plus"></i> Connect Provider</h3>
+        <form method="POST" action="/admin/companies/<%= company.id %>/fuel/integrations">
+          <div class="form-row">
+            <div class="form-group"><label>Provider</label><select name="provider" id="providerSelect" onchange="updateProviderHelp()"><option value="samsara">Samsara</option><option value="motive">Motive (KeepTruckin)</option></select></div>
+            <div class="form-group"><label>Label</label><input type="text" name="label" placeholder="e.g. Main account"></div>
+          </div>
+          <div class="form-group"><label>API Token *</label><input type="password" name="api_key" required placeholder="Paste your API token" id="tokenInput"><div id="providerHelp" style="font-size:10px;color:var(--muted);margin-top:2px;">Token is encrypted at rest using AES-256-GCM</div></div>
+          <script>
+          function updateProviderHelp(){
+            var p=document.getElementById('providerSelect').value;
+            var h=document.getElementById('providerHelp');
+            var i=document.getElementById('tokenInput');
+            if(p==='samsara'){h.textContent='Samsara → Settings → API Tokens → Create token with Vehicle scope';i.placeholder='samsara_api_...';}
+            else if(p==='motive'){h.textContent='Motive → Admin → Developers → Request API Key';i.placeholder='Paste Motive API key';}
+          }
+          </script>
+          <div class="form-group"><label>Custom Base URL (optional)</label><input type="text" name="base_url" placeholder="Leave blank for default"></div>
+          <button type="submit" class="btn btn-primary"><i class="ti ti-plug"></i> Connect</button>
+        </form>
+      </div>
+
+      <div style="margin-top:12px;"><a href="/admin/companies/<%= company.id %>/fuel" class="btn btn-sm">← Back to Fuel</a></div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

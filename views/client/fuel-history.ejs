@@ -1,0 +1,68 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><i class="ti ti-history"></i> Fuel History</h2></div>
+    </div>
+    <div class="content">
+      <div class="tabs" style="margin-bottom:14px;">
+        <a class="tab" href="/client/fuel"><i class="ti ti-dashboard"></i> Dashboard</a>
+        <a class="tab active" href="/client/fuel/history"><i class="ti ti-history"></i> History</a>
+        <a class="tab" href="/client/fuel/calculator"><i class="ti ti-calculator"></i> Calculator</a>
+      </div>
+
+      <% if (ledgers.length === 0) { %>
+        <div class="empty"><span class="e-icon"><i class="ti ti-history" style="font-size:40px;"></i></span><div class="e-text">No payout history yet</div><div style="font-size:12px;color:var(--muted);">Your fuel incentive payouts will appear here after each period is calculated.</div></div>
+      <% } else { %>
+        <!-- Summary -->
+        <%
+          var totalPayout = ledgers.reduce((s,l) => s + (l.driver_payout||0), 0);
+          var totalMiles = ledgers.reduce((s,l) => s + (l.total_miles||0), 0);
+          var avgMpg = ledgers.filter(l => l.actual_mpg > 0).length > 0 ? (ledgers.filter(l => l.actual_mpg > 0).reduce((s,l) => s + l.actual_mpg, 0) / ledgers.filter(l => l.actual_mpg > 0).length) : 0;
+        %>
+        <div class="metrics">
+          <div class="metric ok"><div class="m-label">Total Earned</div><div class="m-val green">$<%= totalPayout.toFixed(2) %></div></div>
+          <div class="metric"><div class="m-label">Total Miles</div><div class="m-val"><%= Math.round(totalMiles).toLocaleString() %></div></div>
+          <div class="metric hi"><div class="m-label">Avg MPG</div><div class="m-val pri"><%= avgMpg.toFixed(2) %></div></div>
+          <div class="metric"><div class="m-label">Periods</div><div class="m-val"><%= ledgers.length %></div></div>
+        </div>
+
+        <% ledgers.forEach(l => { %>
+          <div class="card" style="margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:12px;font-weight:800;"><%= l.period_start %> → <%= l.period_end %></div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px;">
+                  <span class="badge <%= l.status === 'eligible' ? 'active' : 'inactive' %>" style="font-size:9px;"><%= l.status %></span>
+                  <span class="badge <%= l.period_status === 'approved' ? 'active' : l.period_status === 'closed' ? 'draft' : 'sent' %>" style="font-size:9px;"><%= l.period_status %></span>
+                  · <%= l.group_name || 'No group' %>
+                </div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:22px;font-weight:900;color:<%= l.driver_payout > 0 ? 'var(--success)' : 'var(--muted)' %>;">$<%= (l.driver_payout||0).toFixed(2) %></div>
+              </div>
+            </div>
+            <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;font-size:11px;">
+              <div><span style="color:var(--muted);">Miles:</span> <strong><%= Math.round(l.total_miles||0).toLocaleString() %></strong></div>
+              <div><span style="color:var(--muted);">MPG:</span> <strong style="color:<%= l.actual_mpg > l.baseline_mpg ? 'var(--success)' : 'var(--danger)' %>;"><%= l.actual_mpg %></strong></div>
+              <div><span style="color:var(--muted);">Baseline:</span> <%= l.baseline_mpg %></div>
+              <div><span style="color:var(--muted);">Target:</span> <%= l.target_mpg || '—' %></div>
+              <div><span style="color:var(--muted);">Saved:</span> <%= l.savings_gallons ? l.savings_gallons.toFixed(1) + ' gal' : '—' %></div>
+              <% if (l.kpi_earned) { %><div style="color:var(--success);font-weight:700;">KPI: $<%= (l.kpi_bonus_usd||0).toFixed(2) %></div><% } %>
+            </div>
+            <!-- Explanation -->
+            <% if (l.explanation_json) { %>
+              <details style="margin-top:8px;"><summary style="cursor:pointer;font-size:10px;font-weight:700;color:var(--primary);">Calculation Details</summary>
+                <div style="margin-top:6px;padding:8px;background:var(--bg);border-radius:6px;font-size:10px;line-height:1.8;">
+                  <% try { JSON.parse(l.explanation_json).forEach(line => { %><div style="<%= line.includes('PAYOUT') ? 'font-weight:900;color:var(--primary);' : line.includes('INELIGIBLE') ? 'color:var(--danger);' : '' %>"><%= line %></div><% }); } catch(e) {} %>
+                </div>
+              </details>
+            <% } %>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

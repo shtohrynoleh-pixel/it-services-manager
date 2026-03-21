@@ -1,0 +1,180 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>" style="opacity:0.4;text-decoration:none;"><i class="ti ti-building"></i></a> → <i class="ti ti-gas-station"></i> Fuel Incentive — <%= company.name %></h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div class="tabs">
+        <a class="tab <%= tab==='dashboard'?'active':'' %>" href="/admin/companies/<%= company.id %>/fuel?tab=dashboard"><i class="ti ti-dashboard"></i> Dashboard</a>
+        <a class="tab <%= tab==='config'?'active':'' %>" href="/admin/companies/<%= company.id %>/fuel?tab=config"><i class="ti ti-settings"></i> Config</a>
+        <a class="tab <%= tab==='groups'?'active':'' %>" href="/admin/companies/<%= company.id %>/fuel?tab=groups"><i class="ti ti-category"></i> Groups</a>
+        <a class="tab <%= tab==='baselines'?'active':'' %>" href="/admin/companies/<%= company.id %>/fuel?tab=baselines"><i class="ti ti-target"></i> Driver Baselines</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/fuel/baselines-view" style="color:var(--primary);"><i class="ti ti-chart-dots-3"></i> Computed</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/fuel/targets" style="color:var(--primary);"><i class="ti ti-target-arrow"></i> Targets</a>
+        <a class="tab <%= tab==='audit'?'active':'' %>" href="/admin/companies/<%= company.id %>/fuel?tab=audit"><i class="ti ti-list"></i> Audit</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/fuel/reports" style="color:var(--primary);"><i class="ti ti-chart-line"></i> Reports</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/fuel/periods" style="color:var(--primary);"><i class="ti ti-calendar-stats"></i> Periods</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/fuel/ledger" style="color:var(--primary);"><i class="ti ti-file-invoice"></i> Ledger</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/fuel/integrations" style="color:var(--primary);"><i class="ti ti-plug-connected"></i> Integrations</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/fuel/vin" style="color:var(--primary);"><i class="ti ti-barcode"></i> VIN Decode</a>
+      </div>
+
+      <% if (tab === 'dashboard') { %>
+        <div class="metrics">
+          <div class="metric <%= config.enabled ? 'ok' : 'bad' %>"><div class="m-label">Program</div><div class="m-val"><%= config.enabled ? 'Active' : 'Off' %></div></div>
+          <div class="metric"><div class="m-label">Mode</div><div class="m-val" style="font-size:14px;"><%= config.billing_mode || '—' %></div></div>
+          <div class="metric"><div class="m-label">Split</div><div class="m-val" style="font-size:14px;">D:<%= config.split_driver_pct||50 %>% / C:<%= config.split_company_pct||50 %>%</div></div>
+          <div class="metric hi"><div class="m-label">Groups</div><div class="m-val pri"><%= groups.length %></div></div>
+        </div>
+        <% if (!config.enabled) { %>
+          <div class="card" style="text-align:center;padding:40px;"><i class="ti ti-gas-station" style="font-size:48px;color:var(--muted);display:block;margin-bottom:12px;"></i><h3>Not Configured</h3><p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Set up configuration to start.</p><a href="/admin/companies/<%= company.id %>/fuel?tab=config" class="btn btn-primary"><i class="ti ti-settings"></i> Configure</a></div>
+        <% } else { %>
+          <div class="card"><h3><i class="ti ti-chart-bar"></i> Summary</h3>
+            <div class="card-row"><span class="label">Baseline Window</span><span class="value"><%= config.baseline_window_days||90 %>d</span></div>
+            <div class="card-row"><span class="label">Default MPG</span><span class="value"><%= config.baseline_mpg || 'Not set' %></span></div>
+            <div class="card-row"><span class="label">Min Miles</span><span class="value"><%= (config.min_miles_qualify||500).toLocaleString() %></span></div>
+            <div class="card-row"><span class="label">Max Bonus/gal</span><span class="value">$<%= config.ceiling_bonus_per_gallon||0.50 %></span></div>
+            <div class="card-row"><span class="label">Baselines Set</span><span class="value"><%= baselines.length %></span></div>
+          </div>
+          <div class="card"><h3><i class="ti ti-list"></i> Recent Activity</h3>
+            <% auditLog.slice(0,8).forEach(a => { %>
+              <div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #f8fafc;font-size:11px;"><span class="badge draft" style="font-size:8px;"><%= a.action %></span><div style="flex:1;"><%= a.details || '' %></div><div style="color:var(--muted);font-size:9px;"><%= a.created_at ? a.created_at.split('T')[0] : '' %></div></div>
+            <% }) %>
+            <% if (auditLog.length === 0) { %><div style="font-size:11px;color:var(--muted);padding:8px;">No activity yet.</div><% } %>
+          </div>
+        <% } %>
+
+      <% } else if (tab === 'config') { %>
+        <div class="card">
+          <h3><i class="ti ti-settings"></i> Configuration</h3>
+          <form method="POST" action="/admin/companies/<%= company.id %>/fuel/config">
+            <div class="form-check" style="margin-bottom:14px;"><input type="checkbox" name="enabled" value="1" <%= config.enabled?'checked':'' %>> <strong>Enable Program</strong></div>
+            <div class="form-row"><div class="form-group"><label>Billing Mode</label><select name="billing_mode"><% ['per-truck','per-driver','fleet-average'].forEach(m => { %><option <%=config.billing_mode===m?'selected':''%>><%= m %></option><%})%></select></div><div class="form-group"><label>Pay Frequency</label><select name="pay_frequency"><% ['weekly','biweekly','monthly'].forEach(f => { %><option <%=config.pay_frequency===f?'selected':''%>><%= f %></option><%})%></select></div></div>
+            <div class="form-row"><div class="form-group"><label>Driver Split %</label><input type="number" name="split_driver_pct" value="<%= config.split_driver_pct||50 %>"></div><div class="form-group"><label>Company Split %</label><input type="number" name="split_company_pct" value="<%= config.split_company_pct||50 %>"></div></div>
+            <div class="form-row"><div class="form-group"><label>Baseline Window (days)</label><input type="number" name="baseline_window_days" value="<%= config.baseline_window_days||90 %>"></div><div class="form-group"><label>Default Baseline MPG</label><input type="number" name="baseline_mpg" step="0.01" value="<%= config.baseline_mpg||0 %>"></div></div>
+            <div class="form-row"><div class="form-group"><label>Fuel Price Source</label><select name="fuel_price_source"><option value="manual" <%=config.fuel_price_source==='manual'?'selected':''%>>Manual</option><option value="company-average" <%=config.fuel_price_source==='company-average'?'selected':''%>>Company Fuel Log Avg</option></select></div><div class="form-group"><label>Manual Price ($/gal)</label><input type="number" name="fuel_price_manual" step="0.01" value="<%= config.fuel_price_manual||0 %>"></div></div>
+            <div class="form-row"><div class="form-group"><label>Min Miles to Qualify</label><input type="number" name="min_miles_qualify" value="<%= config.min_miles_qualify||500 %>"></div><div class="form-group"><label>Max Bonus/gal ($)</label><input type="number" name="ceiling_bonus_per_gallon" step="0.01" value="<%= config.ceiling_bonus_per_gallon||0.50 %>"></div></div>
+            <div class="form-group"><label>Penalty/gal below baseline ($) — 0 = no penalty</label><input type="number" name="floor_penalty_per_gallon" step="0.01" value="<%= config.floor_penalty_per_gallon||0 %>"></div>
+            <div class="form-group"><label>Notes</label><textarea name="notes"><%= config.notes||'' %></textarea></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary"><i class="ti ti-check"></i> Save</button></div>
+          </form>
+        </div>
+
+      <% } else if (tab === 'groups') { %>
+        <!-- GROUPS with truck/driver assignment -->
+        <% groups.forEach(g => { %>
+          <div class="card" style="margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <h3 style="margin-bottom:2px;"><%= g.name %> <% if (!g.is_active) { %><span class="badge inactive">Inactive</span><% } %></h3>
+                <div style="font-size:11px;color:var(--muted);"><%= g.description||'' %> · Baseline: <strong><%= g.baseline_mpg||'—' %> MPG</strong> · <%= g.trucks.length %> trucks · <%= g.drivers.length %> drivers</div>
+              </div>
+              <div style="display:flex;gap:4px;">
+                <button class="btn btn-sm" onclick="document.getElementById('editGrp-<%= g.id %>').classList.add('open')"><i class="ti ti-edit"></i></button>
+                <form method="POST" action="/admin/companies/<%= company.id %>/fuel/groups/<%= g.id %>/delete" style="display:inline" onsubmit="return confirm('Delete group and all assignments?')"><button type="submit" class="btn btn-sm btn-danger"><i class="ti ti-trash"></i></button></form>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;">
+              <!-- Assigned trucks -->
+              <div style="flex:1;min-width:200px;">
+                <div style="font-size:11px;font-weight:800;color:var(--primary);margin-bottom:6px;"><i class="ti ti-truck"></i> TRUCKS</div>
+                <% g.trucks.forEach(t => { %>
+                  <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #f8fafc;font-size:11px;">
+                    <strong>#<%= t.unit_number %></strong>
+                    <span style="color:var(--muted);flex:1;"><%= [t.year,t.make,t.model].filter(Boolean).join(' ') %></span>
+                    <form method="POST" action="/admin/companies/<%= company.id %>/fuel/groups/<%= g.id %>/remove-truck/<%= t.vehicle_id %>" style="display:inline"><button type="submit" class="btn-ghost" style="font-size:10px;color:var(--danger);">×</button></form>
+                  </div>
+                <% }) %>
+                <form method="POST" action="/admin/companies/<%= company.id %>/fuel/groups/<%= g.id %>/assign-truck" style="display:flex;gap:4px;margin-top:6px;">
+                  <select name="vehicle_id" style="flex:1;padding:4px;font-size:10px;border:1px solid var(--border);border-radius:4px;" required>
+                    <option value="">+ Add truck</option>
+                    <% var assignedTruckIds = new Set(groups.flatMap(gr => gr.trucks.map(t => t.vehicle_id))); %>
+                    <% vehicles.filter(v => !assignedTruckIds.has(v.id)).forEach(v => { %><option value="<%= v.id %>">#<%= v.unit_number %> <%= [v.make,v.model].filter(Boolean).join(' ') %></option><% }) %>
+                  </select>
+                  <button type="submit" class="btn btn-sm btn-primary" style="font-size:10px;padding:3px 8px;">+</button>
+                </form>
+              </div>
+
+              <!-- Assigned drivers -->
+              <div style="flex:1;min-width:200px;">
+                <div style="font-size:11px;font-weight:800;color:var(--primary);margin-bottom:6px;"><i class="ti ti-user"></i> DRIVERS</div>
+                <% g.drivers.forEach(d => { %>
+                  <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #f8fafc;font-size:11px;">
+                    <strong><%= d.name %></strong>
+                    <span style="color:var(--muted);flex:1;"><%= d.role||'' %></span>
+                    <form method="POST" action="/admin/companies/<%= company.id %>/fuel/groups/<%= g.id %>/remove-driver/<%= d.driver_id %>" style="display:inline"><button type="submit" class="btn-ghost" style="font-size:10px;color:var(--danger);">×</button></form>
+                  </div>
+                <% }) %>
+                <form method="POST" action="/admin/companies/<%= company.id %>/fuel/groups/<%= g.id %>/assign-driver" style="display:flex;gap:4px;margin-top:6px;">
+                  <select name="driver_id" style="flex:1;padding:4px;font-size:10px;border:1px solid var(--border);border-radius:4px;" required>
+                    <option value="">+ Add driver</option>
+                    <% var assignedDriverIds = new Set(groups.flatMap(gr => gr.drivers.map(d => d.driver_id))); %>
+                    <% drivers.filter(d => !assignedDriverIds.has(d.id)).forEach(d => { %><option value="<%= d.id %>"><%= d.name %></option><% }) %>
+                  </select>
+                  <button type="submit" class="btn btn-sm btn-primary" style="font-size:10px;padding:3px 8px;">+</button>
+                </form>
+              </div>
+            </div>
+
+            <!-- Edit group modal -->
+            <div class="modal-bg" id="editGrp-<%= g.id %>" onclick="if(event.target===this)this.classList.remove('open')">
+              <div class="modal" style="max-width:400px;">
+                <h3>Edit Group</h3>
+                <form method="POST" action="/admin/companies/<%= company.id %>/fuel/groups/<%= g.id %>/edit">
+                  <div class="form-group"><label>Name</label><input type="text" name="name" value="<%= g.name %>" required></div>
+                  <div class="form-group"><label>Baseline MPG</label><input type="number" name="baseline_mpg" step="0.01" value="<%= g.baseline_mpg||0 %>"></div>
+                  <div class="form-group"><label>Description</label><input type="text" name="description" value="<%= g.description||'' %>"></div>
+                  <div class="form-check"><input type="checkbox" name="is_active" value="1" <%= g.is_active ? 'checked' : '' %>> Active</div>
+                  <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('editGrp-<%= g.id %>').classList.remove('open')">Cancel</button></div>
+                </form>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+
+        <!-- Add group -->
+        <div class="card">
+          <h3><i class="ti ti-plus"></i> New Group</h3>
+          <form method="POST" action="/admin/companies/<%= company.id %>/fuel/groups">
+            <div class="form-row"><div class="form-group"><label>Name *</label><input type="text" name="name" required placeholder="e.g. Sleeper Trucks"></div><div class="form-group"><label>Baseline MPG</label><input type="number" name="baseline_mpg" step="0.01" placeholder="6.5"></div></div>
+            <div class="form-group"><label>Description</label><input type="text" name="description" placeholder="2020+ Freightliner Cascadia"></div>
+            <button type="submit" class="btn btn-sm btn-primary">Create Group</button>
+          </form>
+        </div>
+
+      <% } else if (tab === 'baselines') { %>
+        <div class="card">
+          <h3><i class="ti ti-target"></i> Driver Baselines</h3>
+          <% if (baselines.length > 0) { %>
+            <table class="tbl" style="margin-bottom:14px;"><thead><tr><th>Driver</th><th>Group</th><th>Baseline MPG</th><th>Effective</th><th>Notes</th></tr></thead><tbody>
+            <% baselines.forEach(b => { %><tr><td><strong><%= b.driver_name||'—' %></strong></td><td><%= b.group_name||'—' %></td><td><%= b.baseline_mpg %></td><td><%= b.effective_date||'—' %></td><td style="font-size:10px;color:var(--muted);"><%= b.notes||'' %></td></tr><% }) %>
+            </tbody></table>
+          <% } %>
+          <form method="POST" action="/admin/companies/<%= company.id %>/fuel/baselines" style="padding-top:12px;border-top:1px solid var(--border);">
+            <div class="form-row"><div class="form-group"><label>Driver *</label><select name="driver_id" required><option value="">—</option><% drivers.forEach(d => { %><option value="<%= d.id %>"><%= d.name %></option><% }) %></select></div><div class="form-group"><label>Group</label><select name="group_id"><option value="">—</option><% groups.forEach(g => { %><option value="<%= g.id %>"><%= g.name %> (<%= g.baseline_mpg %> MPG)</option><% }) %></select></div></div>
+            <div class="form-row"><div class="form-group"><label>Baseline MPG *</label><input type="number" name="baseline_mpg" step="0.01" required></div><div class="form-group"><label>Effective Date</label><input type="date" name="effective_date" value="<%= new Date().toISOString().slice(0,10) %>"></div></div>
+            <div class="form-group"><label>Notes</label><input type="text" name="notes"></div>
+            <button type="submit" class="btn btn-sm btn-primary">Set Baseline</button>
+          </form>
+        </div>
+
+      <% } else if (tab === 'audit') { %>
+        <div class="card">
+          <h3><i class="ti ti-list"></i> Audit Log</h3>
+          <% if (auditLog.length === 0) { %><div style="font-size:12px;color:var(--muted);padding:12px;">No entries.</div><% } else { %>
+            <table class="tbl"><thead><tr><th>Date</th><th>Action</th><th>Driver</th><th>Vehicle</th><th>Details</th><th>By</th></tr></thead><tbody>
+            <% auditLog.forEach(a => { %><tr><td style="font-size:10px;"><%= a.created_at ? a.created_at.replace('T',' ').substring(0,16) : '' %></td><td><span class="badge draft" style="font-size:8px;"><%= a.action %></span></td><td><%= a.driver_name||'—' %></td><td><%= a.vehicle_unit ? '#'+a.vehicle_unit : '—' %></td><td style="font-size:10px;"><%= a.details||'' %></td><td style="font-size:10px;color:var(--muted);"><%= a.created_by||'' %></td></tr><% }) %>
+            </tbody></table>
+          <% } %>
+        </div>
+      <% } %>
+
+      <div style="margin-top:16px;"><a href="/admin/companies/<%= company.id %>" class="btn btn-sm">← Back to <%= company.name %></a></div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

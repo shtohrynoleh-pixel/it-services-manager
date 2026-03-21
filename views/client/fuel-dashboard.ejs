@@ -1,0 +1,88 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><i class="ti ti-gas-station"></i> Fuel Incentive</h2></div>
+    </div>
+    <div class="content">
+      <% if (error) { %>
+        <div class="card" style="text-align:center;padding:32px;"><i class="ti ti-gas-station" style="font-size:40px;color:var(--muted);display:block;margin-bottom:8px;"></i><div style="font-weight:700;"><%= error %></div></div>
+      <% } else if (data) { %>
+
+        <!-- Quick nav -->
+        <div class="tabs" style="margin-bottom:14px;">
+          <a class="tab active" href="/client/fuel"><i class="ti ti-dashboard"></i> Dashboard</a>
+          <a class="tab" href="/client/fuel/history"><i class="ti ti-history"></i> History</a>
+          <a class="tab" href="/client/fuel/calculator"><i class="ti ti-calculator"></i> Calculator</a>
+        </div>
+
+        <!-- MPG Gauge -->
+        <div class="card" style="text-align:center;">
+          <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Your Current MPG</div>
+          <div style="font-size:56px;font-weight:900;color:<%= data.currentMpg >= (data.target.target_mpg || data.baselineMpg) ? 'var(--success)' : data.currentMpg > 0 ? 'var(--danger)' : 'var(--muted)' %>;line-height:1;">
+            <%= data.currentMpg > 0 ? data.currentMpg : '—' %>
+          </div>
+          <div style="font-size:13px;color:var(--muted);margin-top:4px;">
+            Baseline: <strong><%= data.baselineMpg %></strong>
+            <% if (data.target.target_mpg) { %> · Target: <strong><%= data.target.target_mpg %></strong><% } %>
+          </div>
+
+          <!-- Progress bar -->
+          <% if (data.baselineMpg > 0 && data.currentMpg > 0) { %>
+            <% var pct = Math.min(100, Math.round((data.currentMpg / (data.target.target_mpg || data.baselineMpg)) * 100)); %>
+            <div style="max-width:400px;margin:16px auto 0;">
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:4px;"><span>Baseline: <%= data.baselineMpg %></span><span>Target: <%= data.target.target_mpg || data.baselineMpg %></span></div>
+              <div style="height:12px;background:#e2e8f0;border-radius:6px;overflow:hidden;position:relative;">
+                <div style="height:100%;width:<%= pct %>%;background:<%= pct >= 100 ? 'linear-gradient(90deg,#10b981,#059669)' : pct >= 80 ? 'var(--accent)' : 'var(--danger)' %>;border-radius:6px;transition:width 0.5s;"></div>
+              </div>
+              <div style="font-size:10px;color:var(--muted);margin-top:4px;"><%= pct %>% of target</div>
+            </div>
+          <% } %>
+        </div>
+
+        <!-- Stats -->
+        <div class="metrics">
+          <div class="metric"><div class="m-label">Miles This Period</div><div class="m-val"><%= Math.round(data.currentMiles).toLocaleString() %></div></div>
+          <div class="metric"><div class="m-label">Gallons Used</div><div class="m-val"><%= data.currentGallons > 0 ? data.currentGallons.toFixed(1) : '—' %></div></div>
+          <div class="metric ok"><div class="m-label">Projected Payout</div><div class="m-val green">$<%= data.projectedPayout.toFixed(2) %></div></div>
+          <div class="metric"><div class="m-label">Gal Saved</div><div class="m-val"><%= data.projectedSavingsGal > 0 ? data.projectedSavingsGal.toFixed(1) : '—' %></div></div>
+        </div>
+
+        <!-- Period info -->
+        <div class="card">
+          <h3><i class="ti ti-calendar"></i> Current Period</h3>
+          <% if (data.period) { %>
+            <div class="card-row"><span class="label">Period</span><span class="value"><%= data.period.period_start %> → <%= data.period.period_end %></span></div>
+            <div class="card-row"><span class="label">Status</span><span class="value"><span class="badge <%= data.period.status==='approved'?'active':'draft' %>"><%= data.period.status %></span></span></div>
+            <div class="card-row"><span class="label">Group</span><span class="value"><%= data.driverGroup ? data.driverGroup.name : 'Not assigned' %></span></div>
+            <div class="card-row"><span class="label">Target Source</span><span class="value"><%= data.target.source === 'driver_override' ? 'Personal override' : data.target.source === 'group_policy' ? 'Group policy' : 'None set' %></span></div>
+            <% if (data.ledgerEntry) { %>
+              <div style="margin-top:10px;padding:12px;background:<%= data.ledgerEntry.status === 'eligible' ? '#f0fdfa' : '#fef2f2' %>;border-radius:8px;">
+                <div style="font-weight:800;font-size:13px;color:<%= data.ledgerEntry.status === 'eligible' ? 'var(--success)' : 'var(--danger)' %>;"><%= data.ledgerEntry.status === 'eligible' ? 'Eligible for Payout' : 'Not Eligible' %></div>
+                <% if (data.ledgerEntry.driver_payout > 0) { %>
+                  <div style="font-size:24px;font-weight:900;color:var(--primary);margin-top:4px;">$<%= data.ledgerEntry.driver_payout.toFixed(2) %></div>
+                <% } %>
+              </div>
+            <% } %>
+          <% } else { %>
+            <div style="font-size:12px;color:var(--muted);">No active period</div>
+          <% } %>
+        </div>
+
+        <!-- Tips -->
+        <div class="card" style="background:linear-gradient(135deg,#f0fdfa,#ecfeff);border-color:var(--primary);">
+          <h3><i class="ti ti-bulb"></i> How to Earn More</h3>
+          <div style="font-size:12px;line-height:1.8;color:#475569;">
+            <strong>Beat your baseline (<%= data.baselineMpg %> MPG)</strong> to earn fuel savings<br>
+            <strong>Hit your target (<%= data.target.target_mpg || '—' %> MPG)</strong> to earn the KPI bonus<br>
+            <strong>Reduce idling</strong> — every minute of idle burns ~0.8 gal/hr<br>
+            <strong>Maintain speed</strong> — 65 mph is the sweet spot for most trucks<br>
+            <strong>Check tire pressure</strong> — under-inflated tires reduce MPG by 0.2-0.5
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>
