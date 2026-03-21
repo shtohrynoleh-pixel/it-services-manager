@@ -33,7 +33,10 @@
 
       <!-- VEHICLES TAB -->
       <div id="ftab-vehicles">
-        <button class="btn btn-primary btn-sm" onclick="document.getElementById('addVehicleModal').classList.add('open')" style="margin-bottom:12px;">+ Add Truck</button>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('addVehicleModal').classList.add('open')">+ Add Truck</button>
+          <% if ((eldVehicles||[]).length > 0) { %><button class="btn btn-sm" onclick="document.getElementById('importEldModal').classList.add('open')"><i class="ti ti-download"></i> Import from ELD (<%= eldVehicles.length %>)</button><% } %>
+        </div>
         <% if (vehicles.length === 0) { %>
           <div class="empty"><span class="e-icon"><i class="ti ti-truck" style="font-size:40px;"></i></span><div class="e-text">No trucks yet</div></div>
         <% } else { %>
@@ -97,6 +100,9 @@
                     <div class="form-row"><div class="form-group"><label>Registration Exp</label><input type="date" name="registration_expires" value="<%= v.registration_expires||'' %>"></div><div class="form-group"><label>Inspection Exp</label><input type="date" name="inspection_expires" value="<%= v.inspection_expires||'' %>"></div></div>
                     <div class="form-row"><div class="form-group"><label>Insurance Policy</label><input type="text" name="insurance_policy" value="<%= v.insurance_policy||'' %>"></div><div class="form-group"><label>Insurance Exp</label><input type="date" name="insurance_expires" value="<%= v.insurance_expires||'' %>"></div></div>
                     <div class="form-row"><div class="form-group"><label>GPS Unit</label><input type="text" name="gps_unit" value="<%= v.gps_unit||'' %>"></div><div class="form-group"><label>ELD Provider</label><input type="text" name="eld_provider" value="<%= v.eld_provider||'' %>"></div></div>
+                    <% if ((eldVehicles||[]).length > 0) { %>
+                    <div class="form-group"><label><i class="ti ti-link"></i> Linked ELD Vehicle (for live GPS)</label><select name="eld_vehicle_id"><option value="">— Not linked —</option><% (eldVehicles||[]).forEach(ev => { %><option value="<%= ev.id %>" <%= v.eld_vehicle_id === ev.id ? 'selected' : '' %>><%= ev.name %> — <%= [ev.make,ev.model].filter(Boolean).join(' ') %> (<%= ev.provider %>)</option><% }) %></select></div>
+                    <% } %>
                     <div class="form-group"><label>Notes</label><textarea name="notes"><%= v.notes||'' %></textarea></div>
                     <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('editV-<%= v.id %>').classList.remove('open')">Cancel</button></div>
                   </form>
@@ -232,6 +238,40 @@
           </form>
         </div>
       </div>
+
+      <!-- Import from ELD modal -->
+      <% if ((eldVehicles||[]).length > 0) { %>
+      <div class="modal-bg" id="importEldModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal" style="max-width:600px;">
+          <h3><i class="ti ti-download"></i> Import Vehicles from ELD</h3>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Select ELD vehicles to copy into your fleet. They will be auto-linked for live GPS tracking.</p>
+          <form method="POST" action="/admin/companies/<%= company.id %>/fleet/import-eld">
+            <div style="max-height:350px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+              <div style="display:flex;padding:8px 12px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;border-bottom:2px solid var(--border);background:var(--bg);position:sticky;top:0;">
+                <div style="width:30px;"></div><div style="flex:1;">Vehicle</div><div style="width:100px;">Provider</div><div style="width:80px;">Status</div>
+              </div>
+              <%
+                // Find which ELD vehicles are already linked
+                var linkedEldIds = new Set(vehicles.filter(v => v.eld_vehicle_id).map(v => v.eld_vehicle_id));
+              %>
+              <% (eldVehicles||[]).forEach(ev => { var alreadyLinked = linkedEldIds.has(ev.id); %>
+                <label style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid #f1f5f9;cursor:<%= alreadyLinked ? 'default' : 'pointer' %>;font-size:12px;<%= alreadyLinked ? 'opacity:0.5;' : '' %>">
+                  <div style="width:30px;"><input type="checkbox" name="eld_ids" value="<%= ev.id %>" <%= alreadyLinked ? 'disabled checked' : '' %> style="width:auto;"></div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;"><%= ev.name || '—' %></div>
+                    <div style="font-size:10px;color:var(--muted);"><%= [ev.make, ev.model].filter(Boolean).join(' ') %><%= ev.vin ? ' · VIN: ' + ev.vin : '' %></div>
+                  </div>
+                  <div style="width:100px;"><span class="badge <%= ev.provider === 'samsara' ? '' : 'draft' %>" style="font-size:9px;"><%= ev.provider %></span></div>
+                  <div style="width:80px;"><%= alreadyLinked ? '<span class="badge active" style="font-size:9px;">Linked</span>' : '<span class="badge prospect" style="font-size:9px;">Available</span>' %></div>
+                </label>
+              <% }) %>
+            </div>
+            <div style="margin-top:8px;font-size:11px;color:var(--muted);"><%= linkedEldIds.size %> already linked · <%= eldVehicles.length - linkedEldIds.size %> available</div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Import Selected</button><button type="button" class="btn" onclick="document.getElementById('importEldModal').classList.remove('open')">Cancel</button></div>
+          </form>
+        </div>
+      </div>
+      <% } %>
 
       <div style="margin-top:16px;"><a href="/admin/companies/<%= company.id %>" class="btn btn-sm">← Back to <%= company.name %></a></div>
 

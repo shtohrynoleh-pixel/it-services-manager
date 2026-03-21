@@ -677,8 +677,8 @@ module.exports = function(db) {
   router.post('/companies/:cid/fleet/vehicles/:vid/edit', (req, res) => {
     const b = req.body;
     try {
-      db.prepare('UPDATE fleet_vehicles SET unit_number=?, type=?, make=?, model=?, year=?, vin=?, license_plate=?, state=?, color=?, status=?, driver_id=?, fuel_type=?, odometer=?, purchase_date=?, purchase_price=?, insurance_policy=?, insurance_expires=?, registration_expires=?, inspection_expires=?, gps_unit=?, eld_provider=?, notes=? WHERE id=? AND company_id=?').run(
-        b.unit_number, b.type, b.make, b.model, parseInt(b.year)||null, b.vin, b.license_plate, b.state, b.color, b.status, b.driver_id||null, b.fuel_type, parseInt(b.odometer)||0, b.purchase_date||null, parseFloat(b.purchase_price)||0, b.insurance_policy, b.insurance_expires||null, b.registration_expires||null, b.inspection_expires||null, b.gps_unit, b.eld_provider, b.notes, req.params.vid, req.params.cid
+      db.prepare('UPDATE fleet_vehicles SET unit_number=?, type=?, make=?, model=?, year=?, vin=?, license_plate=?, state=?, color=?, status=?, driver_id=?, fuel_type=?, odometer=?, purchase_date=?, purchase_price=?, insurance_policy=?, insurance_expires=?, registration_expires=?, inspection_expires=?, gps_unit=?, eld_provider=?, eld_vehicle_id=?, notes=? WHERE id=? AND company_id=?').run(
+        b.unit_number, b.type, b.make, b.model, parseInt(b.year)||null, b.vin, b.license_plate, b.state, b.color, b.status, b.driver_id||null, b.fuel_type, parseInt(b.odometer)||0, b.purchase_date||null, parseFloat(b.purchase_price)||0, b.insurance_policy, b.insurance_expires||null, b.registration_expires||null, b.inspection_expires||null, b.gps_unit, b.eld_provider, b.eld_vehicle_id||null, b.notes, req.params.vid, req.params.cid
       );
     } catch(e) {}
     res.redirect('/admin/companies/' + req.params.cid + '/fleet');
@@ -782,6 +782,27 @@ module.exports = function(db) {
     // Get fleet vehicles linked to ELD
     const fleetVehicles = safeAll("SELECT fv.*, ev.last_lat, ev.last_lng, ev.last_location, ev.last_speed, ev.status as eld_status, ev.driver_name as eld_driver, ev.fuel_pct, ev.odometer as eld_odometer, ei.provider FROM fleet_vehicles fv LEFT JOIN eld_vehicles ev ON fv.eld_vehicle_id = ev.id LEFT JOIN eld_integrations ei ON ev.integration_id = ei.id WHERE fv.company_id = ?", [company.id]);
     res.render(V('fleet-map'), { user: req.session.user, company, eldVehicles, fleetVehicles, settings: getSettings(), page: 'companies' });
+  });
+
+  // Bulk import ELD vehicles into fleet
+  router.post('/companies/:cid/fleet/import-eld', (req, res) => {
+    let eldIds = req.body.eld_ids;
+    if (!eldIds) return res.redirect('/admin/companies/' + req.params.cid + '/fleet');
+    if (!Array.isArray(eldIds)) eldIds = [eldIds];
+
+    for (const eid of eldIds) {
+      const ev = safeGet('SELECT * FROM eld_vehicles WHERE id = ? AND company_id = ?', [parseInt(eid), req.params.cid]);
+      if (!ev) continue;
+      // Check if already linked
+      const existing = safeGet('SELECT id FROM fleet_vehicles WHERE eld_vehicle_id = ? AND company_id = ?', [ev.id, req.params.cid]);
+      if (existing) continue;
+      try {
+        db.prepare('INSERT INTO fleet_vehicles (company_id, unit_number, type, make, model, year, vin, license_plate, status, eld_vehicle_id) VALUES (?,?,?,?,?,?,?,?,?,?)').run(
+          req.params.cid, ev.name || 'ELD-' + ev.id, 'truck', ev.make || null, ev.model || null, ev.year || null, ev.vin || null, ev.license_plate || null, 'active', ev.id
+        );
+      } catch(e) { console.error('Import ELD error:', e.message); }
+    }
+    res.redirect('/admin/companies/' + req.params.cid + '/fleet');
   });
 
   // Link ELD vehicle to fleet vehicle
