@@ -245,48 +245,107 @@
 
       <!-- Import from ELD modal -->
       <% if ((eldVehicles||[]).length > 0) { %>
+      <%
+        var linkedEldIds = new Set(vehicles.filter(v => v.eld_vehicle_id).map(v => v.eld_vehicle_id));
+        var linkedTrailerEldIds = new Set((trailers||[]).filter(t => t.eld_vehicle_id).map(t => t.eld_vehicle_id));
+        var availableCount = eldVehicles.filter(ev => {
+          var isTrailer = (ev.asset_type === 'trailer');
+          return !(isTrailer ? linkedTrailerEldIds.has(ev.id) : linkedEldIds.has(ev.id));
+        }).length;
+        var eldProviders = [...new Set(eldVehicles.map(v => v.provider).filter(Boolean))];
+        var eldTypes = [...new Set(eldVehicles.map(v => v.asset_type || 'vehicle'))];
+      %>
       <div class="modal-bg" id="importEldModal" onclick="if(event.target===this)this.classList.remove('open')">
-        <div class="modal" style="max-width:600px;">
-          <h3><i class="ti ti-download"></i> Import Vehicles from ELD</h3>
-          <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Select ELD vehicles to copy into your fleet. They will be auto-linked for live GPS tracking.</p>
+        <div class="modal" style="max-width:700px;">
+          <h3><i class="ti ti-download"></i> Import from ELD</h3>
+
+          <!-- Filters -->
+          <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center;">
+            <input type="text" id="impSearch" placeholder="Search name, VIN, make..." oninput="filterImport()" style="flex:1;min-width:150px;padding:6px 10px;font-size:11px;border:1px solid var(--border);border-radius:6px;">
+            <select id="impType" onchange="filterImport()" style="padding:5px 8px;font-size:11px;border:1px solid var(--border);border-radius:6px;">
+              <option value="">All types</option>
+              <% eldTypes.forEach(t => { %><option value="<%= t %>"><%= t %></option><% }) %>
+            </select>
+            <select id="impProvider" onchange="filterImport()" style="padding:5px 8px;font-size:11px;border:1px solid var(--border);border-radius:6px;">
+              <option value="">All providers</option>
+              <% eldProviders.forEach(p => { %><option value="<%= p %>"><%= p %></option><% }) %>
+            </select>
+            <select id="impAge" onchange="filterImport()" style="padding:5px 8px;font-size:11px;border:1px solid var(--border);border-radius:6px;">
+              <option value="">Any last update</option>
+              <option value="1">Last 24 hours</option>
+              <option value="3">Last 3 days</option>
+              <option value="7">Last 7 days</option>
+              <option value="14" selected>Last 14 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="9999">All (include stale)</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <button type="button" class="btn btn-sm" onclick="selectVisible(true)">Select Visible</button>
+            <button type="button" class="btn btn-sm" onclick="selectVisible(false)">Deselect All</button>
+            <div id="impCount" style="font-size:10px;color:var(--muted);display:flex;align-items:center;margin-left:auto;"></div>
+          </div>
+
           <form method="POST" action="/admin/companies/<%= company.id %>/fleet/import-eld">
-            <div style="display:flex;gap:8px;margin-bottom:8px;">
-              <button type="button" class="btn btn-sm" onclick="document.querySelectorAll('#eldImportList input[type=checkbox]:not(:disabled)').forEach(c=>c.checked=true)">Select All</button>
-              <button type="button" class="btn btn-sm" onclick="document.querySelectorAll('#eldImportList input[type=checkbox]:not(:disabled)').forEach(c=>c.checked=false)">Deselect All</button>
-            </div>
             <div id="eldImportList" style="max-height:350px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
-              <div style="display:flex;padding:8px 12px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;border-bottom:2px solid var(--border);background:var(--bg);position:sticky;top:0;">
-                <div style="width:30px;"></div><div style="flex:1;">Vehicle</div><div style="width:100px;">Provider</div><div style="width:80px;">Status</div>
+              <div style="display:flex;padding:6px 10px;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;border-bottom:2px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:1;">
+                <div style="width:26px;"></div><div style="flex:1;">Name / Info</div><div style="width:70px;">Type</div><div style="width:70px;">Source</div><div style="width:80px;">Last Update</div><div style="width:55px;">Status</div>
               </div>
-              <%
-                var linkedEldIds = new Set(vehicles.filter(v => v.eld_vehicle_id).map(v => v.eld_vehicle_id));
-                var availableCount = 0;
-              %>
-              <%
-                // Also check trailers for linked
-                var linkedTrailerEldIds = new Set((trailers||[]).filter(t => t.eld_vehicle_id).map(t => t.eld_vehicle_id));
-              %>
               <% (eldVehicles||[]).forEach(ev => {
                 var isTrailer = (ev.asset_type === 'trailer');
                 var alreadyLinked = isTrailer ? linkedTrailerEldIds.has(ev.id) : linkedEldIds.has(ev.id);
-                if (!alreadyLinked) availableCount++;
+                var lastUp = ev.last_updated || '';
+                var daysSince = lastUp ? Math.round((Date.now() - new Date(lastUp + 'Z').getTime()) / 86400000) : 9999;
               %>
-                <label style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid #f1f5f9;cursor:<%= alreadyLinked ? 'default' : 'pointer' %>;font-size:12px;<%= alreadyLinked ? 'opacity:0.4;' : '' %>">
-                  <div style="width:30px;"><input type="checkbox" name="eld_ids" value="<%= ev.id %>" <%= alreadyLinked ? 'disabled' : 'checked' %> style="width:auto;"></div>
+                <label class="imp-row" data-search="<%= [ev.name, ev.make, ev.model, ev.vin, ev.license_plate].filter(Boolean).join(' ').toLowerCase() %>" data-type="<%= ev.asset_type || 'vehicle' %>" data-provider="<%= ev.provider %>" data-days="<%= daysSince %>" data-linked="<%= alreadyLinked ? '1' : '0' %>" style="display:flex;align-items:center;padding:6px 10px;border-bottom:1px solid #f8fafc;cursor:<%= alreadyLinked ? 'default' : 'pointer' %>;font-size:11px;<%= alreadyLinked ? 'opacity:0.35;' : '' %>">
+                  <div style="width:26px;"><input type="checkbox" name="eld_ids" value="<%= ev.id %>" <%= alreadyLinked ? 'disabled' : '' %> style="width:auto;"></div>
                   <div style="flex:1;min-width:0;">
-                    <div style="font-weight:700;"><%= ev.name || '—' %> <span class="badge <%= isTrailer ? 'sent' : ev.asset_type === 'asset' ? 'prospect' : 'active' %>" style="font-size:8px;"><i class="ti ti-<%= isTrailer ? 'container' : ev.asset_type === 'asset' ? 'tag' : 'truck' %>" style="font-size:9px;"></i> <%= ev.asset_type || 'vehicle' %></span></div>
-                    <div style="font-size:10px;color:var(--muted);"><%= [ev.make, ev.model].filter(Boolean).join(' ') %><%= ev.vin ? ' · VIN: ...' + ev.vin.slice(-6) : '' %></div>
+                    <div style="font-weight:700;font-size:11px;"><%= ev.name || '—' %></div>
+                    <div style="font-size:9px;color:var(--muted);"><%= [ev.make, ev.model].filter(Boolean).join(' ') %><%= ev.vin ? ' · ...' + ev.vin.slice(-6) : '' %><%= ev.license_plate ? ' · ' + ev.license_plate : '' %></div>
                   </div>
-                  <div style="width:100px;"><span class="badge draft" style="font-size:9px;"><%= ev.provider %></span></div>
-                  <div style="width:80px;"><%= alreadyLinked ? '<span class="badge active" style="font-size:9px;">In fleet</span>' : '<span class="badge prospect" style="font-size:9px;">New</span>' %></div>
+                  <div style="width:70px;"><span class="badge <%= isTrailer ? 'sent' : ev.asset_type === 'asset' ? 'prospect' : 'active' %>" style="font-size:8px;"><i class="ti ti-<%= isTrailer ? 'container' : ev.asset_type === 'asset' ? 'tag' : 'truck' %>" style="font-size:8px;"></i> <%= ev.asset_type || 'vehicle' %></span></div>
+                  <div style="width:70px;"><span style="font-size:9px;color:var(--muted);"><%= ev.provider %></span></div>
+                  <div style="width:80px;font-size:9px;color:<%= daysSince <= 1 ? 'var(--success)' : daysSince <= 14 ? 'var(--muted)' : 'var(--danger)' %>;"><%= daysSince < 9999 ? (daysSince === 0 ? 'Today' : daysSince + 'd ago') : 'Never' %></div>
+                  <div style="width:55px;"><%= alreadyLinked ? '<span class="badge active" style="font-size:8px;">In fleet</span>' : '<span class="badge prospect" style="font-size:8px;">New</span>' %></div>
                 </label>
               <% }) %>
             </div>
-            <div style="margin-top:8px;font-size:11px;color:var(--muted);"><%= linkedEldIds.size %> in fleet · <strong><%= availableCount %> ready to import</strong></div>
-            <div class="form-actions"><button type="submit" class="btn btn-primary"><i class="ti ti-download"></i> Import <%= availableCount %> Vehicle<%= availableCount !== 1 ? 's' : '' %> to Fleet</button><button type="button" class="btn" onclick="document.getElementById('importEldModal').classList.remove('open')">Cancel</button></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary"><i class="ti ti-download"></i> Import Selected to Fleet</button><button type="button" class="btn" onclick="document.getElementById('importEldModal').classList.remove('open')">Cancel</button></div>
           </form>
         </div>
       </div>
+      <script>
+      function filterImport() {
+        var q = (document.getElementById('impSearch').value || '').toLowerCase();
+        var type = document.getElementById('impType').value;
+        var prov = document.getElementById('impProvider').value;
+        var maxDays = parseInt(document.getElementById('impAge').value) || 9999;
+        var shown = 0, checked = 0;
+        document.querySelectorAll('.imp-row').forEach(function(r) {
+          var matchQ = !q || r.dataset.search.indexOf(q) >= 0;
+          var matchType = !type || r.dataset.type === type;
+          var matchProv = !prov || r.dataset.provider === prov;
+          var matchAge = parseInt(r.dataset.days) <= maxDays;
+          var show = matchQ && matchType && matchProv && matchAge;
+          r.style.display = show ? '' : 'none';
+          if (show && r.dataset.linked === '0') shown++;
+          var cb = r.querySelector('input[type=checkbox]');
+          if (cb && !cb.disabled && cb.checked && show) checked++;
+        });
+        document.getElementById('impCount').textContent = shown + ' available · ' + checked + ' selected';
+      }
+      function selectVisible(check) {
+        document.querySelectorAll('.imp-row').forEach(function(r) {
+          if (r.style.display === 'none') return;
+          var cb = r.querySelector('input[type=checkbox]');
+          if (cb && !cb.disabled) cb.checked = check;
+        });
+        filterImport();
+      }
+      // Init count
+      setTimeout(filterImport, 100);
+      </script>
       <% } %>
 
       <div style="margin-top:16px;"><a href="/admin/companies/<%= company.id %>" class="btn btn-sm">← Back to <%= company.name %></a></div>
