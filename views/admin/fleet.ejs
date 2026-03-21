@@ -13,6 +13,7 @@
         <a class="tab" href="#" onclick="showFTab('trailers')"><i class="ti ti-container"></i> Trailers (<%= trailers.length %>)</a>
         <a class="tab" href="#" onclick="showFTab('maintenance')"><i class="ti ti-tool"></i> Maintenance</a>
         <a class="tab" href="#" onclick="showFTab('fuel')"><i class="ti ti-gas-station"></i> Fuel</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/fleet/map" style="color:var(--primary);"><i class="ti ti-map-2"></i> Live Map</a>
       </div>
 
       <!-- Metrics -->
@@ -38,7 +39,7 @@
         <% } else { %>
           <div style="overflow-x:auto;">
           <table class="tbl">
-            <thead><tr><th>Unit #</th><th>Vehicle</th><th>VIN</th><th>Plate</th><th>Driver</th><th>Status</th><th>Reg Exp</th><th>Insp Exp</th><th></th></tr></thead>
+            <thead><tr><th>Unit #</th><th>Vehicle</th><th>Plate</th><th>Driver</th><th>Status</th><th>Location</th><th>ELD</th><th>Expires</th><th></th></tr></thead>
             <tbody>
             <% vehicles.forEach(v => {
               var regWarn = v.registration_expires && v.registration_expires <= new Date(Date.now()+30*86400000).toISOString().slice(0,10);
@@ -46,18 +47,42 @@
             %>
               <tr>
                 <td><strong><%= v.unit_number || '—' %></strong></td>
-                <td><%= [v.year, v.make, v.model].filter(Boolean).join(' ') || '—' %><% if (v.color) { %> <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:<%= v.color %>;vertical-align:middle;"></span><% } %></td>
-                <td style="font-size:10px;font-family:monospace;"><%= v.vin || '—' %></td>
+                <td><%= [v.year, v.make, v.model].filter(Boolean).join(' ') || '—' %></td>
                 <td><%= v.license_plate || '—' %><% if (v.state) { %> (<%= v.state %>)<% } %></td>
-                <td><%= v.driver_name || '—' %></td>
+                <td><%= v.eld_driver || v.driver_name || '—' %></td>
                 <td><span class="badge <%= v.status==='active'?'active':v.status==='in-shop'?'sent':'inactive' %>"><%= v.status %></span></td>
-                <td style="<%= regWarn ? 'color:var(--danger);font-weight:700;' : '' %>"><%= v.registration_expires || '—' %></td>
-                <td style="<%= inspWarn ? 'color:var(--danger);font-weight:700;' : '' %>"><%= v.inspection_expires || '—' %></td>
+                <td style="font-size:10px;">
+                  <% if (v.last_location) { %>
+                    <span style="color:var(--primary);"><i class="ti ti-map-pin" style="font-size:10px;"></i> <%= v.last_location %></span>
+                    <% if (v.last_speed != null) { %><br><span style="color:<%= v.last_speed > 2 ? 'var(--success)' : 'var(--muted)' %>;font-weight:700;"><%= v.last_speed > 2 ? Math.round(v.last_speed) + ' mph' : 'Stopped' %></span><% } %>
+                  <% } else { %>—<% } %>
+                </td>
+                <td>
+                  <% if (v.eld_vehicle_id) { %>
+                    <span class="badge active" style="font-size:8px;">Linked</span>
+                  <% } else { %>
+                    <button class="btn-ghost" style="font-size:10px;color:var(--primary);" onclick="document.getElementById('linkEld-<%= v.id %>').classList.add('open')"><i class="ti ti-link"></i> Link</button>
+                  <% } %>
+                </td>
+                <td style="font-size:10px;"><%= regWarn ? '<span style="color:var(--danger);font-weight:700;">Reg: '+v.registration_expires+'</span>' : '' %><%= inspWarn ? '<span style="color:var(--danger);font-weight:700;">Insp: '+v.inspection_expires+'</span>' : '' %><%= !regWarn && !inspWarn ? 'OK' : '' %></td>
                 <td style="white-space:nowrap;">
                   <button class="btn-ghost" onclick="document.getElementById('editV-<%= v.id %>').classList.add('open')"><i class="ti ti-edit"></i></button>
                   <form method="POST" action="/admin/companies/<%= company.id %>/fleet/vehicles/<%= v.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Delete?')" style="color:var(--danger);"><i class="ti ti-trash"></i></button></form>
                 </td>
               </tr>
+              <!-- Link ELD modal -->
+              <% if (!v.eld_vehicle_id && (eldVehicles||[]).length > 0) { %>
+              <div class="modal-bg" id="linkEld-<%= v.id %>" onclick="if(event.target===this)this.classList.remove('open')">
+                <div class="modal" style="max-width:400px;">
+                  <h3><i class="ti ti-link"></i> Link ELD Vehicle</h3>
+                  <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Connect <strong>#<%= v.unit_number %></strong> to an ELD-tracked vehicle to see live GPS location.</p>
+                  <form method="POST" action="/admin/companies/<%= company.id %>/fleet/vehicles/<%= v.id %>/link-eld">
+                    <div class="form-group"><label>Select ELD Vehicle</label><select name="eld_vehicle_id" required><option value="">—</option><% (eldVehicles||[]).forEach(ev => { %><option value="<%= ev.id %>"><%= ev.name %> — <%= [ev.make,ev.model].filter(Boolean).join(' ') %> (<%= ev.provider %>)</option><% }) %></select></div>
+                    <div class="form-actions"><button type="submit" class="btn btn-primary">Link</button><button type="button" class="btn" onclick="document.getElementById('linkEld-<%= v.id %>').classList.remove('open')">Cancel</button></div>
+                  </form>
+                </div>
+              </div>
+              <% } %>
               <!-- Edit modal -->
               <div class="modal-bg" id="editV-<%= v.id %>" onclick="if(event.target===this)this.classList.remove('open')">
                 <div class="modal">

@@ -1,0 +1,148 @@
+<%- include('../partials/head') %>
+<style>
+#fleetMap{width:100%;height:calc(100vh - 200px);min-height:400px;border-radius:12px;border:1px solid var(--border);}
+.map-sidebar{position:absolute;top:10px;right:10px;width:280px;max-height:calc(100% - 20px);overflow-y:auto;background:rgba(255,255,255,0.95);backdrop-filter:blur(10px);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);padding:12px;z-index:500;font-size:12px;}
+.map-v-item{padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;transition:all 0.12s;}
+.map-v-item:hover{border-color:var(--primary);background:#f0fdfa;}
+.map-v-item h4{font-size:12px;font-weight:800;margin:0 0 2px;}
+.map-v-item .mv-sub{font-size:10px;color:var(--muted);}
+.map-v-item .mv-loc{font-size:10px;color:var(--primary);margin-top:2px;}
+.map-counter{position:absolute;top:10px;left:10px;background:rgba(255,255,255,0.95);backdrop-filter:blur(10px);border-radius:10px;padding:8px 16px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:500;font-size:12px;font-weight:700;}
+</style>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <h2><a href="/admin/companies/<%= company.id %>/fleet" style="opacity:0.4;text-decoration:none;"><i class="ti ti-truck"></i></a> → <i class="ti ti-map-2"></i> Live Map — <%= company.name %></h2>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-sm" onclick="refreshMap()"><i class="ti ti-refresh"></i> Refresh</button>
+        <a href="/admin/companies/<%= company.id %>/fleet" class="btn btn-sm"><i class="ti ti-truck"></i> Fleet</a>
+        <%- include('../partials/notif-bell') %>
+      </div>
+    </div>
+    <div class="content" style="position:relative;padding-bottom:0;">
+      <div id="fleetMap"></div>
+      <div class="map-counter" id="mapCounter">Loading...</div>
+      <div class="map-sidebar" id="mapSidebar">
+        <div style="font-weight:800;margin-bottom:8px;"><i class="ti ti-truck"></i> Vehicles</div>
+        <input type="text" id="mapSearch" placeholder="Search..." oninput="filterMapList()" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;margin-bottom:8px;">
+        <div id="mapVehicleList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Leaflet CSS + JS (free open-source maps) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+var CID = '<%= company.id %>';
+var map, markers = {};
+
+// Init map
+map = L.map('fleetMap').setView([39.8283, -98.5795], 5); // Center of US
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap',
+  maxZoom: 18
+}).addTo(map);
+
+// Custom truck icon
+var truckIcon = L.divIcon({
+  className: 'truck-marker',
+  html: '<div style="background:var(--primary);color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px solid #fff;"><i class="ti ti-truck"></i></div>',
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  popupAnchor: [0, -18]
+});
+
+var movingIcon = L.divIcon({
+  className: 'truck-marker',
+  html: '<div style="background:#10b981;color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(16,185,129,0.4);border:2px solid #fff;"><i class="ti ti-truck"></i></div>',
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  popupAnchor: [0, -18]
+});
+
+var stoppedIcon = L.divIcon({
+  className: 'truck-marker',
+  html: '<div style="background:#94a3b8;color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2px solid #fff;"><i class="ti ti-truck"></i></div>',
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  popupAnchor: [0, -18]
+});
+
+function loadVehicles() {
+  fetch('/admin/companies/' + CID + '/fleet/map-data')
+    .then(r => r.json())
+    .then(vehicles => {
+      var bounds = [];
+      var listHtml = '';
+      var count = { total: 0, moving: 0, stopped: 0 };
+
+      vehicles.forEach(v => {
+        if (!v.last_lat || !v.last_lng) return;
+        var lat = v.last_lat, lng = v.last_lng;
+        var isMoving = v.last_speed && v.last_speed > 2;
+        var icon = isMoving ? movingIcon : stoppedIcon;
+        var name = v.fleet_unit ? '#' + v.fleet_unit : v.name;
+        var vehicle = v.fleet_make && v.fleet_model ? v.fleet_make + ' ' + v.fleet_model : [v.make, v.model].filter(Boolean).join(' ');
+
+        count.total++;
+        if (isMoving) count.moving++; else count.stopped++;
+
+        var popup = '<div style="font-size:12px;min-width:180px;">' +
+          '<div style="font-weight:800;font-size:14px;">' + (name || '—') + '</div>' +
+          '<div style="color:#64748b;margin-top:2px;">' + (vehicle || '') + '</div>' +
+          (v.driver_name ? '<div style="margin-top:4px;"><strong>Driver:</strong> ' + v.driver_name + '</div>' : '') +
+          (v.last_location ? '<div><strong>Location:</strong> ' + v.last_location + '</div>' : '') +
+          (v.last_speed != null ? '<div><strong>Speed:</strong> ' + Math.round(v.last_speed) + ' mph</div>' : '') +
+          (v.fuel_pct != null ? '<div><strong>Fuel:</strong> ' + v.fuel_pct + '%</div>' : '') +
+          (v.odometer ? '<div><strong>Odometer:</strong> ' + Math.round(v.odometer).toLocaleString() + ' mi</div>' : '') +
+          '<div style="font-size:9px;color:#94a3b8;margin-top:4px;">' + v.provider + (v.integration_label ? ' · ' + v.integration_label : '') + '</div>' +
+          '</div>';
+
+        if (markers[v.id]) {
+          markers[v.id].setLatLng([lat, lng]).setIcon(icon).setPopupContent(popup);
+        } else {
+          markers[v.id] = L.marker([lat, lng], { icon: icon }).addTo(map).bindPopup(popup);
+        }
+        bounds.push([lat, lng]);
+
+        listHtml += '<div class="map-v-item" data-search="' + (name + ' ' + vehicle + ' ' + (v.driver_name||'')).toLowerCase() + '" onclick="map.setView([' + lat + ',' + lng + '],14);markers[' + v.id + '].openPopup();">' +
+          '<h4>' + (name || '—') + '</h4>' +
+          '<div class="mv-sub">' + vehicle + (v.driver_name ? ' · ' + v.driver_name : '') + '</div>' +
+          '<div class="mv-loc">' + (isMoving ? '🟢 ' + Math.round(v.last_speed) + ' mph' : '⚫ Stopped') + (v.last_location ? ' · ' + v.last_location : '') + '</div>' +
+          '</div>';
+      });
+
+      document.getElementById('mapVehicleList').innerHTML = listHtml || '<div style="color:var(--muted);text-align:center;padding:16px;">No vehicles with GPS data</div>';
+      document.getElementById('mapCounter').innerHTML = '<span style="color:var(--primary);">' + count.total + '</span> vehicles · <span style="color:#10b981;">' + count.moving + ' moving</span> · <span style="color:#94a3b8;">' + count.stopped + ' stopped</span>';
+
+      if (bounds.length > 0 && !window._mapFitted) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+        window._mapFitted = true;
+      }
+    }).catch(e => console.error('Map data error:', e));
+}
+
+function refreshMap() {
+  window._mapFitted = false;
+  loadVehicles();
+}
+
+function filterMapList() {
+  var q = document.getElementById('mapSearch').value.toLowerCase();
+  document.querySelectorAll('#mapVehicleList .map-v-item').forEach(el => {
+    el.style.display = (!q || el.dataset.search.includes(q)) ? '' : 'none';
+  });
+}
+
+// Load and auto-refresh
+loadVehicles();
+setInterval(loadVehicles, 30000); // Refresh every 30 seconds
+</script>
+<%- include('../partials/foot') %>

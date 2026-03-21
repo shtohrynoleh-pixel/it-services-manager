@@ -653,7 +653,15 @@ module.exports = function(db) {
     const maintenance = safeAll('SELECT m.*, fv.unit_number as vehicle_unit, ft.unit_number as trailer_unit FROM fleet_maintenance m LEFT JOIN fleet_vehicles fv ON m.vehicle_id = fv.id LEFT JOIN fleet_trailers ft ON m.trailer_id = ft.id WHERE m.company_id = ? ORDER BY m.date DESC LIMIT 50', [company.id]);
     const fuel = safeAll('SELECT f.*, fv.unit_number as vehicle_unit FROM fleet_fuel f LEFT JOIN fleet_vehicles fv ON f.vehicle_id = fv.id WHERE f.company_id = ? ORDER BY f.date DESC LIMIT 50', [company.id]);
     const drivers = safeAll('SELECT id, name FROM company_users WHERE company_id = ? AND is_active = 1 ORDER BY name', [company.id]);
-    res.render(V('fleet'), { user: req.session.user, company, vehicles, trailers, maintenance, fuel, drivers, settings: getSettings(), page: 'companies' });
+    const eldVehicles = safeAll('SELECT ev.id, ev.name, ev.make, ev.model, ev.vin, ev.provider FROM eld_vehicles ev JOIN eld_integrations ei ON ev.integration_id = ei.id WHERE ev.company_id = ?', [company.id]);
+    // Enrich fleet vehicles with ELD data
+    vehicles.forEach(v => {
+      if (v.eld_vehicle_id) {
+        const ev = safeGet('SELECT last_lat, last_lng, last_location, last_speed, fuel_pct, odometer, status as eld_status, driver_name as eld_driver FROM eld_vehicles WHERE id = ?', [v.eld_vehicle_id]);
+        if (ev) Object.assign(v, ev);
+      }
+    });
+    res.render(V('fleet'), { user: req.session.user, company, vehicles, trailers, maintenance, fuel, drivers, eldVehicles, settings: getSettings(), page: 'companies' });
   });
 
   router.post('/companies/:cid/fleet/vehicles', (req, res) => {
@@ -763,6 +771,30 @@ module.exports = function(db) {
       await syncIntegration(db, intg);
     }
     res.redirect('/admin/companies/' + req.params.cid + '/eld');
+  });
+
+  // === FLEET MAP ===
+  router.get('/companies/:cid/fleet/map', (req, res) => {
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.cid);
+    if (!company) return res.redirect('/admin/companies');
+    // Get all ELD vehicles with location
+    const eldVehicles = safeAll("SELECT ev.*, ei.provider, ei.label as integration_label FROM eld_vehicles ev JOIN eld_integrations ei ON ev.integration_id = ei.id WHERE ev.company_id = ? AND ev.last_lat IS NOT NULL", [company.id]);
+    // Get fleet vehicles linked to ELD
+    const fleetVehicles = safeAll("SELECT fv.*, ev.last_lat, ev.last_lng, ev.last_location, ev.last_speed, ev.status as eld_status, ev.driver_name as eld_driver, ev.fuel_pct, ev.odometer as eld_odometer, ei.provider FROM fleet_vehicles fv LEFT JOIN eld_vehicles ev ON fv.eld_vehicle_id = ev.id LEFT JOIN eld_integrations ei ON ev.integration_id = ei.id WHERE fv.company_id = ?", [company.id]);
+    res.render(V('fleet-map'), { user: req.session.user, company, eldVehicles, fleetVehicles, settings: getSettings(), page: 'companies' });
+  });
+
+  // Link ELD vehicle to fleet vehicle
+  router.post('/companies/:cid/fleet/vehicles/:vid/link-eld', (req, res) => {
+    const { eld_vehicle_id } = req.body;
+    try { db.prepare('UPDATE fleet_vehicles SET eld_vehicle_id = ? WHERE id = ? AND company_id = ?').run(eld_vehicle_id || null, req.params.vid, req.params.cid); } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/fleet');
+  });
+
+  // API endpoint for live map data (AJAX polling)
+  router.get('/companies/:cid/fleet/map-data', (req, res) => {
+    const vehicles = safeAll("SELECT ev.*, ei.provider, ei.label as integration_label, fv.unit_number as fleet_unit, fv.make as fleet_make, fv.model as fleet_model FROM eld_vehicles ev JOIN eld_integrations ei ON ev.integration_id = ei.id LEFT JOIN fleet_vehicles fv ON fv.eld_vehicle_id = ev.id WHERE ev.company_id = ? AND ev.last_lat IS NOT NULL", [req.params.cid]);
+    res.json(vehicles);
   });
 
   // === DOMAIN MANAGEMENT ===

@@ -919,6 +919,11 @@ function initDB() {
     [['Executive','Leadership and ownership',1],['Operations','Dispatch, logistics, and daily operations',2],['Driving','CDL drivers and fleet operators',3],['Maintenance','Truck and equipment maintenance',4],['Accounting','Finance, billing, and payroll',5],['Safety','Safety compliance and training',6],['HR','Hiring, onboarding, and employee management',7],['Administration','Office support and front desk',8],['IT','Technology and systems',9],['Warehouse','Loading, unloading, and yard operations',10]].forEach(d => di.run(...d));
   }
 
+  // Add eld_vehicle_id to fleet_vehicles if missing
+  try { db.prepare('SELECT eld_vehicle_id FROM fleet_vehicles LIMIT 1').get(); } catch(e) {
+    try { db.exec('ALTER TABLE fleet_vehicles ADD COLUMN eld_vehicle_id INTEGER'); } catch(e2) {}
+  }
+
   // Add SLA columns to tasks if missing
   try { db.prepare('SELECT started_at FROM tasks LIMIT 1').get(); } catch(e) {
     try { db.exec('ALTER TABLE tasks ADD COLUMN started_at TEXT'); } catch(e2) {}
