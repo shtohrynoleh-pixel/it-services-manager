@@ -1,0 +1,144 @@
+<%- include('../partials/head') %>
+<style>
+.timeline{position:relative;padding-left:24px;}
+.timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:#e2e8f0;}
+.tl-item{position:relative;padding:8px 0;font-size:12px;}
+.tl-item::before{content:'';position:absolute;left:-20px;top:12px;width:12px;height:12px;border-radius:50%;background:var(--primary);border:2px solid #fff;box-shadow:0 0 0 2px var(--primary);}
+.tl-item.delivered::before{background:var(--success);}
+.tl-time{font-size:10px;color:var(--muted);}
+.tl-status{font-weight:800;text-transform:uppercase;font-size:10px;}
+</style>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <h2><a href="/admin/companies/<%= company.id %>/tms" style="opacity:0.4;text-decoration:none;"><i class="ti ti-route"></i></a> → <%= load.load_number %></h2>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <a href="/admin/companies/<%= company.id %>/tms/loads/<%= load.id %>/rate-con" target="_blank" class="btn btn-sm"><i class="ti ti-printer"></i> Rate Con</a>
+        <%- include('../partials/notif-bell') %>
+      </div>
+    </div>
+    <div class="content">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <!-- Left: Load info -->
+        <div style="flex:1;min-width:300px;">
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:11px;color:var(--muted);font-weight:600;"><%= load.load_number %></div>
+                <h3 style="font-size:18px;margin-bottom:2px;"><%= load.pickup_city||'' %>, <%= load.pickup_state||'' %> → <%= load.delivery_city||'' %>, <%= load.delivery_state||'' %></h3>
+                <div style="font-size:12px;color:var(--muted);"><%= load.commodity || '' %> · <%= load.equipment_type %> · <%= load.total_miles||0 %> mi</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:24px;font-weight:900;color:var(--success);">$<%= (load.total_pay||0).toLocaleString() %></div>
+                <div style="font-size:11px;color:var(--muted);">$<%= load.rate_per_mile||0 %>/mi</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Status + Quick actions -->
+          <div class="card">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+              <% ['available','dispatched','at-pickup','in-transit','at-delivery','delivered'].forEach(s => { %>
+                <form method="POST" action="/admin/companies/<%= company.id %>/tms/loads/<%= load.id %>/status" style="display:inline"><input type="hidden" name="status" value="<%= s %>"><button type="submit" class="btn btn-sm" style="<%= load.status===s?'background:var(--primary);color:#fff;border-color:var(--primary);':'opacity:0.6;' %>font-size:10px;"><%= s %></button></form>
+              <% }) %>
+            </div>
+            <div class="card-row"><span class="label">Broker</span><span class="value"><%= load.broker||'—' %><%= load.broker_mc ? ' MC#'+load.broker_mc : '' %></span></div>
+            <div class="card-row"><span class="label">Customer</span><span class="value"><%= load.customer||'—' %></span></div>
+            <div class="card-row"><span class="label">Driver</span><span class="value"><%= load.driver_name||'Unassigned' %></span></div>
+            <div class="card-row"><span class="label">Truck</span><span class="value"><%= load.vehicle_unit ? '#'+load.vehicle_unit : '—' %></span></div>
+            <div class="card-row"><span class="label">Trailer</span><span class="value"><%= load.trailer_unit ? '#'+load.trailer_unit : '—' %></span></div>
+            <div class="card-row"><span class="label">Dispatcher</span><span class="value"><%= load.dispatcher_name||'—' %></span></div>
+            <div class="card-row"><span class="label">POD Received</span><span class="value"><%= load.pod_received ? '✅ Yes' : '❌ No' %></span></div>
+            <% if (load.weight) { %><div class="card-row"><span class="label">Weight</span><span class="value"><%= load.weight.toLocaleString() %> lbs</span></div><% } %>
+          </div>
+
+          <!-- Pay breakdown -->
+          <div class="card">
+            <h3><i class="ti ti-cash"></i> Pay Breakdown</h3>
+            <div class="card-row"><span class="label">Line Haul</span><span class="value">$<%= (load.rate||0).toFixed(2) %></span></div>
+            <% if (load.fuel_surcharge) { %><div class="card-row"><span class="label">Fuel Surcharge</span><span class="value">$<%= load.fuel_surcharge.toFixed(2) %></span></div><% } %>
+            <% if (load.detention_pay) { %><div class="card-row"><span class="label">Detention</span><span class="value">$<%= load.detention_pay.toFixed(2) %></span></div><% } %>
+            <% if (load.accessorial) { %><div class="card-row"><span class="label">Accessorial</span><span class="value">$<%= load.accessorial.toFixed(2) %></span></div><% } %>
+            <div class="card-row" style="font-weight:900;font-size:14px;border-top:2px solid var(--border);"><span class="label">Total</span><span class="value" style="color:var(--success);">$<%= (load.total_pay||0).toFixed(2) %></span></div>
+          </div>
+
+          <!-- Stops -->
+          <div class="card">
+            <h3><i class="ti ti-map-pins"></i> Stops (<%= stops.length + 2 %>)</h3>
+            <div style="padding:6px 0;border-bottom:1px solid #f1f5f9;"><span class="badge" style="background:#d1fae5;color:#065f46;font-size:9px;">PICKUP</span> <strong><%= load.pickup_city||'' %>, <%= load.pickup_state||'' %></strong> · <%= load.pickup_date||'' %> <%= load.pickup_time||'' %></div>
+            <% stops.forEach(s => { %>
+              <div style="padding:6px 0;border-bottom:1px solid #f1f5f9;"><span class="badge draft" style="font-size:9px;"><%= s.type.toUpperCase() %></span> <strong><%= s.city||'' %>, <%= s.state||'' %></strong> · <%= s.date||'' %> <%= s.time||'' %><% if (s.contact) { %> · <%= s.contact %><% } %></div>
+            <% }) %>
+            <div style="padding:6px 0;"><span class="badge" style="background:#fee2e2;color:#991b1b;font-size:9px;">DELIVERY</span> <strong><%= load.delivery_city||'' %>, <%= load.delivery_state||'' %></strong> · <%= load.delivery_date||'' %> <%= load.delivery_time||'' %></div>
+            <details style="margin-top:8px;"><summary style="font-size:11px;font-weight:700;color:var(--primary);cursor:pointer;">+ Add Stop</summary>
+              <form method="POST" action="/admin/companies/<%= company.id %>/tms/loads/<%= load.id %>/stops" style="margin-top:8px;">
+                <div class="form-row"><div class="form-group"><label>Type</label><select name="type"><option>pickup</option><option>delivery</option><option>fuel</option><option>rest</option></select></div><div class="form-group"><label>City</label><input type="text" name="city" required></div></div>
+                <div class="form-row"><div class="form-group"><label>State</label><input type="text" name="state" maxlength="2"></div><div class="form-group"><label>Date</label><input type="date" name="date"></div></div>
+                <button type="submit" class="btn btn-sm btn-primary">Add Stop</button>
+              </form>
+            </details>
+          </div>
+
+          <!-- Documents -->
+          <div class="card">
+            <h3><i class="ti ti-paperclip"></i> Documents (<%= docs.length %>)</h3>
+            <% docs.forEach(d => { %>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;">
+                <span class="badge draft" style="font-size:8px;"><%= d.type %></span>
+                <a href="/admin/companies/<%= company.id %>/tms/loads/<%= load.id %>/docs/<%= d.id %>" style="font-size:12px;font-weight:600;"><%= d.original_name %></a>
+                <span style="font-size:9px;color:var(--muted);margin-left:auto;"><%= d.uploaded_by||'' %></span>
+              </div>
+            <% }) %>
+            <form method="POST" action="/admin/companies/<%= company.id %>/tms/loads/<%= load.id %>/docs" enctype="multipart/form-data" style="margin-top:10px;display:flex;gap:6px;align-items:flex-end;">
+              <div class="form-group" style="margin:0;"><select name="doc_type" style="padding:5px;font-size:11px;"><option>rate-con</option><option>bol</option><option>pod</option><option>invoice</option><option>other</option></select></div>
+              <div class="form-group" style="margin:0;flex:1;"><input type="file" name="file" required style="padding:4px;font-size:11px;"></div>
+              <button type="submit" class="btn btn-sm btn-primary">Upload</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Right: Timeline -->
+        <div style="width:280px;flex-shrink:0;">
+          <div class="card">
+            <h3><i class="ti ti-clock"></i> Timeline</h3>
+            <div class="timeline">
+              <% timeline.forEach(t => { %>
+                <div class="tl-item <%= t.status === 'delivered' ? 'delivered' : '' %>">
+                  <div class="tl-status" style="color:<%= t.status==='delivered'?'var(--success)':t.status==='in-transit'?'var(--primary)':'var(--muted)' %>;"><%= t.status %></div>
+                  <% if (t.note) { %><div><%= t.note %></div><% } %>
+                  <% if (t.location) { %><div style="color:var(--primary);"><i class="ti ti-map-pin" style="font-size:10px;"></i> <%= t.location %></div><% } %>
+                  <div class="tl-time"><%= t.created_at ? t.created_at.replace('T',' ').substring(0,16) : '' %> · <%= t.changed_by||'' %></div>
+                </div>
+              <% }) %>
+              <% if (timeline.length === 0) { %><div style="font-size:11px;color:var(--muted);padding:8px 0;">No updates yet</div><% } %>
+            </div>
+            <!-- Add update -->
+            <form method="POST" action="/admin/companies/<%= company.id %>/tms/loads/<%= load.id %>/update" style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+              <div class="form-group" style="margin-bottom:6px;"><input type="text" name="note" placeholder="Add update..." style="font-size:11px;padding:6px 10px;"></div>
+              <div class="form-group" style="margin-bottom:6px;"><input type="text" name="location" placeholder="Location (optional)" style="font-size:11px;padding:6px 10px;"></div>
+              <button type="submit" class="btn btn-sm btn-primary" style="width:100;font-size:10px;">Post Update</button>
+            </form>
+          </div>
+
+          <!-- Timestamps -->
+          <div class="card">
+            <h3 style="font-size:12px;"><i class="ti ti-calendar"></i> Timestamps</h3>
+            <div style="font-size:11px;line-height:2;">
+              Created: <strong><%= load.created_at ? load.created_at.replace('T',' ').substring(0,16) : '—' %></strong><br>
+              Dispatched: <strong><%= load.dispatched_at || '—' %></strong><br>
+              Picked Up: <strong><%= load.picked_up_at || '—' %></strong><br>
+              Delivered: <strong><%= load.delivered_at || '—' %></strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;"><a href="/admin/companies/<%= company.id %>/tms" class="btn btn-sm">← Back to TMS</a></div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

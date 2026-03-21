@@ -1,0 +1,170 @@
+<%- include('../partials/head') %>
+<style>
+.eq-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:11px;transition:all 0.12s;}
+.eq-card:hover{border-color:var(--primary);}
+.eq-card.busy{opacity:0.5;border-left:3px solid var(--danger);}
+.eq-card.free{border-left:3px solid var(--success);}
+.eq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;}
+.d-board{display:flex;gap:10px;overflow-x:auto;min-height:300px;}
+.d-col{flex:1;min-width:220px;background:var(--bg);border-radius:10px;padding:8px;}
+.d-col-head{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;padding:6px 8px;margin-bottom:6px;border-radius:6px;text-align:center;}
+.d-load{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px;font-size:11px;}
+.d-load:hover{border-color:var(--primary);}
+.d-route{font-weight:800;font-size:12px;margin-bottom:2px;}
+.d-meta{color:var(--muted);font-size:10px;}
+.d-pay{font-weight:900;color:var(--success);font-size:14px;}
+</style>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><i class="ti ti-layout-board-split"></i> Centralized Dispatch</h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div class="tabs">
+        <a class="tab <%= tab==='board'?'active':'' %>" href="/admin/dispatch?tab=board"><i class="ti ti-layout-board"></i> Load Board</a>
+        <a class="tab <%= tab==='trucks'?'active':'' %>" href="/admin/dispatch?tab=trucks"><i class="ti ti-truck"></i> Trucks (<%= availTrucks.length %>)</a>
+        <a class="tab <%= tab==='trailers'?'active':'' %>" href="/admin/dispatch?tab=trailers"><i class="ti ti-container"></i> Trailers (<%= availTrailers.length %>)</a>
+        <a class="tab <%= tab==='drivers'?'active':'' %>" href="/admin/dispatch?tab=drivers"><i class="ti ti-user"></i> Drivers (<%= allDrivers.length %>)</a>
+      </div>
+
+      <!-- Metrics -->
+      <%
+        var freeTrucks = availTrucks.filter(t => !t.on_load).length;
+        var freeTrailers = availTrailers.filter(t => !t.on_load).length;
+        var freeDrivers = allDrivers.filter(d => !d.on_load).length;
+      %>
+      <div class="metrics">
+        <div class="metric hi"><div class="m-label">Active Loads</div><div class="m-val pri"><%= allLoads.length %></div></div>
+        <div class="metric <%= freeTrucks > 0 ? 'ok' : 'bad' %>"><div class="m-label">Free Trucks</div><div class="m-val <%= freeTrucks > 0 ? 'green' : 'red' %>"><%= freeTrucks %>/<%= availTrucks.length %></div></div>
+        <div class="metric <%= freeTrailers > 0 ? 'ok' : 'bad' %>"><div class="m-label">Free Trailers</div><div class="m-val <%= freeTrailers > 0 ? 'green' : 'red' %>"><%= freeTrailers %>/<%= availTrailers.length %></div></div>
+        <div class="metric <%= freeDrivers > 0 ? '' : 'bad' %>"><div class="m-label">Available Drivers</div><div class="m-val"><%= freeDrivers %>/<%= allDrivers.length %></div></div>
+      </div>
+
+      <% if (tab === 'board') { %>
+        <!-- CROSS-COMPANY LOAD BOARD -->
+        <div class="d-board">
+          <% [{key:'available',label:'Available',bg:'#dbeafe',fg:'#1e40af'},{key:'dispatched',label:'Dispatched',bg:'#fef3c7',fg:'#92400e'},{key:'active',label:'In Transit',bg:'#d1fae5',fg:'#065f46'}].forEach(col => {
+            var colLoads = col.key === 'active' ? allLoads.filter(l => ['in-transit','at-pickup','at-delivery'].includes(l.status)) : allLoads.filter(l => l.status === col.key);
+          %>
+            <div class="d-col">
+              <div class="d-col-head" style="background:<%= col.bg %>;color:<%= col.fg %>;"><%= col.label %> (<%= colLoads.length %>)</div>
+              <% colLoads.forEach(l => { %>
+                <a href="/admin/companies/<%= l.company_id %>/tms/loads/<%= l.id %>" class="d-load" style="text-decoration:none;color:inherit;display:block;">
+                  <div style="display:flex;justify-content:space-between;">
+                    <div class="d-route"><%= l.pickup_city||'?' %> → <%= l.delivery_city||'?' %></div>
+                    <div class="d-pay">$<%= (l.total_pay||0).toLocaleString() %></div>
+                  </div>
+                  <div class="d-meta">
+                    <span style="background:var(--primary-light);color:var(--primary-dark);padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;"><%= l.company_name %></span>
+                    <%= l.load_number %> · <%= l.driver_name || 'No driver' %> · <%= l.total_miles||0 %> mi
+                    <% if (l.pickup_date) { %> · <%= l.pickup_date %><% } %>
+                  </div>
+                </a>
+              <% }) %>
+              <% if (colLoads.length === 0) { %><div style="padding:16px;text-align:center;color:var(--muted);font-size:10px;">Empty</div><% } %>
+            </div>
+          <% }) %>
+        </div>
+
+      <% } else if (tab === 'trucks') { %>
+        <!-- TRUCK AVAILABILITY -->
+        <div style="display:flex;gap:6px;margin-bottom:12px;">
+          <button class="btn btn-sm btn-primary" onclick="filterEq('all','truck')">All (<%= availTrucks.length %>)</button>
+          <button class="btn btn-sm" onclick="filterEq('free','truck')">Free (<%= freeTrucks %>)</button>
+          <button class="btn btn-sm" onclick="filterEq('busy','truck')">On Load (<%= availTrucks.length - freeTrucks %>)</button>
+          <input type="text" id="truckSearch" placeholder="Search..." oninput="filterEq(null,'truck')" style="margin-left:auto;padding:5px 10px;font-size:11px;border:1px solid var(--border);border-radius:6px;width:200px;">
+        </div>
+        <div class="eq-grid" id="truckGrid">
+          <% availTrucks.forEach(t => { %>
+            <div class="eq-card <%= t.on_load ? 'busy' : 'free' %>" data-status="<%= t.on_load ? 'busy' : 'free' %>" data-search="<%= [t.unit_number, t.make, t.model, t.company_name, t.driver_name, t.last_location].filter(Boolean).join(' ').toLowerCase() %>">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                  <div style="font-weight:800;font-size:13px;">#<%= t.unit_number || '—' %></div>
+                  <div style="color:var(--muted);"><%= [t.year, t.make, t.model].filter(Boolean).join(' ') %></div>
+                </div>
+                <span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:4px;background:<%= t.on_load ? '#fee2e2' : '#d1fae5' %>;color:<%= t.on_load ? '#991b1b' : '#065f46' %>;"><%= t.on_load ? 'ON LOAD' : 'FREE' %></span>
+              </div>
+              <div style="margin-top:6px;font-size:10px;color:var(--muted);">
+                <span style="background:var(--primary-light);padding:1px 6px;border-radius:4px;color:var(--primary-dark);font-weight:700;font-size:9px;"><%= t.company_name %></span>
+                <% if (t.driver_name) { %> · <i class="ti ti-user" style="font-size:10px;"></i> <%= t.driver_name %><% } %>
+              </div>
+              <% if (t.last_location) { %><div style="margin-top:4px;font-size:10px;color:var(--primary);"><i class="ti ti-map-pin" style="font-size:10px;"></i> <%= t.last_location %><% if (t.last_speed > 2) { %> · <span style="color:var(--success);"><%= Math.round(t.last_speed) %> mph</span><% } %></div><% } %>
+            </div>
+          <% }) %>
+        </div>
+
+      <% } else if (tab === 'trailers') { %>
+        <!-- TRAILER AVAILABILITY -->
+        <div style="display:flex;gap:6px;margin-bottom:12px;">
+          <button class="btn btn-sm btn-primary" onclick="filterEq('all','trailer')">All (<%= availTrailers.length %>)</button>
+          <button class="btn btn-sm" onclick="filterEq('free','trailer')">Free (<%= freeTrailers %>)</button>
+          <button class="btn btn-sm" onclick="filterEq('busy','trailer')">On Load (<%= availTrailers.length - freeTrailers %>)</button>
+          <input type="text" id="trailerSearch" placeholder="Search..." oninput="filterEq(null,'trailer')" style="margin-left:auto;padding:5px 10px;font-size:11px;border:1px solid var(--border);border-radius:6px;width:200px;">
+        </div>
+        <div class="eq-grid" id="trailerGrid">
+          <% availTrailers.forEach(t => { %>
+            <div class="eq-card <%= t.on_load ? 'busy' : 'free' %>" data-status="<%= t.on_load ? 'busy' : 'free' %>" data-search="<%= [t.unit_number, t.type, t.make, t.company_name, t.assigned_truck, t.last_location].filter(Boolean).join(' ').toLowerCase() %>">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                  <div style="font-weight:800;font-size:13px;">#<%= t.unit_number || '—' %> <span class="badge draft" style="font-size:8px;"><%= t.type %></span></div>
+                  <div style="color:var(--muted);"><%= [t.year, t.make, t.model].filter(Boolean).join(' ') %><%= t.length_ft ? ' · ' + t.length_ft + "'" : '' %></div>
+                </div>
+                <span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:4px;background:<%= t.on_load ? '#fee2e2' : '#d1fae5' %>;color:<%= t.on_load ? '#991b1b' : '#065f46' %>;"><%= t.on_load ? 'ON LOAD' : 'FREE' %></span>
+              </div>
+              <div style="margin-top:6px;font-size:10px;color:var(--muted);">
+                <span style="background:var(--primary-light);padding:1px 6px;border-radius:4px;color:var(--primary-dark);font-weight:700;font-size:9px;"><%= t.company_name %></span>
+                <% if (t.assigned_truck) { %> · Truck #<%= t.assigned_truck %><% } %>
+              </div>
+              <% if (t.last_location) { %><div style="margin-top:4px;font-size:10px;color:var(--primary);"><i class="ti ti-map-pin" style="font-size:10px;"></i> <%= t.last_location %></div><% } %>
+            </div>
+          <% }) %>
+        </div>
+
+      <% } else if (tab === 'drivers') { %>
+        <!-- DRIVER AVAILABILITY -->
+        <div style="display:flex;gap:6px;margin-bottom:12px;">
+          <button class="btn btn-sm btn-primary" onclick="filterEq('all','driver')">All (<%= allDrivers.length %>)</button>
+          <button class="btn btn-sm" onclick="filterEq('free','driver')">Available (<%= freeDrivers %>)</button>
+          <button class="btn btn-sm" onclick="filterEq('busy','driver')">On Load (<%= allDrivers.length - freeDrivers %>)</button>
+          <input type="text" id="driverSearch" placeholder="Search..." oninput="filterEq(null,'driver')" style="margin-left:auto;padding:5px 10px;font-size:11px;border:1px solid var(--border);border-radius:6px;width:200px;">
+        </div>
+        <div class="eq-grid" id="driverGrid">
+          <% allDrivers.forEach(d => { %>
+            <div class="eq-card <%= d.on_load ? 'busy' : 'free' %>" data-status="<%= d.on_load ? 'busy' : 'free' %>" data-search="<%= [d.name, d.company_name, d.department, d.role, d.phone].filter(Boolean).join(' ').toLowerCase() %>">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                  <div style="font-weight:800;font-size:13px;"><%= d.name %></div>
+                  <div style="color:var(--muted);"><%= d.role || '' %><%= d.department ? ' · ' + d.department : '' %></div>
+                </div>
+                <span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:4px;background:<%= d.on_load ? '#fee2e2' : '#d1fae5' %>;color:<%= d.on_load ? '#991b1b' : '#065f46' %>;"><%= d.on_load ? 'ON LOAD' : 'AVAILABLE' %></span>
+              </div>
+              <div style="margin-top:6px;font-size:10px;color:var(--muted);">
+                <span style="background:var(--primary-light);padding:1px 6px;border-radius:4px;color:var(--primary-dark);font-weight:700;font-size:9px;"><%= d.company_name %></span>
+                <% if (d.phone) { %> · <%= d.phone %><% } %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+
+      <script>
+      var currentEqFilter = 'all';
+      function filterEq(status, type) {
+        if (status) currentEqFilter = status;
+        var gridId = type === 'truck' ? 'truckGrid' : type === 'trailer' ? 'trailerGrid' : 'driverGrid';
+        var searchId = type === 'truck' ? 'truckSearch' : type === 'trailer' ? 'trailerSearch' : 'driverSearch';
+        var q = (document.getElementById(searchId) || {}).value || '';
+        q = q.toLowerCase();
+        document.querySelectorAll('#' + gridId + ' .eq-card').forEach(function(c) {
+          var matchStatus = currentEqFilter === 'all' || c.dataset.status === currentEqFilter;
+          var matchSearch = !q || c.dataset.search.indexOf(q) >= 0;
+          c.style.display = (matchStatus && matchSearch) ? '' : 'none';
+        });
+      }
+      </script>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

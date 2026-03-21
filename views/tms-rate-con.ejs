@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rate Confirmation — <%= load.load_number %></title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#1e293b;padding:20px;}
+.rc{max-width:800px;margin:0 auto;}
+.rc-head{display:flex;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #0891b2;}
+.rc-head h1{font-size:20px;color:#0891b2;}
+.rc-head .rc-num{font-size:24px;font-weight:900;color:#0891b2;}
+.rc-parties{display:flex;gap:32px;margin-bottom:20px;}
+.rc-party{flex:1;}
+.rc-party h3{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:4px;}
+.rc-party strong{font-size:14px;}
+table{width:100%;border-collapse:collapse;margin-bottom:16px;}
+th{background:#f8fafc;padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;border-bottom:2px solid #e2e8f0;}
+td{padding:10px 12px;border-bottom:1px solid #f1f5f9;}
+.total-row{font-size:18px;font-weight:900;color:#0891b2;}
+.sig{margin-top:40px;display:flex;gap:40px;}
+.sig-line{flex:1;border-top:1px solid #334155;padding-top:4px;font-size:10px;color:#64748b;}
+.no-print{background:#0891b2;color:#fff;padding:8px 16px;text-align:center;font-size:13px;}
+.no-print button{background:#fff;color:#0891b2;border:none;padding:8px 20px;border-radius:6px;font-weight:700;cursor:pointer;margin:0 8px;}
+@media print{.no-print{display:none;}}
+</style></head><body>
+<div class="no-print"><button onclick="window.print()">Print / Save PDF</button></div>
+<div class="rc">
+  <div class="rc-head">
+    <div><% if (settings.business_logo) { %><img src="<%= settings.business_logo %>" style="height:32px;margin-bottom:4px;"><br><% } %><h1><%= settings.business_name || 'IT Forge' %></h1><div style="font-size:11px;color:#64748b;"><%= settings.business_address || '' %><br><%= settings.business_email || '' %> · <%= settings.business_phone || '' %></div></div>
+    <div style="text-align:right;"><div style="font-size:10px;color:#64748b;">RATE CONFIRMATION</div><div class="rc-num"><%= load.load_number %></div><div style="font-size:11px;color:#64748b;">Date: <%= load.created_at ? load.created_at.split('T')[0] : '' %></div></div>
+  </div>
+  <div class="rc-parties">
+    <div class="rc-party"><h3>Carrier</h3><strong><%= company.name %></strong><br><%= company.address ? company.address + ', ' : '' %><%= [company.city, company.state, company.zip].filter(Boolean).join(', ') %></div>
+    <div class="rc-party"><h3>Broker / Customer</h3><strong><%= load.broker || load.customer || '—' %></strong><% if (load.broker_mc) { %><br>MC# <%= load.broker_mc %><% } %><% if (load.reference_number) { %><br>Ref# <%= load.reference_number %><% } %></div>
+  </div>
+  <table>
+    <thead><tr><th></th><th>Location</th><th>Date</th><th>Time</th></tr></thead>
+    <tbody>
+      <tr><td style="font-weight:700;color:#10b981;">PICKUP</td><td><%= load.pickup_address ? load.pickup_address + ', ' : '' %><%= load.pickup_city||'' %>, <%= load.pickup_state||'' %></td><td><%= load.pickup_date||'—' %></td><td><%= load.pickup_time||'' %></td></tr>
+      <% stops.forEach(s => { %>
+        <tr><td style="font-weight:700;"><%= s.type.toUpperCase() %></td><td><%= s.address ? s.address + ', ' : '' %><%= s.city||'' %>, <%= s.state||'' %></td><td><%= s.date||'' %></td><td><%= s.time||'' %></td></tr>
+      <% }) %>
+      <tr><td style="font-weight:700;color:#ef4444;">DELIVERY</td><td><%= load.delivery_address ? load.delivery_address + ', ' : '' %><%= load.delivery_city||'' %>, <%= load.delivery_state||'' %></td><td><%= load.delivery_date||'—' %></td><td><%= load.delivery_time||'' %></td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>Equipment</th><th>Commodity</th><th>Weight</th><th>Miles</th></tr></thead>
+    <tbody><tr><td><%= load.equipment_type %></td><td><%= load.commodity||'General Freight' %></td><td><%= load.weight ? load.weight.toLocaleString()+' lbs' : '—' %></td><td><%= load.total_miles ? load.total_miles.toLocaleString() : '—' %></td></tr></tbody>
+  </table>
+  <table>
+    <thead><tr><th>Description</th><th style="text-align:right;">Amount</th></tr></thead>
+    <tbody>
+      <tr><td>Line Haul</td><td style="text-align:right;">$<%= (load.rate||0).toFixed(2) %></td></tr>
+      <% if (load.fuel_surcharge) { %><tr><td>Fuel Surcharge</td><td style="text-align:right;">$<%= load.fuel_surcharge.toFixed(2) %></td></tr><% } %>
+      <% if (load.detention_pay) { %><tr><td>Detention</td><td style="text-align:right;">$<%= load.detention_pay.toFixed(2) %></td></tr><% } %>
+      <% if (load.accessorial) { %><tr><td>Accessorial</td><td style="text-align:right;">$<%= load.accessorial.toFixed(2) %></td></tr><% } %>
+      <tr><td class="total-row">TOTAL</td><td class="total-row" style="text-align:right;">$<%= (load.total_pay||0).toFixed(2) %></td></tr>
+    </tbody>
+  </table>
+  <% if (load.notes) { %><div style="margin-top:12px;padding:10px;background:#f8fafc;border-radius:6px;font-size:11px;"><strong>Notes:</strong> <%= load.notes %></div><% } %>
+  <div class="sig">
+    <div class="sig-line">Carrier Signature / Date</div>
+    <div class="sig-line">Broker Signature / Date</div>
+  </div>
+</div>
+</body></html>

@@ -397,7 +397,9 @@ module.exports = function(db) {
     const depts = safeAll('SELECT * FROM departments ORDER BY sort_order');
     const imported = req.query.imported || null;
     const importError = req.query.importError || null;
-    res.render(V('company-detail'), { user: req.session.user, company, tab, contacts, users, servers, subs, assets, inventory, locations, agreements, invoices, tasks, clientUsers, allServices, allPeople, roles, depts, imported, importError, settings: getSettings(), page: 'companies' });
+    let modules = safeGet('SELECT * FROM company_modules WHERE company_id = ?', [company.id]);
+    if (!modules) { try { db.prepare('INSERT INTO company_modules (company_id) VALUES (?)').run(company.id); } catch(e) {} modules = safeGet('SELECT * FROM company_modules WHERE company_id = ?', [company.id]) || {}; }
+    res.render(V('company-detail'), { user: req.session.user, company, tab, contacts, users, servers, subs, assets, inventory, locations, agreements, invoices, tasks, clientUsers, allServices, allPeople, roles, depts, imported, importError, modules, settings: getSettings(), page: 'companies' });
   });
 
   router.post('/companies/:id/delete', (req, res) => {
@@ -405,6 +407,33 @@ module.exports = function(db) {
     db.prepare('DELETE FROM users WHERE company_id = ?').run(req.params.id);
     db.prepare('DELETE FROM tasks WHERE company_id = ?').run(req.params.id);
     res.redirect('/admin/companies');
+  });
+
+  // === COMPANY MODULES (enable/disable features) ===
+  router.get('/companies/:cid/modules', (req, res) => {
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.cid);
+    if (!company) return res.redirect('/admin/companies');
+    let modules = safeGet('SELECT * FROM company_modules WHERE company_id = ?', [company.id]);
+    if (!modules) {
+      try { db.prepare('INSERT INTO company_modules (company_id) VALUES (?)').run(company.id); } catch(e) {}
+      modules = safeGet('SELECT * FROM company_modules WHERE company_id = ?', [company.id]) || {};
+    }
+    res.render(V('company-modules'), { user: req.session.user, company, modules, settings: getSettings(), page: 'companies' });
+  });
+
+  router.post('/companies/:cid/modules', (req, res) => {
+    const b = req.body;
+    const fields = ['tms','fleet','monitoring','files','chat','sops','policies','passwords','eld','domains','rdp'];
+    const existing = safeGet('SELECT id FROM company_modules WHERE company_id = ?', [req.params.cid]);
+    if (existing) {
+      const sets = fields.map(f => f + '=?').join(',');
+      const vals = fields.map(f => b[f] ? 1 : 0);
+      vals.push(req.params.cid);
+      db.prepare('UPDATE company_modules SET ' + sets + ' WHERE company_id = ?').run(...vals);
+    } else {
+      db.prepare('INSERT INTO company_modules (company_id, ' + fields.join(',') + ') VALUES (?, ' + fields.map(() => '?').join(',') + ')').run(req.params.cid, ...fields.map(f => b[f] ? 1 : 0));
+    }
+    res.redirect('/admin/companies/' + req.params.cid + '/modules');
   });
 
   // === EMAIL PROVIDER SECURITY (must be before generic /:id/:table) ===
@@ -642,6 +671,210 @@ module.exports = function(db) {
     if (!agr || !agr.attachment) return res.status(404).send('No attachment');
     const filePath = require('path').resolve(__dirname, '..', 'uploads', agr.attachment);
     res.download(filePath, agr.attachment_name);
+  });
+
+  // === CENTRALIZED DISPATCH (cross-company) ===
+  router.get('/dispatch', (req, res) => {
+    const visibleIds = getVisibleCompanyIds(req);
+    let whereCompany = '';
+    if (visibleIds) whereCompany = ' AND l.company_id IN (' + visibleIds.join(',') + ')';
+
+    const allLoads = safeAll("SELECT l.*, c.name as company_name, d.name as driver_name, v.unit_number as vehicle_unit, t.unit_number as trailer_unit FROM tms_loads l LEFT JOIN companies c ON l.company_id = c.id LEFT JOIN company_users d ON l.driver_id = d.id LEFT JOIN fleet_vehicles v ON l.vehicle_id = v.id LEFT JOIN fleet_trailers t ON l.trailer_id = t.id WHERE l.status NOT IN ('delivered','cancelled')" + whereCompany + " ORDER BY CASE l.status WHEN 'in-transit' THEN 1 WHEN 'dispatched' THEN 2 WHEN 'at-pickup' THEN 3 WHEN 'at-delivery' THEN 4 WHEN 'available' THEN 5 END, l.pickup_date ASC");
+
+    // Available equipment across all companies
+    let vWhere = visibleIds ? ' AND fv.company_id IN (' + visibleIds.join(',') + ')' : '';
+    const availTrucks = safeAll("SELECT fv.*, c.name as company_name, cu.name as driver_name, ev.last_location, ev.last_lat, ev.last_lng, ev.last_speed FROM fleet_vehicles fv LEFT JOIN companies c ON fv.company_id = c.id LEFT JOIN company_users cu ON fv.driver_id = cu.id LEFT JOIN eld_vehicles ev ON fv.eld_vehicle_id = ev.id WHERE fv.status = 'active'" + vWhere + " ORDER BY c.name, fv.unit_number");
+    const availTrailers = safeAll("SELECT ft.*, c.name as company_name, fv2.unit_number as assigned_truck, ev.last_location, ev.last_lat, ev.last_lng FROM fleet_trailers ft LEFT JOIN companies c ON ft.company_id = c.id LEFT JOIN fleet_vehicles fv2 ON ft.assigned_vehicle_id = fv2.id LEFT JOIN eld_vehicles ev ON ft.eld_vehicle_id = ev.id WHERE ft.status = 'active'" + (visibleIds ? ' AND ft.company_id IN (' + visibleIds.join(',') + ')' : '') + " ORDER BY c.name, ft.unit_number");
+
+    // Drivers: who has a load, who doesn't
+    const driversOnLoad = new Set(allLoads.filter(l => l.driver_id).map(l => l.driver_id));
+    let dWhere = visibleIds ? ' AND cu.company_id IN (' + visibleIds.join(',') + ')' : '';
+    const allDrivers = safeAll("SELECT cu.*, c.name as company_name FROM company_users cu LEFT JOIN companies c ON cu.company_id = c.id WHERE cu.is_active = 1" + dWhere + " ORDER BY c.name, cu.name");
+    allDrivers.forEach(d => { d.on_load = driversOnLoad.has(d.id); });
+
+    // Trucks on loads
+    const trucksOnLoad = new Set(allLoads.filter(l => l.vehicle_id).map(l => l.vehicle_id));
+    availTrucks.forEach(t => { t.on_load = trucksOnLoad.has(t.id); });
+    const trailersOnLoad = new Set(allLoads.filter(l => l.trailer_id).map(l => l.trailer_id));
+    availTrailers.forEach(t => { t.on_load = trailersOnLoad.has(t.id); });
+
+    const companies = filterCompanies(safeAll('SELECT id, name FROM companies ORDER BY name'), req);
+    const tab = req.query.tab || 'board';
+
+    res.render(V('dispatch'), { user: req.session.user, allLoads, availTrucks, availTrailers, allDrivers, companies, tab, settings: getSettings(), page: 'dispatch' });
+  });
+
+  // === TMS — DISPATCH BOARD ===
+  router.get('/companies/:cid/tms', (req, res) => {
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.cid);
+    if (!company) return res.redirect('/admin/companies');
+    const tab = req.query.tab || 'board';
+    const loads = safeAll("SELECT l.*, d.name as driver_name, v.unit_number as vehicle_unit, t.unit_number as trailer_unit, disp.name as dispatcher_name FROM tms_loads l LEFT JOIN company_users d ON l.driver_id = d.id LEFT JOIN fleet_vehicles v ON l.vehicle_id = v.id LEFT JOIN fleet_trailers t ON l.trailer_id = t.id LEFT JOIN company_users disp ON l.dispatcher_id = disp.id WHERE l.company_id = ? ORDER BY CASE l.status WHEN 'in-transit' THEN 1 WHEN 'dispatched' THEN 2 WHEN 'available' THEN 3 WHEN 'at-pickup' THEN 4 WHEN 'at-delivery' THEN 5 ELSE 6 END, l.pickup_date ASC", [company.id]);
+    const trips = safeAll("SELECT tr.*, d.name as driver_name, v.unit_number as vehicle_unit FROM tms_trips tr LEFT JOIN company_users d ON tr.driver_id = d.id LEFT JOIN fleet_vehicles v ON tr.vehicle_id = v.id WHERE tr.company_id = ? ORDER BY tr.start_date DESC LIMIT 50", [company.id]);
+    const settlements = safeAll("SELECT s.*, d.name as driver_name FROM tms_driver_pay s LEFT JOIN company_users d ON s.driver_id = d.id WHERE s.company_id = ? ORDER BY s.period_end DESC LIMIT 50", [company.id]);
+    const drivers = safeAll("SELECT id, name, department, role FROM company_users WHERE company_id = ? AND is_active = 1 ORDER BY name", [company.id]);
+    const vehicles = safeAll("SELECT id, unit_number, make, model FROM fleet_vehicles WHERE company_id = ? AND status = 'active' ORDER BY unit_number", [company.id]);
+    const trailers = safeAll("SELECT id, unit_number, type FROM fleet_trailers WHERE company_id = ? AND status = 'active' ORDER BY unit_number", [company.id]);
+    const dispatchers = safeAll("SELECT d.*, u.name FROM tms_dispatchers d JOIN company_users u ON d.user_id = u.id WHERE d.company_id = ? AND d.is_active = 1", [company.id]);
+
+    // Stats
+    const stats = {
+      active: loads.filter(l => ['dispatched','in-transit','at-pickup','at-delivery'].includes(l.status)).length,
+      available: loads.filter(l => l.status === 'available').length,
+      delivered: loads.filter(l => l.status === 'delivered').length,
+      totalRevenue: loads.filter(l => l.status === 'delivered').reduce((s,l) => s + (l.total_pay||0), 0),
+      totalMiles: loads.filter(l => l.status === 'delivered').reduce((s,l) => s + (l.total_miles||0), 0),
+      avgRpm: 0,
+      unpaidSettlements: settlements.filter(s => s.status !== 'paid').reduce((s,p) => s + (p.net_pay||0), 0)
+    };
+    if (stats.totalMiles > 0) stats.avgRpm = (stats.totalRevenue / stats.totalMiles).toFixed(2);
+
+    res.render(V('tms'), { user: req.session.user, company, tab, loads, trips, settlements, drivers, vehicles, trailers, dispatchers, stats, settings: getSettings(), page: 'companies' });
+  });
+
+  // Create load
+  router.post('/companies/:cid/tms/loads', (req, res) => {
+    const b = req.body;
+    const loadNum = 'LD-' + Date.now().toString(36).toUpperCase();
+    const totalPay = (parseFloat(b.rate)||0) + (parseFloat(b.fuel_surcharge)||0) + (parseFloat(b.detention_pay)||0) + (parseFloat(b.accessorial)||0);
+    const rpm = (parseInt(b.total_miles)||0) > 0 ? (totalPay / parseInt(b.total_miles)).toFixed(2) : 0;
+    try {
+      db.prepare('INSERT INTO tms_loads (company_id, load_number, status, broker, broker_mc, broker_contact, broker_phone, broker_email, customer, reference_number, commodity, weight, pieces, temperature, equipment_type, rate, rate_type, fuel_surcharge, detention_pay, accessorial, total_pay, total_miles, rate_per_mile, pickup_city, pickup_state, pickup_address, pickup_date, pickup_time, pickup_notes, delivery_city, delivery_state, delivery_address, delivery_date, delivery_time, delivery_notes, driver_id, vehicle_id, trailer_id, dispatcher_id, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+        req.params.cid, loadNum, b.status||'available', b.broker, b.broker_mc, b.broker_contact, b.broker_phone, b.broker_email, b.customer, b.reference_number, b.commodity, parseInt(b.weight)||null, parseInt(b.pieces)||null, b.temperature, b.equipment_type||'dry-van', parseFloat(b.rate)||0, b.rate_type||'flat', parseFloat(b.fuel_surcharge)||0, parseFloat(b.detention_pay)||0, parseFloat(b.accessorial)||0, totalPay, parseInt(b.total_miles)||0, rpm, b.pickup_city, b.pickup_state, b.pickup_address, b.pickup_date, b.pickup_time, b.pickup_notes, b.delivery_city, b.delivery_state, b.delivery_address, b.delivery_date, b.delivery_time, b.delivery_notes, b.driver_id||null, b.vehicle_id||null, b.trailer_id||null, b.dispatcher_id||null, b.notes
+      );
+      awardXP(db, xpUser(req), 'create_task', 'Created load ' + loadNum, req);
+    } catch(e) { console.error('TMS Load create:', e.message); }
+    res.redirect('/admin/companies/' + req.params.cid + '/tms');
+  });
+
+  // Update load status
+  router.post('/companies/:cid/tms/loads/:lid/status', (req, res) => {
+    const { status } = req.body;
+    const now = "datetime('now')";
+    try {
+      db.prepare('UPDATE tms_loads SET status = ? WHERE id = ? AND company_id = ?').run(status, req.params.lid, req.params.cid);
+      db.prepare('INSERT INTO tms_status_log (load_id, status, changed_by) VALUES (?,?,?)').run(req.params.lid, status, xpUser(req));
+      if (status === 'dispatched') db.prepare("UPDATE tms_loads SET dispatched_at = datetime('now') WHERE id = ?").run(req.params.lid);
+      if (status === 'at-pickup' || status === 'in-transit') db.prepare("UPDATE tms_loads SET picked_up_at = COALESCE(picked_up_at, datetime('now')) WHERE id = ?").run(req.params.lid);
+      if (status === 'delivered') db.prepare("UPDATE tms_loads SET delivered_at = datetime('now') WHERE id = ?").run(req.params.lid);
+    } catch(e) {}
+    res.redirect(req.body.redirect || '/admin/companies/' + req.params.cid + '/tms');
+  });
+
+  // Edit load
+  router.post('/companies/:cid/tms/loads/:lid/edit', (req, res) => {
+    const b = req.body;
+    const totalPay = (parseFloat(b.rate)||0) + (parseFloat(b.fuel_surcharge)||0) + (parseFloat(b.detention_pay)||0) + (parseFloat(b.accessorial)||0);
+    const rpm = (parseInt(b.total_miles)||0) > 0 ? (totalPay / parseInt(b.total_miles)).toFixed(2) : 0;
+    try {
+      db.prepare('UPDATE tms_loads SET status=?, broker=?, broker_mc=?, broker_contact=?, broker_phone=?, customer=?, reference_number=?, commodity=?, weight=?, equipment_type=?, rate=?, rate_type=?, fuel_surcharge=?, detention_pay=?, accessorial=?, total_pay=?, total_miles=?, rate_per_mile=?, pickup_city=?, pickup_state=?, pickup_address=?, pickup_date=?, pickup_time=?, delivery_city=?, delivery_state=?, delivery_address=?, delivery_date=?, delivery_time=?, driver_id=?, vehicle_id=?, trailer_id=?, dispatcher_id=?, pod_received=?, notes=? WHERE id=? AND company_id=?').run(
+        b.status, b.broker, b.broker_mc, b.broker_contact, b.broker_phone, b.customer, b.reference_number, b.commodity, parseInt(b.weight)||null, b.equipment_type, parseFloat(b.rate)||0, b.rate_type, parseFloat(b.fuel_surcharge)||0, parseFloat(b.detention_pay)||0, parseFloat(b.accessorial)||0, totalPay, parseInt(b.total_miles)||0, rpm, b.pickup_city, b.pickup_state, b.pickup_address, b.pickup_date, b.pickup_time, b.delivery_city, b.delivery_state, b.delivery_address, b.delivery_date, b.delivery_time, b.driver_id||null, b.vehicle_id||null, b.trailer_id||null, b.dispatcher_id||null, b.pod_received?1:0, b.notes, req.params.lid, req.params.cid
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/tms?tab=board');
+  });
+
+  // Load detail page
+  router.get('/companies/:cid/tms/loads/:lid', (req, res) => {
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.cid);
+    if (!company) return res.redirect('/admin/companies');
+    const load = safeGet("SELECT l.*, d.name as driver_name, v.unit_number as vehicle_unit, t.unit_number as trailer_unit, disp.name as dispatcher_name FROM tms_loads l LEFT JOIN company_users d ON l.driver_id = d.id LEFT JOIN fleet_vehicles v ON l.vehicle_id = v.id LEFT JOIN fleet_trailers t ON l.trailer_id = t.id LEFT JOIN company_users disp ON l.dispatcher_id = disp.id WHERE l.id = ? AND l.company_id = ?", [req.params.lid, req.params.cid]);
+    if (!load) return res.redirect('/admin/companies/' + req.params.cid + '/tms');
+    const stops = safeAll('SELECT * FROM tms_stops WHERE load_id = ? ORDER BY stop_order', [load.id]);
+    const timeline = safeAll('SELECT * FROM tms_status_log WHERE load_id = ? ORDER BY created_at DESC', [load.id]);
+    const docs = safeAll('SELECT * FROM tms_documents WHERE load_id = ? ORDER BY created_at DESC', [load.id]);
+    const drivers = safeAll("SELECT id, name FROM company_users WHERE company_id = ? AND is_active = 1 ORDER BY name", [company.id]);
+    const vehicles = safeAll("SELECT id, unit_number FROM fleet_vehicles WHERE company_id = ? AND status = 'active' ORDER BY unit_number", [company.id]);
+    const trailers = safeAll("SELECT id, unit_number FROM fleet_trailers WHERE company_id = ? AND status = 'active' ORDER BY unit_number", [company.id]);
+    res.render(V('tms-load'), { user: req.session.user, company, load, stops, timeline, docs, drivers, vehicles, trailers, settings: getSettings(), page: 'companies' });
+  });
+
+  // Upload load document
+  router.post('/companies/:cid/tms/loads/:lid/docs', fileUpload.single('file'), (req, res) => {
+    if (!req.file) return res.redirect('/admin/companies/' + req.params.cid + '/tms/loads/' + req.params.lid);
+    try {
+      db.prepare('INSERT INTO tms_documents (load_id, type, filename, original_name, uploaded_by) VALUES (?,?,?,?,?)').run(
+        req.params.lid, req.body.doc_type || 'other', req.file.filename, req.file.originalname, xpUser(req)
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/tms/loads/' + req.params.lid);
+  });
+
+  // Download load document
+  router.get('/companies/:cid/tms/loads/:lid/docs/:did', (req, res) => {
+    const doc = safeGet('SELECT * FROM tms_documents WHERE id = ? AND load_id = ?', [req.params.did, req.params.lid]);
+    if (!doc) return res.status(404).send('Not found');
+    res.download(require('path').resolve(__dirname, '..', 'uploads', doc.filename), doc.original_name);
+  });
+
+  // Add stop
+  router.post('/companies/:cid/tms/loads/:lid/stops', (req, res) => {
+    const b = req.body;
+    const maxOrder = safeGet('SELECT MAX(stop_order) as m FROM tms_stops WHERE load_id = ?', [req.params.lid]);
+    try {
+      db.prepare('INSERT INTO tms_stops (load_id, stop_order, type, city, state, address, date, time, contact, phone, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(
+        req.params.lid, (maxOrder && maxOrder.m || 0) + 1, b.type || 'pickup', b.city, b.state, b.address, b.date, b.time, b.contact, b.phone, b.notes
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/tms/loads/' + req.params.lid);
+  });
+
+  // Add status update
+  router.post('/companies/:cid/tms/loads/:lid/update', (req, res) => {
+    const { note, location } = req.body;
+    const load = safeGet('SELECT status FROM tms_loads WHERE id = ?', [req.params.lid]);
+    try {
+      db.prepare('INSERT INTO tms_status_log (load_id, status, note, location, changed_by) VALUES (?,?,?,?,?)').run(
+        req.params.lid, load ? load.status : 'update', note, location, xpUser(req)
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/tms/loads/' + req.params.lid);
+  });
+
+  // Rate confirmation print
+  router.get('/companies/:cid/tms/loads/:lid/rate-con', (req, res) => {
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.cid);
+    const load = safeGet("SELECT l.*, d.name as driver_name, v.unit_number as vehicle_unit, t.unit_number as trailer_unit FROM tms_loads l LEFT JOIN company_users d ON l.driver_id = d.id LEFT JOIN fleet_vehicles v ON l.vehicle_id = v.id LEFT JOIN fleet_trailers t ON l.trailer_id = t.id WHERE l.id = ? AND l.company_id = ?", [req.params.lid, req.params.cid]);
+    if (!load) return res.status(404).send('Not found');
+    const stops = safeAll('SELECT * FROM tms_stops WHERE load_id = ? ORDER BY stop_order', [load.id]);
+    const settings2 = {};
+    try { db.prepare('SELECT key, value FROM settings').all().forEach(r => { settings2[r.key] = r.value; }); } catch(e) {}
+    res.render('tms-rate-con', { company, load, stops, settings: settings2 });
+  });
+
+  router.post('/companies/:cid/tms/loads/:lid/delete', (req, res) => {
+    try {
+      db.prepare('DELETE FROM tms_stops WHERE load_id = ?').run(req.params.lid);
+      db.prepare('DELETE FROM tms_status_log WHERE load_id = ?').run(req.params.lid);
+      db.prepare('DELETE FROM tms_documents WHERE load_id = ?').run(req.params.lid);
+      db.prepare('DELETE FROM tms_loads WHERE id = ? AND company_id = ?').run(req.params.lid, req.params.cid);
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/tms');
+  });
+
+  // Create settlement
+  router.post('/companies/:cid/tms/settlements', (req, res) => {
+    const b = req.body;
+    const gross = parseFloat(b.gross_pay) || 0;
+    const net = gross + (parseFloat(b.bonus)||0) + (parseFloat(b.reimbursements)||0) - (parseFloat(b.deductions)||0);
+    try {
+      db.prepare('INSERT INTO tms_driver_pay (company_id, driver_id, period_start, period_end, pay_type, rate, total_miles, total_loads, gross_pay, bonus, deductions, reimbursements, net_pay, status, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+        req.params.cid, b.driver_id, b.period_start, b.period_end, b.pay_type||'per-mile', parseFloat(b.rate)||0, parseInt(b.total_miles)||0, parseInt(b.total_loads)||0, gross, parseFloat(b.bonus)||0, parseFloat(b.deductions)||0, parseFloat(b.reimbursements)||0, net, b.status||'draft', b.notes
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/tms?tab=pay');
+  });
+
+  router.post('/companies/:cid/tms/settlements/:sid/pay', (req, res) => {
+    try { db.prepare("UPDATE tms_driver_pay SET status = 'paid', paid_date = datetime('now') WHERE id = ? AND company_id = ?").run(req.params.sid, req.params.cid); } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/tms?tab=pay');
+  });
+
+  // Add dispatcher
+  router.post('/companies/:cid/tms/dispatchers', (req, res) => {
+    const { user_id, team_name, max_drivers } = req.body;
+    try { db.prepare('INSERT INTO tms_dispatchers (company_id, user_id, team_name, max_drivers) VALUES (?,?,?,?)').run(req.params.cid, user_id, team_name, parseInt(max_drivers)||20); } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/tms?tab=team');
   });
 
   // === FLEET MANAGEMENT ===

@@ -728,6 +728,187 @@ function initDB() {
       FOREIGN KEY (integration_id) REFERENCES eld_integrations(id) ON DELETE CASCADE
     );
 
+    -- Company module toggles (which features are enabled per company)
+    CREATE TABLE IF NOT EXISTS company_modules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL UNIQUE,
+      tms INTEGER DEFAULT 0,
+      fleet INTEGER DEFAULT 0,
+      monitoring INTEGER DEFAULT 0,
+      files INTEGER DEFAULT 1,
+      chat INTEGER DEFAULT 1,
+      sops INTEGER DEFAULT 1,
+      policies INTEGER DEFAULT 1,
+      passwords INTEGER DEFAULT 1,
+      eld INTEGER DEFAULT 0,
+      domains INTEGER DEFAULT 1,
+      rdp INTEGER DEFAULT 1,
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    );
+
+    -- TMS: Load documents (BOL, POD, rate con, etc.)
+    CREATE TABLE IF NOT EXISTS tms_documents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      load_id INTEGER NOT NULL,
+      type TEXT DEFAULT 'other',
+      filename TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      uploaded_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (load_id) REFERENCES tms_loads(id) ON DELETE CASCADE
+    );
+
+    -- TMS: Load status history / timeline
+    CREATE TABLE IF NOT EXISTS tms_status_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      load_id INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      note TEXT,
+      location TEXT,
+      changed_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (load_id) REFERENCES tms_loads(id) ON DELETE CASCADE
+    );
+
+    -- TMS: Loads / Orders
+    CREATE TABLE IF NOT EXISTS tms_loads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      load_number TEXT,
+      status TEXT DEFAULT 'available',
+      broker TEXT,
+      broker_mc TEXT,
+      broker_contact TEXT,
+      broker_phone TEXT,
+      broker_email TEXT,
+      customer TEXT,
+      reference_number TEXT,
+      commodity TEXT,
+      weight INTEGER,
+      pieces INTEGER,
+      temperature TEXT,
+      equipment_type TEXT DEFAULT 'dry-van',
+      rate REAL DEFAULT 0,
+      rate_type TEXT DEFAULT 'flat',
+      fuel_surcharge REAL DEFAULT 0,
+      detention_pay REAL DEFAULT 0,
+      accessorial REAL DEFAULT 0,
+      total_pay REAL DEFAULT 0,
+      total_miles INTEGER DEFAULT 0,
+      rate_per_mile REAL DEFAULT 0,
+      pickup_city TEXT,
+      pickup_state TEXT,
+      pickup_address TEXT,
+      pickup_date TEXT,
+      pickup_time TEXT,
+      pickup_notes TEXT,
+      delivery_city TEXT,
+      delivery_state TEXT,
+      delivery_address TEXT,
+      delivery_date TEXT,
+      delivery_time TEXT,
+      delivery_notes TEXT,
+      driver_id INTEGER,
+      vehicle_id INTEGER,
+      trailer_id INTEGER,
+      dispatcher_id INTEGER,
+      dispatched_at TEXT,
+      picked_up_at TEXT,
+      delivered_at TEXT,
+      invoice_status TEXT DEFAULT 'not-invoiced',
+      pod_received INTEGER DEFAULT 0,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+      FOREIGN KEY (driver_id) REFERENCES company_users(id) ON DELETE SET NULL,
+      FOREIGN KEY (vehicle_id) REFERENCES fleet_vehicles(id) ON DELETE SET NULL,
+      FOREIGN KEY (trailer_id) REFERENCES fleet_trailers(id) ON DELETE SET NULL,
+      FOREIGN KEY (dispatcher_id) REFERENCES company_users(id) ON DELETE SET NULL
+    );
+
+    -- TMS: Load stops (multi-stop loads)
+    CREATE TABLE IF NOT EXISTS tms_stops (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      load_id INTEGER NOT NULL,
+      stop_order INTEGER DEFAULT 1,
+      type TEXT DEFAULT 'pickup',
+      city TEXT,
+      state TEXT,
+      address TEXT,
+      date TEXT,
+      time TEXT,
+      contact TEXT,
+      phone TEXT,
+      notes TEXT,
+      arrived_at TEXT,
+      departed_at TEXT,
+      FOREIGN KEY (load_id) REFERENCES tms_loads(id) ON DELETE CASCADE
+    );
+
+    -- TMS: Trips (group loads into trips for a driver)
+    CREATE TABLE IF NOT EXISTS tms_trips (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      trip_number TEXT,
+      driver_id INTEGER,
+      vehicle_id INTEGER,
+      trailer_id INTEGER,
+      status TEXT DEFAULT 'planned',
+      start_date TEXT,
+      end_date TEXT,
+      start_odometer INTEGER,
+      end_odometer INTEGER,
+      total_miles INTEGER DEFAULT 0,
+      fuel_cost REAL DEFAULT 0,
+      toll_cost REAL DEFAULT 0,
+      other_cost REAL DEFAULT 0,
+      total_revenue REAL DEFAULT 0,
+      total_cost REAL DEFAULT 0,
+      profit REAL DEFAULT 0,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+      FOREIGN KEY (driver_id) REFERENCES company_users(id) ON DELETE SET NULL,
+      FOREIGN KEY (vehicle_id) REFERENCES fleet_vehicles(id) ON DELETE SET NULL,
+      FOREIGN KEY (trailer_id) REFERENCES fleet_trailers(id) ON DELETE SET NULL
+    );
+
+    -- TMS: Driver pay / settlements
+    CREATE TABLE IF NOT EXISTS tms_driver_pay (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      driver_id INTEGER NOT NULL,
+      period_start TEXT,
+      period_end TEXT,
+      pay_type TEXT DEFAULT 'per-mile',
+      rate REAL DEFAULT 0,
+      total_miles INTEGER DEFAULT 0,
+      total_loads INTEGER DEFAULT 0,
+      gross_pay REAL DEFAULT 0,
+      bonus REAL DEFAULT 0,
+      deductions REAL DEFAULT 0,
+      reimbursements REAL DEFAULT 0,
+      net_pay REAL DEFAULT 0,
+      status TEXT DEFAULT 'draft',
+      paid_date TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+      FOREIGN KEY (driver_id) REFERENCES company_users(id) ON DELETE CASCADE
+    );
+
+    -- TMS: Dispatchers
+    CREATE TABLE IF NOT EXISTS tms_dispatchers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      team_name TEXT,
+      max_drivers INTEGER DEFAULT 20,
+      is_active INTEGER DEFAULT 1,
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES company_users(id) ON DELETE CASCADE
+    );
+
     -- Fleet: Vehicles (trucks)
     CREATE TABLE IF NOT EXISTS fleet_vehicles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

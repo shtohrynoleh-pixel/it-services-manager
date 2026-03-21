@@ -15,12 +15,15 @@
         <% ['overview','contacts','users','servers','subscriptions','assets','inventory','agreements','invoices','tasks'].forEach(t => { %>
           <a class="tab <%= tab === t ? 'active' : '' %>" href="/admin/companies/<%= company.id %>?tab=<%= t %>"><%= t.charAt(0).toUpperCase() + t.slice(1) %></a>
         <% }) %>
-        <a class="tab" href="/admin/companies/<%= company.id %>/fleet" style="color:var(--primary);"><i class="ti ti-truck"></i> Fleet</a>
-        <a class="tab" href="/admin/companies/<%= company.id %>/eld" style="color:var(--primary);"><i class="ti ti-plug-connected"></i> ELD</a>
-        <a class="tab" href="/admin/companies/<%= company.id %>/domains" style="color:var(--primary);"><i class="ti ti-world"></i> Domains</a>
-        <a class="tab" href="/admin/companies/<%= company.id %>/files" style="color:var(--primary);"><i class="ti ti-folder"></i> Files</a>
-        <a class="tab" href="/admin/companies/<%= company.id %>/rdp" style="color:var(--primary);"><i class="ti ti-remote"></i> RDP</a>
+        <% var m = modules || {}; %>
+        <% if (m.tms) { %><a class="tab" href="/admin/companies/<%= company.id %>/tms" style="color:var(--primary);"><i class="ti ti-route"></i> TMS</a><% } %>
+        <% if (m.fleet) { %><a class="tab" href="/admin/companies/<%= company.id %>/fleet" style="color:var(--primary);"><i class="ti ti-truck"></i> Fleet</a><% } %>
+        <% if (m.eld) { %><a class="tab" href="/admin/companies/<%= company.id %>/eld" style="color:var(--primary);"><i class="ti ti-plug-connected"></i> ELD</a><% } %>
+        <% if (m.domains) { %><a class="tab" href="/admin/companies/<%= company.id %>/domains" style="color:var(--primary);"><i class="ti ti-world"></i> Domains</a><% } %>
+        <% if (m.files) { %><a class="tab" href="/admin/companies/<%= company.id %>/files" style="color:var(--primary);"><i class="ti ti-folder"></i> Files</a><% } %>
+        <% if (m.rdp) { %><a class="tab" href="/admin/companies/<%= company.id %>/rdp" style="color:var(--primary);"><i class="ti ti-remote"></i> RDP</a><% } %>
         <a class="tab" href="/admin/companies/<%= company.id %>/email-security" style="color:var(--primary);"><i class="ti ti-mail"></i> Email</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/modules" style="color:var(--muted);font-size:10px;"><i class="ti ti-settings"></i></a>
       </div>
 
       <% if (tab === 'overview') { %>

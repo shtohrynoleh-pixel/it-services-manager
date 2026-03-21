@@ -1,0 +1,48 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>" style="opacity:0.4;text-decoration:none;"><i class="ti ti-building"></i></a> → <i class="ti ti-settings"></i> Modules — <%= company.name %></h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div class="card">
+        <h3><i class="ti ti-puzzle"></i> Enabled Modules</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">Choose which features are available for this company. Disabled modules won't show in tabs or menus.</p>
+        <form method="POST" action="/admin/companies/<%= company.id %>/modules">
+          <%
+            var moduleList = [
+              { key: 'tms', label: 'TMS (Dispatch & Loads)', icon: 'ti-route', desc: 'Load management, dispatch board, driver pay, profitability tracking' },
+              { key: 'fleet', label: 'Fleet Management', icon: 'ti-truck', desc: 'Trucks, trailers, maintenance logs, fuel tracking' },
+              { key: 'eld', label: 'ELD Integration', icon: 'ti-plug-connected', desc: 'Samsara & Motive GPS tracking, vehicle sync, live map' },
+              { key: 'monitoring', label: 'IT Monitoring', icon: 'ti-activity', desc: 'Server/website uptime monitoring with alerts' },
+              { key: 'files', label: 'File Management', icon: 'ti-folder', desc: 'Shared folders, uploads, access control, storage quotas' },
+              { key: 'chat', label: 'Team Chat', icon: 'ti-message-circle', desc: 'Real-time messaging, channels, file sharing' },
+              { key: 'sops', label: 'SOPs', icon: 'ti-list-check', desc: 'Standard operating procedures with acknowledgment tracking' },
+              { key: 'policies', label: 'Security Policies', icon: 'ti-shield-check', desc: 'Security policies with compliance tracking' },
+              { key: 'passwords', label: 'Password Vault', icon: 'ti-key', desc: 'Shared credentials with access control' },
+              { key: 'domains', label: 'Domain Management', icon: 'ti-world', desc: 'Domain, DNS, SSL, hosting tracking' },
+              { key: 'rdp', label: 'Remote Connections', icon: 'ti-remote', desc: 'RDP, SSH, VNC connection management' }
+            ];
+          %>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <% moduleList.forEach(mod => { %>
+              <label style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all 0.12s;<%= modules[mod.key] ? 'background:#f0fdfa;border-color:var(--primary);' : '' %>" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='<%= modules[mod.key] ? 'var(--primary)' : 'var(--border)' %>'">
+                <input type="checkbox" name="<%= mod.key %>" value="1" <%= modules[mod.key] ? 'checked' : '' %> style="width:auto;flex-shrink:0;" onchange="this.closest('label').style.background=this.checked?'#f0fdfa':'';this.closest('label').style.borderColor=this.checked?'var(--primary)':'var(--border)';">
+                <i class="ti <%= mod.icon %>" style="font-size:22px;color:<%= modules[mod.key] ? 'var(--primary)' : 'var(--muted)' %>;flex-shrink:0;width:28px;text-align:center;"></i>
+                <div style="flex:1;">
+                  <div style="font-size:13px;font-weight:800;"><%= mod.label %></div>
+                  <div style="font-size:11px;color:var(--muted);"><%= mod.desc %></div>
+                </div>
+              </label>
+            <% }) %>
+          </div>
+          <div class="form-actions"><button type="submit" class="btn btn-primary"><i class="ti ti-check"></i> Save Modules</button></div>
+        </form>
+      </div>
+      <div style="margin-top:12px;"><a href="/admin/companies/<%= company.id %>" class="btn btn-sm">← Back to <%= company.name %></a></div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

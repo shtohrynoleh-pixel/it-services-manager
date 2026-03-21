@@ -1,0 +1,364 @@
+<%- include('../partials/head') %>
+<style>
+.load-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:8px;transition:all 0.12s;}
+.load-card:hover{border-color:var(--primary);box-shadow:0 2px 8px rgba(8,145,178,0.06);}
+.load-card.urgent{border-left:4px solid var(--danger);}
+.load-route{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:4px;}
+.load-route .arrow{color:var(--primary);font-size:16px;}
+.load-meta{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);}
+.load-meta strong{color:var(--text);}
+.load-pay{font-size:18px;font-weight:900;color:var(--success);}
+.status-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;font-size:10px;font-weight:800;text-transform:uppercase;}
+.st-available{background:#dbeafe;color:#1e40af;}
+.st-dispatched{background:#fef3c7;color:#92400e;}
+.st-in-transit{background:#d1fae5;color:#065f46;}
+.st-at-pickup{background:#e0e7ff;color:#3730a3;}
+.st-at-delivery{background:#fce7f3;color:#9d174d;}
+.st-delivered{background:#f1f5f9;color:#475569;}
+.st-cancelled{background:#fee2e2;color:#991b1b;}
+.board-cols{display:flex;gap:12px;overflow-x:auto;min-height:300px;}
+.board-col{flex:1;min-width:240px;background:var(--bg);border-radius:10px;padding:10px;}
+.board-col-head{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;padding:8px;margin-bottom:8px;border-radius:6px;text-align:center;}
+</style>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <h2><a href="/admin/companies/<%= company.id %>" style="opacity:0.4;text-decoration:none;"><i class="ti ti-building"></i></a> → <i class="ti ti-route"></i> TMS — <%= company.name %></h2>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('addLoadModal').classList.add('open')"><i class="ti ti-plus"></i> New Load</button>
+        <%- include('../partials/notif-bell') %>
+      </div>
+    </div>
+    <div class="content">
+      <!-- Tabs -->
+      <div class="tabs">
+        <a class="tab <%= tab==='board'?'active':'' %>" href="/admin/companies/<%= company.id %>/tms?tab=board"><i class="ti ti-layout-board"></i> Dispatch Board</a>
+        <a class="tab <%= tab==='loads'?'active':'' %>" href="/admin/companies/<%= company.id %>/tms?tab=loads"><i class="ti ti-list"></i> All Loads (<%= loads.length %>)</a>
+        <a class="tab <%= tab==='equipment'?'active':'' %>" href="/admin/companies/<%= company.id %>/tms?tab=equipment"><i class="ti ti-truck"></i> Equipment</a>
+        <a class="tab <%= tab==='pay'?'active':'' %>" href="/admin/companies/<%= company.id %>/tms?tab=pay"><i class="ti ti-cash"></i> Driver Pay</a>
+        <a class="tab <%= tab==='profit'?'active':'' %>" href="/admin/companies/<%= company.id %>/tms?tab=profit"><i class="ti ti-chart-bar"></i> Profitability</a>
+        <a class="tab <%= tab==='team'?'active':'' %>" href="/admin/companies/<%= company.id %>/tms?tab=team"><i class="ti ti-users-group"></i> Dispatch Team</a>
+      </div>
+
+      <!-- Metrics -->
+      <div class="metrics">
+        <div class="metric hi"><div class="m-label">Active Loads</div><div class="m-val pri"><%= stats.active %></div></div>
+        <div class="metric"><div class="m-label">Available</div><div class="m-val"><%= stats.available %></div></div>
+        <div class="metric ok"><div class="m-label">Revenue</div><div class="m-val green">$<%= stats.totalRevenue.toLocaleString() %></div></div>
+        <div class="metric"><div class="m-label">Avg RPM</div><div class="m-val">$<%= stats.avgRpm %></div></div>
+      </div>
+
+      <% if (tab === 'board') { %>
+        <!-- DISPATCH BOARD — Kanban columns -->
+        <div class="board-cols">
+          <% var boardStatuses = [
+            {key:'available', label:'Available', color:'#dbeafe', text:'#1e40af'},
+            {key:'dispatched', label:'Dispatched', color:'#fef3c7', text:'#92400e'},
+            {key:'in-transit', label:'In Transit', color:'#d1fae5', text:'#065f46'},
+            {key:'delivered', label:'Delivered', color:'#f1f5f9', text:'#475569'}
+          ]; %>
+          <% boardStatuses.forEach(bs => { var colLoads = loads.filter(l => l.status === bs.key || (bs.key === 'in-transit' && ['at-pickup','at-delivery','in-transit'].includes(l.status))); %>
+            <div class="board-col">
+              <div class="board-col-head" style="background:<%= bs.color %>;color:<%= bs.text %>;"><%= bs.label %> (<%= colLoads.length %>)</div>
+              <% colLoads.forEach(l => { %>
+                <a href="/admin/companies/<%= company.id %>/tms/loads/<%= l.id %>" class="load-card" style="cursor:pointer;text-decoration:none;color:inherit;display:block;">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div>
+                      <div style="font-size:10px;color:var(--muted);font-weight:600;"><%= l.load_number %></div>
+                      <div class="load-route"><%= l.pickup_city || '?' %>, <%= l.pickup_state || '' %> <span class="arrow">→</span> <%= l.delivery_city || '?' %>, <%= l.delivery_state || '' %></div>
+                    </div>
+                    <div class="load-pay">$<%= (l.total_pay||0).toLocaleString() %></div>
+                  </div>
+                  <div class="load-meta">
+                    <% if (l.driver_name) { %><span><i class="ti ti-user"></i> <%= l.driver_name %></span><% } %>
+                    <% if (l.vehicle_unit) { %><span><i class="ti ti-truck"></i> #<%= l.vehicle_unit %></span><% } %>
+                    <% if (l.pickup_date) { %><span><i class="ti ti-calendar"></i> <%= l.pickup_date %></span><% } %>
+                    <% if (l.total_miles) { %><span><%= l.total_miles %> mi</span><% } %>
+                    <% if (l.broker) { %><span><%= l.broker %></span><% } %>
+                  </div>
+                  <!-- Quick status buttons -->
+                  <div style="display:flex;gap:4px;margin-top:6px;" onclick="event.stopPropagation();">
+                    <% if (l.status === 'available') { %><form method="POST" action="/admin/companies/<%= company.id %>/tms/loads/<%= l.id %>/status"><input type="hidden" name="status" value="dispatched"><button type="submit" class="btn btn-sm" style="font-size:10px;padding:3px 8px;">Dispatch</button></form><% } %>
+                    <% if (l.status === 'dispatched') { %><form method="POST" action="/admin/companies/<%= company.id %>/tms/loads/<%= l.id %>/status"><input type="hidden" name="status" value="in-transit"><button type="submit" class="btn btn-sm" style="font-size:10px;padding:3px 8px;">In Transit</button></form><% } %>
+                    <% if (['in-transit','at-pickup','at-delivery'].includes(l.status)) { %><form method="POST" action="/admin/companies/<%= company.id %>/tms/loads/<%= l.id %>/status"><input type="hidden" name="status" value="delivered"><button type="submit" class="btn btn-sm btn-primary" style="font-size:10px;padding:3px 8px;">Delivered</button></form><% } %>
+                  </div>
+                </div>
+              <% }) %>
+              <% if (colLoads.length === 0) { %><div style="padding:20px;text-align:center;color:var(--muted);font-size:11px;">No loads</div><% } %>
+            </div>
+          <% }) %>
+        </div>
+
+      <% } else if (tab === 'loads') { %>
+        <!-- ALL LOADS — List view -->
+        <input type="text" id="loadSearch" placeholder="Search loads..." oninput="filterLoads()" style="margin-bottom:12px;padding:8px 12px;font-size:12px;width:100%;max-width:300px;">
+        <div style="overflow-x:auto;">
+        <table class="tbl" id="loadTable">
+          <thead><tr><th>Load #</th><th>Route</th><th>Customer/Broker</th><th>Driver</th><th>Truck</th><th>Pay</th><th>Miles</th><th>RPM</th><th>Status</th><th>Pickup</th><th></th></tr></thead>
+          <tbody>
+          <% loads.forEach(l => { %>
+            <tr data-search="<%= [l.load_number,l.pickup_city,l.delivery_city,l.broker,l.customer,l.driver_name,l.vehicle_unit].filter(Boolean).join(' ').toLowerCase() %>">
+              <td><strong><%= l.load_number %></strong></td>
+              <td><%= l.pickup_city||'?' %>, <%= l.pickup_state||'' %> → <%= l.delivery_city||'?' %>, <%= l.delivery_state||'' %></td>
+              <td><%= l.customer || l.broker || '—' %><% if (l.broker_mc) { %> <span style="font-size:9px;color:var(--muted);">MC#<%= l.broker_mc %></span><% } %></td>
+              <td><%= l.driver_name || '—' %></td>
+              <td><%= l.vehicle_unit ? '#'+l.vehicle_unit : '—' %></td>
+              <td style="font-weight:700;color:var(--success);">$<%= (l.total_pay||0).toLocaleString() %></td>
+              <td><%= l.total_miles || '—' %></td>
+              <td>$<%= (l.rate_per_mile||0) %></td>
+              <td><span class="status-pill st-<%= l.status %>"><%= l.status %></span></td>
+              <td><%= l.pickup_date || '—' %></td>
+              <td style="white-space:nowrap;">
+                <button class="btn-ghost" onclick="document.getElementById('editLoad-<%= l.id %>').classList.add('open')"><i class="ti ti-edit"></i></button>
+                <form method="POST" action="/admin/companies/<%= company.id %>/tms/loads/<%= l.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Delete?')" style="color:var(--danger);"><i class="ti ti-trash"></i></button></form>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+        </div>
+        <script>function filterLoads(){var q=document.getElementById('loadSearch').value.toLowerCase();document.querySelectorAll('#loadTable tbody tr').forEach(r=>{r.style.display=(!q||r.dataset.search.indexOf(q)>=0)?'':'none';});}</script>
+
+      <% } else if (tab === 'equipment') { %>
+        <!-- EQUIPMENT AVAILABILITY -->
+        <%
+          var trucksOnLoad = new Set(loads.filter(l => l.vehicle_id && !['delivered','cancelled'].includes(l.status)).map(l => l.vehicle_id));
+          var trailersOnLoad = new Set(loads.filter(l => l.trailer_id && !['delivered','cancelled'].includes(l.status)).map(l => l.trailer_id));
+          var driversOnLoad = new Set(loads.filter(l => l.driver_id && !['delivered','cancelled'].includes(l.status)).map(l => l.driver_id));
+          var freeTrucks = vehicles.filter(v => !trucksOnLoad.has(v.id));
+          var freeTrailers = trailers.filter(t => !trailersOnLoad.has(t.id));
+          var freeDriverCount = drivers.filter(d => !driversOnLoad.has(d.id)).length;
+        %>
+        <div class="metrics" style="margin-bottom:14px;">
+          <div class="metric ok"><div class="m-label">Free Trucks</div><div class="m-val green"><%= freeTrucks.length %>/<%= vehicles.length %></div></div>
+          <div class="metric ok"><div class="m-label">Free Trailers</div><div class="m-val green"><%= freeTrailers.length %>/<%= trailers.length %></div></div>
+          <div class="metric"><div class="m-label">Available Drivers</div><div class="m-val"><%= freeDriverCount %>/<%= drivers.length %></div></div>
+        </div>
+
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+          <!-- Free trucks -->
+          <div class="card" style="flex:1;min-width:280px;">
+            <h3 style="color:var(--success);"><i class="ti ti-truck"></i> Available Trucks (<%= freeTrucks.length %>)</h3>
+            <% freeTrucks.forEach(v => { %>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:11px;">
+                <div style="font-weight:800;">#<%= v.unit_number %></div>
+                <div style="flex:1;color:var(--muted);"><%= [v.make, v.model].filter(Boolean).join(' ') %></div>
+                <% if (v.last_location) { %><div style="font-size:10px;color:var(--primary);"><i class="ti ti-map-pin" style="font-size:10px;"></i> <%= v.last_location %></div><% } %>
+              </div>
+            <% }) %>
+            <% if (freeTrucks.length === 0) { %><div style="font-size:11px;color:var(--muted);padding:8px;">All trucks on loads</div><% } %>
+          </div>
+
+          <!-- Free trailers -->
+          <div class="card" style="flex:1;min-width:280px;">
+            <h3 style="color:var(--success);"><i class="ti ti-container"></i> Available Trailers (<%= freeTrailers.length %>)</h3>
+            <% freeTrailers.forEach(t => { %>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:11px;">
+                <div style="font-weight:800;">#<%= t.unit_number %></div>
+                <div style="flex:1;"><span class="badge draft" style="font-size:8px;"><%= t.type %></span> <%= [t.make, t.model].filter(Boolean).join(' ') %></div>
+                <% if (t.vehicle_unit) { %><div style="font-size:9px;color:var(--muted);">on truck #<%= t.vehicle_unit %></div><% } %>
+              </div>
+            <% }) %>
+            <% if (freeTrailers.length === 0) { %><div style="font-size:11px;color:var(--muted);padding:8px;">All trailers on loads</div><% } %>
+          </div>
+
+          <!-- Available drivers -->
+          <div class="card" style="flex:1;min-width:280px;">
+            <h3><i class="ti ti-user"></i> Available Drivers (<%= freeDriverCount %>)</h3>
+            <% drivers.filter(d => !driversOnLoad.has(d.id)).forEach(d => { %>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:11px;">
+                <div style="font-weight:800;"><%= d.name %></div>
+                <div style="flex:1;color:var(--muted);"><%= d.role || '' %></div>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+
+        <!-- On load -->
+        <div class="card" style="margin-top:12px;">
+          <h3 style="color:var(--danger);"><i class="ti ti-route"></i> Equipment On Loads</h3>
+          <% loads.filter(l => !['delivered','cancelled'].includes(l.status) && (l.vehicle_id || l.trailer_id)).forEach(l => { %>
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:11px;">
+              <div style="font-weight:700;min-width:70px;"><%= l.load_number %></div>
+              <div style="min-width:140px;"><%= l.pickup_city||'' %> → <%= l.delivery_city||'' %></div>
+              <% if (l.vehicle_unit) { %><span style="background:#fee2e2;color:#991b1b;padding:1px 8px;border-radius:4px;font-size:9px;font-weight:700;">Truck #<%= l.vehicle_unit %></span><% } %>
+              <% if (l.trailer_unit) { %><span style="background:#fef3c7;color:#92400e;padding:1px 8px;border-radius:4px;font-size:9px;font-weight:700;">Trailer #<%= l.trailer_unit %></span><% } %>
+              <% if (l.driver_name) { %><span style="font-size:10px;color:var(--muted);"><i class="ti ti-user" style="font-size:10px;"></i> <%= l.driver_name %></span><% } %>
+              <span class="badge <%= l.status==='in-transit'?'active':l.status==='dispatched'?'sent':'prospect' %>" style="font-size:8px;margin-left:auto;"><%= l.status %></span>
+            </div>
+          <% }) %>
+        </div>
+
+      <% } else if (tab === 'pay') { %>
+        <!-- DRIVER PAY -->
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('addPayModal').classList.add('open')" style="margin-bottom:12px;"><i class="ti ti-plus"></i> Create Settlement</button>
+        <div class="metrics" style="margin-bottom:12px;">
+          <div class="metric bad"><div class="m-label">Unpaid</div><div class="m-val red">$<%= stats.unpaidSettlements.toLocaleString() %></div></div>
+          <div class="metric"><div class="m-label">Settlements</div><div class="m-val"><%= settlements.length %></div></div>
+        </div>
+        <% if (settlements.length > 0) { %>
+          <table class="tbl">
+            <thead><tr><th>Driver</th><th>Period</th><th>Type</th><th>Miles</th><th>Loads</th><th>Gross</th><th>Deductions</th><th>Net Pay</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            <% settlements.forEach(s => { %>
+              <tr>
+                <td><strong><%= s.driver_name || '—' %></strong></td>
+                <td style="font-size:11px;"><%= s.period_start || '' %> — <%= s.period_end || '' %></td>
+                <td><%= s.pay_type %></td>
+                <td><%= s.total_miles ? s.total_miles.toLocaleString() : '—' %></td>
+                <td><%= s.total_loads || '—' %></td>
+                <td>$<%= (s.gross_pay||0).toFixed(2) %></td>
+                <td style="color:var(--danger);">-$<%= (s.deductions||0).toFixed(2) %></td>
+                <td style="font-weight:900;color:var(--primary);">$<%= (s.net_pay||0).toFixed(2) %></td>
+                <td><span class="badge <%= s.status==='paid'?'active':s.status==='approved'?'sent':'draft' %>"><%= s.status %></span></td>
+                <td><% if (s.status !== 'paid') { %><form method="POST" action="/admin/companies/<%= company.id %>/tms/settlements/<%= s.id %>/pay" style="display:inline"><button type="submit" class="btn btn-sm btn-primary" style="font-size:10px;" onclick="return confirm('Mark as paid?')">Pay</button></form><% } %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        <% } else { %><div class="empty"><span class="e-icon"><i class="ti ti-cash" style="font-size:40px;"></i></span><div class="e-text">No settlements yet</div></div><% } %>
+
+      <% } else if (tab === 'profit') { %>
+        <!-- PROFITABILITY -->
+        <% var delivered = loads.filter(l => l.status === 'delivered'); %>
+        <div class="metrics">
+          <div class="metric ok"><div class="m-label">Total Revenue</div><div class="m-val green">$<%= stats.totalRevenue.toLocaleString() %></div></div>
+          <div class="metric"><div class="m-label">Total Miles</div><div class="m-val"><%= stats.totalMiles.toLocaleString() %></div></div>
+          <div class="metric hi"><div class="m-label">Avg $/Mile</div><div class="m-val pri">$<%= stats.avgRpm %></div></div>
+          <div class="metric"><div class="m-label">Loads Delivered</div><div class="m-val"><%= delivered.length %></div></div>
+        </div>
+        <% if (delivered.length > 0) { %>
+          <!-- By driver -->
+          <div class="card">
+            <h3><i class="ti ti-user"></i> Revenue by Driver</h3>
+            <% var byDriver = {}; delivered.forEach(l => { var d = l.driver_name || 'Unassigned'; if (!byDriver[d]) byDriver[d] = {rev:0, miles:0, loads:0}; byDriver[d].rev += (l.total_pay||0); byDriver[d].miles += (l.total_miles||0); byDriver[d].loads++; }); %>
+            <table class="tbl">
+              <thead><tr><th>Driver</th><th>Loads</th><th>Miles</th><th>Revenue</th><th>$/Mile</th></tr></thead>
+              <tbody>
+              <% Object.keys(byDriver).sort((a,b) => byDriver[b].rev - byDriver[a].rev).forEach(d => { var r = byDriver[d]; %>
+                <tr><td><strong><%= d %></strong></td><td><%= r.loads %></td><td><%= r.miles.toLocaleString() %></td><td style="font-weight:700;color:var(--success);">$<%= r.rev.toLocaleString() %></td><td>$<%= r.miles > 0 ? (r.rev/r.miles).toFixed(2) : '0' %></td></tr>
+              <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <!-- By broker -->
+          <div class="card">
+            <h3><i class="ti ti-building"></i> Revenue by Broker</h3>
+            <% var byBroker = {}; delivered.forEach(l => { var b = l.broker || 'Unknown'; if (!byBroker[b]) byBroker[b] = {rev:0, loads:0}; byBroker[b].rev += (l.total_pay||0); byBroker[b].loads++; }); %>
+            <table class="tbl">
+              <thead><tr><th>Broker</th><th>Loads</th><th>Revenue</th></tr></thead>
+              <tbody>
+              <% Object.keys(byBroker).sort((a,b) => byBroker[b].rev - byBroker[a].rev).forEach(b => { var r = byBroker[b]; %>
+                <tr><td><strong><%= b %></strong></td><td><%= r.loads %></td><td style="font-weight:700;color:var(--success);">$<%= r.rev.toLocaleString() %></td></tr>
+              <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+      <% } else if (tab === 'team') { %>
+        <!-- DISPATCH TEAM -->
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('addDispModal').classList.add('open')" style="margin-bottom:12px;"><i class="ti ti-plus"></i> Add Dispatcher</button>
+        <% dispatchers.forEach(d => { var driverLoads = loads.filter(l => l.dispatcher_id === d.user_id); %>
+          <div class="card" style="margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div><h3 style="margin-bottom:0;font-size:14px;"><i class="ti ti-headset"></i> <%= d.name %></h3><div style="font-size:11px;color:var(--muted);">Team: <%= d.team_name || '—' %> · Max: <%= d.max_drivers %> drivers</div></div>
+              <div style="font-size:12px;"><strong><%= driverLoads.length %></strong> active loads</div>
+            </div>
+          </div>
+        <% }) %>
+        <% if (dispatchers.length === 0) { %><div class="empty"><span class="e-icon"><i class="ti ti-headset" style="font-size:40px;"></i></span><div class="e-text">No dispatchers assigned</div></div><% } %>
+      <% } %>
+
+      <!-- EDIT LOAD MODALS -->
+      <% loads.forEach(l => { %>
+        <div class="modal-bg" id="editLoad-<%= l.id %>" onclick="if(event.target===this)this.classList.remove('open')">
+          <div class="modal" style="max-width:640px;">
+            <h3><%= l.load_number %> — Edit</h3>
+            <form method="POST" action="/admin/companies/<%= company.id %>/tms/loads/<%= l.id %>/edit">
+              <div class="form-row"><div class="form-group"><label>Status</label><select name="status"><% ['available','dispatched','at-pickup','in-transit','at-delivery','delivered','cancelled'].forEach(s=>{%><option <%=l.status===s?'selected':''%>><%= s %></option><%})%></select></div><div class="form-group"><label>Equipment</label><select name="equipment_type"><% ['dry-van','reefer','flatbed','step-deck','lowboy','tanker','power-only','box-truck'].forEach(t=>{%><option <%=l.equipment_type===t?'selected':''%>><%= t %></option><%})%></select></div></div>
+              <div class="form-row"><div class="form-group"><label>Broker</label><input type="text" name="broker" value="<%= l.broker||'' %>"></div><div class="form-group"><label>MC#</label><input type="text" name="broker_mc" value="<%= l.broker_mc||'' %>"></div></div>
+              <div class="form-row"><div class="form-group"><label>Customer</label><input type="text" name="customer" value="<%= l.customer||'' %>"></div><div class="form-group"><label>Ref #</label><input type="text" name="reference_number" value="<%= l.reference_number||'' %>"></div></div>
+              <div style="font-size:11px;font-weight:800;margin:10px 0 4px;color:var(--primary);">PICKUP</div>
+              <div class="form-row"><div class="form-group"><label>City</label><input type="text" name="pickup_city" value="<%= l.pickup_city||'' %>"></div><div class="form-group"><label>State</label><input type="text" name="pickup_state" value="<%= l.pickup_state||'' %>" maxlength="2"></div></div>
+              <div class="form-row"><div class="form-group"><label>Date</label><input type="date" name="pickup_date" value="<%= l.pickup_date||'' %>"></div><div class="form-group"><label>Time</label><input type="text" name="pickup_time" value="<%= l.pickup_time||'' %>"></div></div>
+              <div style="font-size:11px;font-weight:800;margin:10px 0 4px;color:var(--danger);">DELIVERY</div>
+              <div class="form-row"><div class="form-group"><label>City</label><input type="text" name="delivery_city" value="<%= l.delivery_city||'' %>"></div><div class="form-group"><label>State</label><input type="text" name="delivery_state" value="<%= l.delivery_state||'' %>" maxlength="2"></div></div>
+              <div class="form-row"><div class="form-group"><label>Date</label><input type="date" name="delivery_date" value="<%= l.delivery_date||'' %>"></div><div class="form-group"><label>Time</label><input type="text" name="delivery_time" value="<%= l.delivery_time||'' %>"></div></div>
+              <div style="font-size:11px;font-weight:800;margin:10px 0 4px;">PAY</div>
+              <div class="form-row"><div class="form-group"><label>Rate ($)</label><input type="number" name="rate" step="0.01" value="<%= l.rate||0 %>"></div><div class="form-group"><label>Fuel Surcharge</label><input type="number" name="fuel_surcharge" step="0.01" value="<%= l.fuel_surcharge||0 %>"></div></div>
+              <div class="form-row"><div class="form-group"><label>Miles</label><input type="number" name="total_miles" value="<%= l.total_miles||0 %>"></div><div class="form-group"><label>Commodity</label><input type="text" name="commodity" value="<%= l.commodity||'' %>"></div></div>
+              <div style="font-size:11px;font-weight:800;margin:10px 0 4px;">ASSIGNMENT</div>
+              <div class="form-row"><div class="form-group"><label>Driver</label><select name="driver_id"><option value="">—</option><% drivers.forEach(d=>{%><option value="<%=d.id%>" <%=l.driver_id===d.id?'selected':''%>><%=d.name%></option><%})%></select></div><div class="form-group"><label>Truck</label><select name="vehicle_id"><option value="">—</option><% vehicles.forEach(v=>{%><option value="<%=v.id%>" <%=l.vehicle_id===v.id?'selected':''%>>#<%=v.unit_number%></option><%})%></select></div></div>
+              <div class="form-row"><div class="form-group"><label>Trailer</label><select name="trailer_id"><option value="">—</option><% trailers.forEach(t=>{%><option value="<%=t.id%>" <%=l.trailer_id===t.id?'selected':''%>>#<%=t.unit_number%></option><%})%></select></div><div class="form-group"><label>Dispatcher</label><select name="dispatcher_id"><option value="">—</option><% dispatchers.forEach(d=>{%><option value="<%=d.user_id%>" <%=l.dispatcher_id===d.user_id?'selected':''%>><%=d.name%></option><%})%></select></div></div>
+              <div class="form-check"><input type="checkbox" name="pod_received" value="1" <%= l.pod_received ? 'checked' : '' %>> POD Received</div>
+              <div class="form-group"><label>Notes</label><textarea name="notes"><%= l.notes||'' %></textarea></div>
+              <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('editLoad-<%= l.id %>').classList.remove('open')">Cancel</button></div>
+            </form>
+          </div>
+        </div>
+      <% }) %>
+
+      <!-- ADD LOAD MODAL -->
+      <div class="modal-bg" id="addLoadModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal" style="max-width:640px;">
+          <h3><i class="ti ti-plus"></i> New Load</h3>
+          <form method="POST" action="/admin/companies/<%= company.id %>/tms/loads">
+            <div class="form-row"><div class="form-group"><label>Broker</label><input type="text" name="broker" placeholder="Broker name"></div><div class="form-group"><label>MC#</label><input type="text" name="broker_mc"></div></div>
+            <div class="form-row"><div class="form-group"><label>Customer</label><input type="text" name="customer"></div><div class="form-group"><label>Ref #</label><input type="text" name="reference_number"></div></div>
+            <div style="font-size:11px;font-weight:800;margin:10px 0 4px;color:var(--primary);">PICKUP</div>
+            <div class="form-row"><div class="form-group"><label>City *</label><input type="text" name="pickup_city" required></div><div class="form-group"><label>State</label><input type="text" name="pickup_state" maxlength="2"></div></div>
+            <div class="form-row"><div class="form-group"><label>Date</label><input type="date" name="pickup_date"></div><div class="form-group"><label>Time</label><input type="text" name="pickup_time" placeholder="08:00 AM"></div></div>
+            <div style="font-size:11px;font-weight:800;margin:10px 0 4px;color:var(--danger);">DELIVERY</div>
+            <div class="form-row"><div class="form-group"><label>City *</label><input type="text" name="delivery_city" required></div><div class="form-group"><label>State</label><input type="text" name="delivery_state" maxlength="2"></div></div>
+            <div class="form-row"><div class="form-group"><label>Date</label><input type="date" name="delivery_date"></div><div class="form-group"><label>Time</label><input type="text" name="delivery_time" placeholder="02:00 PM"></div></div>
+            <div style="font-size:11px;font-weight:800;margin:10px 0 4px;">PAY & DETAILS</div>
+            <div class="form-row-3"><div class="form-group"><label>Rate ($)</label><input type="number" name="rate" step="0.01"></div><div class="form-group"><label>Miles</label><input type="number" name="total_miles"></div><div class="form-group"><label>Equipment</label><select name="equipment_type"><option>dry-van</option><option>reefer</option><option>flatbed</option><option>step-deck</option><option>power-only</option></select></div></div>
+            <div class="form-row"><div class="form-group"><label>Commodity</label><input type="text" name="commodity" placeholder="General freight"></div><div class="form-group"><label>Weight (lbs)</label><input type="number" name="weight"></div></div>
+            <div style="font-size:11px;font-weight:800;margin:10px 0 4px;">ASSIGNMENT</div>
+            <div class="form-row"><div class="form-group"><label>Driver</label><select name="driver_id"><option value="">—</option><% drivers.forEach(d=>{%><option value="<%=d.id%>"><%=d.name%></option><%})%></select></div><div class="form-group"><label>Truck</label><select name="vehicle_id"><option value="">—</option><% vehicles.forEach(v=>{%><option value="<%=v.id%>">#<%=v.unit_number%></option><%})%></select></div></div>
+            <div class="form-row"><div class="form-group"><label>Trailer</label><select name="trailer_id"><option value="">—</option><% trailers.forEach(t=>{%><option value="<%=t.id%>">#<%=t.unit_number%></option><%})%></select></div><div class="form-group"><label>Dispatcher</label><select name="dispatcher_id"><option value="">—</option><% dispatchers.forEach(d=>{%><option value="<%=d.user_id%>"><%=d.name%></option><%})%></select></div></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Create Load</button><button type="button" class="btn" onclick="document.getElementById('addLoadModal').classList.remove('open')">Cancel</button></div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ADD SETTLEMENT MODAL -->
+      <div class="modal-bg" id="addPayModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal">
+          <h3><i class="ti ti-cash"></i> Create Settlement</h3>
+          <form method="POST" action="/admin/companies/<%= company.id %>/tms/settlements">
+            <div class="form-group"><label>Driver *</label><select name="driver_id" required><option value="">—</option><% drivers.forEach(d=>{%><option value="<%=d.id%>"><%=d.name%></option><%})%></select></div>
+            <div class="form-row"><div class="form-group"><label>Period Start</label><input type="date" name="period_start"></div><div class="form-group"><label>Period End</label><input type="date" name="period_end"></div></div>
+            <div class="form-row"><div class="form-group"><label>Pay Type</label><select name="pay_type"><option value="per-mile">Per Mile</option><option value="percentage">Percentage</option><option value="flat">Flat Rate</option><option value="hourly">Hourly</option></select></div><div class="form-group"><label>Rate</label><input type="number" name="rate" step="0.01" placeholder="0.55 per mile"></div></div>
+            <div class="form-row"><div class="form-group"><label>Total Miles</label><input type="number" name="total_miles"></div><div class="form-group"><label>Total Loads</label><input type="number" name="total_loads"></div></div>
+            <div class="form-row"><div class="form-group"><label>Gross Pay *</label><input type="number" name="gross_pay" step="0.01" required></div><div class="form-group"><label>Bonus</label><input type="number" name="bonus" step="0.01" value="0"></div></div>
+            <div class="form-row"><div class="form-group"><label>Deductions</label><input type="number" name="deductions" step="0.01" value="0"></div><div class="form-group"><label>Reimbursements</label><input type="number" name="reimbursements" step="0.01" value="0"></div></div>
+            <div class="form-group"><label>Notes</label><textarea name="notes"></textarea></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Create Settlement</button><button type="button" class="btn" onclick="document.getElementById('addPayModal').classList.remove('open')">Cancel</button></div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ADD DISPATCHER MODAL -->
+      <div class="modal-bg" id="addDispModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal" style="max-width:400px;">
+          <h3><i class="ti ti-headset"></i> Add Dispatcher</h3>
+          <form method="POST" action="/admin/companies/<%= company.id %>/tms/dispatchers">
+            <div class="form-group"><label>Employee *</label><select name="user_id" required><option value="">—</option><% drivers.forEach(d=>{%><option value="<%=d.id%>"><%=d.name%></option><%})%></select></div>
+            <div class="form-group"><label>Team Name</label><input type="text" name="team_name" placeholder="e.g. East Coast, Night Shift"></div>
+            <div class="form-group"><label>Max Drivers</label><input type="number" name="max_drivers" value="20"></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Add</button><button type="button" class="btn" onclick="document.getElementById('addDispModal').classList.remove('open')">Cancel</button></div>
+          </form>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;"><a href="/admin/companies/<%= company.id %>" class="btn btn-sm">← Back to <%= company.name %></a></div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>
