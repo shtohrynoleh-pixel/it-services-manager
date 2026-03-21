@@ -777,10 +777,8 @@ module.exports = function(db) {
   router.get('/companies/:cid/fleet/map', (req, res) => {
     const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.cid);
     if (!company) return res.redirect('/admin/companies');
-    // Get all ELD vehicles with location
-    const eldVehicles = safeAll("SELECT ev.*, ei.provider, ei.label as integration_label FROM eld_vehicles ev JOIN eld_integrations ei ON ev.integration_id = ei.id WHERE ev.company_id = ? AND ev.last_lat IS NOT NULL", [company.id]);
-    // Get fleet vehicles linked to ELD
-    const fleetVehicles = safeAll("SELECT fv.*, ev.last_lat, ev.last_lng, ev.last_location, ev.last_speed, ev.status as eld_status, ev.driver_name as eld_driver, ev.fuel_pct, ev.odometer as eld_odometer, ei.provider FROM fleet_vehicles fv LEFT JOIN eld_vehicles ev ON fv.eld_vehicle_id = ev.id LEFT JOIN eld_integrations ei ON ev.integration_id = ei.id WHERE fv.company_id = ?", [company.id]);
+    const eldVehicles = safeAll("SELECT ev.*, ei.provider, ei.label as integration_label FROM eld_vehicles ev LEFT JOIN eld_integrations ei ON ev.integration_id = ei.id WHERE ev.company_id = ?", [company.id]);
+    const fleetVehicles = safeAll("SELECT fv.*, cu.name as driver_name, ev.last_lat, ev.last_lng, ev.last_location, ev.last_speed, ev.status as eld_status, ev.driver_name as eld_driver, ev.fuel_pct, ev.odometer as eld_odometer FROM fleet_vehicles fv LEFT JOIN company_users cu ON fv.driver_id = cu.id LEFT JOIN eld_vehicles ev ON fv.eld_vehicle_id = ev.id WHERE fv.company_id = ?", [company.id]);
     res.render(V('fleet-map'), { user: req.session.user, company, eldVehicles, fleetVehicles, settings: getSettings(), page: 'companies' });
   });
 
@@ -814,8 +812,9 @@ module.exports = function(db) {
 
   // API endpoint for live map data (AJAX polling)
   router.get('/companies/:cid/fleet/map-data', (req, res) => {
-    const vehicles = safeAll("SELECT ev.*, ei.provider, ei.label as integration_label, fv.unit_number as fleet_unit, fv.make as fleet_make, fv.model as fleet_model FROM eld_vehicles ev JOIN eld_integrations ei ON ev.integration_id = ei.id LEFT JOIN fleet_vehicles fv ON fv.eld_vehicle_id = ev.id WHERE ev.company_id = ? AND ev.last_lat IS NOT NULL", [req.params.cid]);
-    res.json(vehicles);
+    // All ELD vehicles with GPS
+    const eldWithGps = safeAll("SELECT ev.*, ei.provider, ei.label as integration_label, fv.unit_number as fleet_unit, fv.make as fleet_make, fv.model as fleet_model, fv.type as fleet_type FROM eld_vehicles ev LEFT JOIN eld_integrations ei ON ev.integration_id = ei.id LEFT JOIN fleet_vehicles fv ON fv.eld_vehicle_id = ev.id WHERE ev.company_id = ? AND ev.last_lat IS NOT NULL AND ev.last_lat != 0", [req.params.cid]);
+    res.json(eldWithGps);
   });
 
   // === DOMAIN MANAGEMENT ===
