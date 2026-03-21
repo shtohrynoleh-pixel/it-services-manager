@@ -1,0 +1,135 @@
+<%- include('../partials/head') %>
+<style>
+.eld-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:12px;}
+.eld-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;}
+.eld-samsara{background:#1a1a2e;color:#00d4aa;}
+.eld-motive{background:#1e3a5f;color:#4fc3f7;}
+.eld-other{background:#f1f5f9;color:#64748b;}
+.v-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+.v-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;transition:all 0.12s;}
+.v-card:hover{border-color:var(--primary);box-shadow:0 2px 12px rgba(8,145,178,0.06);}
+.v-card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.v-card h4{font-size:14px;font-weight:800;margin:0;}
+.v-card-row{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid #f8fafc;}
+.v-card-row .label{color:var(--muted);}
+.v-card-row .value{font-weight:600;}
+.v-source{display:inline-flex;align-items:center;gap:4px;font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;}
+</style>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>" style="opacity:0.4;text-decoration:none;"><i class="ti ti-building"></i></a> → <i class="ti ti-plug-connected"></i> ELD Integrations — <%= company.name %></h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <!-- API Keys -->
+      <div class="card">
+        <h3><i class="ti ti-key"></i> API Keys (<%= integrations.length %>)</h3>
+        <% integrations.forEach(intg => {
+          var provClass = intg.provider === 'samsara' ? 'eld-samsara' : intg.provider === 'motive' ? 'eld-motive' : 'eld-other';
+        %>
+          <div class="eld-card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+              <div>
+                <span class="eld-badge <%= provClass %>"><%= intg.provider.toUpperCase() %></span>
+                <strong style="margin-left:6px;font-size:13px;"><%= intg.label || intg.provider %></strong>
+                <span class="badge <%= intg.is_active ? 'active' : 'inactive' %>" style="margin-left:4px;"><%= intg.is_active ? 'Active' : 'Off' %></span>
+              </div>
+              <div style="display:flex;gap:4px;">
+                <form method="POST" action="/admin/companies/<%= company.id %>/eld/<%= intg.id %>/sync"><button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-refresh"></i> Sync</button></form>
+                <form method="POST" action="/admin/companies/<%= company.id %>/eld/<%= intg.id %>/delete" onsubmit="return confirm('Delete this key and all synced data?')"><button type="submit" class="btn btn-sm btn-danger"><i class="ti ti-trash"></i></button></form>
+              </div>
+            </div>
+            <div style="margin-top:8px;font-size:11px;color:var(--muted);">
+              Key: <code style="background:#f1f5f9;padding:1px 6px;border-radius:4px;font-size:10px;"><%= intg.api_key.substring(0,8) %>....<%= intg.api_key.substring(intg.api_key.length-4) %></code>
+              <% if (intg.base_url) { %> · URL: <code><%= intg.base_url %></code><% } %>
+            </div>
+            <div style="margin-top:4px;font-size:10px;">
+              <% if (intg.last_sync) { %><span style="color:var(--success);font-weight:600;">Last sync: <%= intg.last_sync %></span><% } else { %><span style="color:var(--muted);">Never synced</span><% } %>
+              <% if (intg.last_error) { %><span style="color:var(--danger);margin-left:8px;">Error: <%= intg.last_error %></span><% } %>
+            </div>
+          </div>
+        <% }) %>
+
+        <!-- Add key -->
+        <details style="margin-top:12px;"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--primary);"><i class="ti ti-plus"></i> Add API Key</summary>
+          <form method="POST" action="/admin/companies/<%= company.id %>/eld" style="margin-top:10px;">
+            <div class="form-row"><div class="form-group"><label>Provider *</label><select name="provider"><option value="samsara">Samsara</option><option value="motive">Motive (KeepTruckin)</option></select></div><div class="form-group"><label>Label</label><input type="text" name="label" placeholder="e.g. Main fleet, Owner account"></div></div>
+            <div class="form-group"><label>API Key *</label><input type="text" name="api_key" required placeholder="Paste your API key here"></div>
+            <div class="form-group"><label>Custom Base URL (optional)</label><input type="text" name="base_url" placeholder="Leave blank for default"></div>
+            <button type="submit" class="btn btn-sm btn-primary">Add Key</button>
+          </form>
+        </details>
+      </div>
+
+      <!-- Sync All button -->
+      <% if (integrations.length > 0) { %>
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <form method="POST" action="/admin/companies/<%= company.id %>/eld/sync-all"><button type="submit" class="btn btn-primary btn-sm"><i class="ti ti-refresh"></i> Sync All Keys</button></form>
+          <div style="font-size:12px;color:var(--muted);display:flex;align-items:center;"><%= eldVehicles.length %> vehicles synced from <%= integrations.length %> key(s)</div>
+        </div>
+      <% } %>
+
+      <!-- Synced Vehicles -->
+      <% if (eldVehicles.length > 0) { %>
+        <h3 style="margin-bottom:12px;"><i class="ti ti-truck"></i> Synced Vehicles (<%= eldVehicles.length %>)</h3>
+
+        <!-- Filter by source -->
+        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-primary" onclick="filterEld('')">All (<%= eldVehicles.length %>)</button>
+          <% var providers = [...new Set(eldVehicles.map(v => v.provider))]; providers.forEach(p => { var count = eldVehicles.filter(v => v.provider === p).length; %>
+            <button class="btn btn-sm" onclick="filterEld('<%= p %>')"><%= p %> (<%= count %>)</button>
+          <% }) %>
+          <% var labels = [...new Set(eldVehicles.map(v => v.integration_label).filter(Boolean))]; labels.forEach(l => { var count = eldVehicles.filter(v => v.integration_label === l).length; %>
+            <button class="btn btn-sm" onclick="filterEld('', '<%= l %>')"><%= l %> (<%= count %>)</button>
+          <% }) %>
+        </div>
+
+        <div class="v-grid" id="eldGrid">
+          <% eldVehicles.forEach(v => {
+            var provClass = v.provider === 'samsara' ? 'eld-samsara' : v.provider === 'motive' ? 'eld-motive' : 'eld-other';
+          %>
+            <div class="v-card" data-provider="<%= v.provider %>" data-label="<%= v.integration_label || '' %>">
+              <div class="v-card-head">
+                <div>
+                  <h4><%= v.name || '—' %></h4>
+                  <div style="margin-top:2px;">
+                    <span class="v-source <%= provClass %>"><%= v.provider %></span>
+                    <% if (v.integration_label) { %><span class="v-source eld-other"><%= v.integration_label %></span><% } %>
+                  </div>
+                </div>
+                <span class="badge <%= v.status === 'active' || v.status === 'en-route' ? 'active' : v.status === 'off' || v.status === 'parked' ? 'inactive' : 'draft' %>"><%= v.status || 'unknown' %></span>
+              </div>
+              <div class="v-card-row"><span class="label">Vehicle</span><span class="value"><%= [v.year, v.make, v.model].filter(Boolean).join(' ') || '—' %></span></div>
+              <% if (v.vin) { %><div class="v-card-row"><span class="label">VIN</span><span class="value" style="font-family:monospace;font-size:10px;"><%= v.vin %></span></div><% } %>
+              <% if (v.license_plate) { %><div class="v-card-row"><span class="label">Plate</span><span class="value"><%= v.license_plate %></span></div><% } %>
+              <% if (v.driver_name) { %><div class="v-card-row"><span class="label">Driver</span><span class="value"><%= v.driver_name %></span></div><% } %>
+              <% if (v.odometer) { %><div class="v-card-row"><span class="label">Odometer</span><span class="value"><%= Math.round(v.odometer).toLocaleString() %> mi</span></div><% } %>
+              <% if (v.fuel_pct) { %><div class="v-card-row"><span class="label">Fuel</span><span class="value" style="color:<%= v.fuel_pct > 25 ? 'var(--success)' : 'var(--danger)' %>;"><%= v.fuel_pct %>%</span></div><% } %>
+              <% if (v.last_location) { %><div class="v-card-row"><span class="label">Location</span><span class="value"><%= v.last_location %></span></div><% } %>
+              <% if (v.last_speed != null) { %><div class="v-card-row"><span class="label">Speed</span><span class="value"><%= v.last_speed %> mph</span></div><% } %>
+              <div style="font-size:9px;color:var(--muted);margin-top:6px;">Updated: <%= v.last_updated || '—' %></div>
+            </div>
+          <% }) %>
+        </div>
+      <% } else if (integrations.length > 0) { %>
+        <div class="empty"><span class="e-icon"><i class="ti ti-truck" style="font-size:40px;"></i></span><div class="e-text">No vehicles synced yet</div><div style="font-size:12px;color:var(--muted);">Click "Sync" on an API key above to pull vehicles.</div></div>
+      <% } %>
+
+      <div style="margin-top:16px;"><a href="/admin/companies/<%= company.id %>" class="btn btn-sm">← Back to <%= company.name %></a></div>
+
+      <script>
+      function filterEld(provider, label) {
+        document.querySelectorAll('#eldGrid .v-card').forEach(function(c) {
+          var show = true;
+          if (provider && c.dataset.provider !== provider) show = false;
+          if (label && c.dataset.label !== label) show = false;
+          c.style.display = show ? '' : 'none';
+        });
+      }
+      </script>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

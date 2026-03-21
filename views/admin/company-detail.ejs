@@ -16,6 +16,7 @@
           <a class="tab <%= tab === t ? 'active' : '' %>" href="/admin/companies/<%= company.id %>?tab=<%= t %>"><%= t.charAt(0).toUpperCase() + t.slice(1) %></a>
         <% }) %>
         <a class="tab" href="/admin/companies/<%= company.id %>/fleet" style="color:var(--primary);"><i class="ti ti-truck"></i> Fleet</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/eld" style="color:var(--primary);"><i class="ti ti-plug-connected"></i> ELD</a>
         <a class="tab" href="/admin/companies/<%= company.id %>/domains" style="color:var(--primary);"><i class="ti ti-world"></i> Domains</a>
         <a class="tab" href="/admin/companies/<%= company.id %>/files" style="color:var(--primary);"><i class="ti ti-folder"></i> Files</a>
         <a class="tab" href="/admin/companies/<%= company.id %>/rdp" style="color:var(--primary);"><i class="ti ti-remote"></i> RDP</a>

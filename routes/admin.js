@@ -717,6 +717,54 @@ module.exports = function(db) {
     res.redirect('/admin/companies/' + req.params.cid + '/fleet');
   });
 
+  // === ELD INTEGRATIONS (Samsara, Motive) ===
+  router.get('/companies/:cid/eld', (req, res) => {
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.cid);
+    if (!company) return res.redirect('/admin/companies');
+    const integrations = safeAll('SELECT * FROM eld_integrations WHERE company_id = ? ORDER BY provider, label', [company.id]);
+    const eldVehicles = safeAll('SELECT ev.*, ei.provider, ei.label as integration_label FROM eld_vehicles ev JOIN eld_integrations ei ON ev.integration_id = ei.id WHERE ev.company_id = ? ORDER BY ei.provider, ev.name', [company.id]);
+    res.render(V('eld'), { user: req.session.user, company, integrations, eldVehicles, settings: getSettings(), page: 'companies' });
+  });
+
+  router.post('/companies/:cid/eld', (req, res) => {
+    const { provider, label, api_key, base_url } = req.body;
+    if (!api_key) return res.redirect('/admin/companies/' + req.params.cid + '/eld');
+    const defaults = { samsara: 'https://api.samsara.com', motive: 'https://api.keeptruckin.com' };
+    try {
+      db.prepare('INSERT INTO eld_integrations (company_id, provider, label, api_key, base_url) VALUES (?,?,?,?,?)').run(
+        req.params.cid, provider || 'samsara', label || null, api_key, base_url || defaults[provider] || ''
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/eld');
+  });
+
+  router.post('/companies/:cid/eld/:eid/sync', async (req, res) => {
+    const integration = safeGet('SELECT * FROM eld_integrations WHERE id = ? AND company_id = ?', [req.params.eid, req.params.cid]);
+    if (!integration) return res.redirect('/admin/companies/' + req.params.cid + '/eld');
+    const { syncIntegration } = require('../lib/eld-sync');
+    const result = await syncIntegration(db, integration);
+    console.log('ELD sync:', result);
+    res.redirect('/admin/companies/' + req.params.cid + '/eld');
+  });
+
+  router.post('/companies/:cid/eld/:eid/delete', (req, res) => {
+    try {
+      db.prepare('DELETE FROM eld_vehicles WHERE integration_id = ? AND company_id = ?').run(req.params.eid, req.params.cid);
+      db.prepare('DELETE FROM eld_integrations WHERE id = ? AND company_id = ?').run(req.params.eid, req.params.cid);
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/eld');
+  });
+
+  // Sync all integrations for a company
+  router.post('/companies/:cid/eld/sync-all', async (req, res) => {
+    const integrations = safeAll('SELECT * FROM eld_integrations WHERE company_id = ? AND is_active = 1', [req.params.cid]);
+    const { syncIntegration } = require('../lib/eld-sync');
+    for (const intg of integrations) {
+      await syncIntegration(db, intg);
+    }
+    res.redirect('/admin/companies/' + req.params.cid + '/eld');
+  });
+
   // === DOMAIN MANAGEMENT ===
   router.get('/companies/:cid/domains', (req, res) => {
     const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.cid);

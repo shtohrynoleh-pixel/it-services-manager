@@ -687,6 +687,47 @@ function initDB() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    -- ELD/Telematics API keys (Samsara, Motive, etc.)
+    CREATE TABLE IF NOT EXISTS eld_integrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      provider TEXT NOT NULL,
+      label TEXT,
+      api_key TEXT NOT NULL,
+      base_url TEXT,
+      is_active INTEGER DEFAULT 1,
+      last_sync TEXT,
+      last_error TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    );
+
+    -- Synced vehicles from ELD providers
+    CREATE TABLE IF NOT EXISTS eld_vehicles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      integration_id INTEGER NOT NULL,
+      external_id TEXT,
+      name TEXT,
+      make TEXT,
+      model TEXT,
+      year INTEGER,
+      vin TEXT,
+      license_plate TEXT,
+      status TEXT,
+      odometer REAL,
+      fuel_pct REAL,
+      last_location TEXT,
+      last_lat REAL,
+      last_lng REAL,
+      last_speed REAL,
+      driver_name TEXT,
+      raw_data TEXT,
+      last_updated TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+      FOREIGN KEY (integration_id) REFERENCES eld_integrations(id) ON DELETE CASCADE
+    );
+
     -- Fleet: Vehicles (trucks)
     CREATE TABLE IF NOT EXISTS fleet_vehicles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
