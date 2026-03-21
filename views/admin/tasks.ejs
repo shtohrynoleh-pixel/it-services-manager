@@ -30,36 +30,78 @@
         </form>
       </details>
 
+      <%
+        // SLA metrics
+        var completedTasks = tasks.filter(t => t.status === 'done' && t.sla_resolve_min);
+        var avgResponse = completedTasks.length > 0 ? Math.round(tasks.filter(t => t.sla_response_min).reduce((s,t) => s + t.sla_response_min, 0) / tasks.filter(t => t.sla_response_min).length) : 0;
+        var avgResolve = completedTasks.length > 0 ? Math.round(completedTasks.reduce((s,t) => s + t.sla_resolve_min, 0) / completedTasks.length) : 0;
+        function fmtMin(m) {
+          if (!m) return '—';
+          if (m < 60) return m + 'min';
+          if (m < 1440) return Math.round(m/60*10)/10 + 'hr';
+          return Math.round(m/1440*10)/10 + 'days';
+        }
+      %>
+      <% if (completedTasks.length > 0) { %>
+        <div class="metrics" style="margin-bottom:14px;">
+          <div class="metric hi"><div class="m-label">Avg Response</div><div class="m-val pri" style="font-size:20px;"><%= fmtMin(avgResponse) %></div></div>
+          <div class="metric ok"><div class="m-label">Avg Resolution</div><div class="m-val green" style="font-size:20px;"><%= fmtMin(avgResolve) %></div></div>
+          <div class="metric"><div class="m-label">Resolved</div><div class="m-val"><%= completedTasks.length %></div></div>
+          <div class="metric"><div class="m-label">Open</div><div class="m-val"><%= tasks.filter(t => t.status !== 'done').length %></div></div>
+        </div>
+      <% } %>
+
       <% if (tasks.length === 0) { %>
-        <div class="empty"><span class="e-icon">✅</span><div class="e-text">No tasks<%= filter === 'open' ? ' open' : '' %></div></div>
+        <div class="empty"><span class="e-icon"><i class="ti ti-checkbox" style="font-size:40px;"></i></span><div class="e-text">No tasks<%= filter === 'open' ? ' open' : '' %></div></div>
       <% } else { %>
         <% tasks.forEach(t => { %>
-          <div class="item-card" style="cursor:default;align-items:flex-start;">
+          <%
+            // Calculate age
+            var ageMin = t.created_at ? Math.round((Date.now() - new Date(t.created_at + 'Z').getTime()) / 60000) : 0;
+            var isOverdue = t.due_date && t.due_date < new Date().toISOString().slice(0,10) && t.status !== 'done';
+          %>
+          <div class="item-card" style="cursor:default;align-items:flex-start;<%= isOverdue ? 'border-color:var(--danger);background:#fef2f2;' : '' %>">
             <div style="margin-right:10px;margin-top:2px;">
               <% if (t.status === 'done') { %>
-                <span style="color:var(--success);font-size:18px;">✅</span>
+                <span style="color:var(--success);font-size:18px;"><i class="ti ti-circle-check"></i></span>
               <% } else { %>
-                <form method="POST" action="/admin/tasks/<%= t.id %>/status" style="display:inline"><input type="hidden" name="status" value="done"><button type="submit" style="background:none;border:2px solid var(--border);width:22px;height:22px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;" title="Mark done">&nbsp;</button></form>
+                <form method="POST" action="/admin/tasks/<%= t.id %>/status" style="display:inline"><input type="hidden" name="status" value="done"><button type="submit" style="background:none;border:2px solid var(--border);width:22px;height:22px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Mark done">&nbsp;</button></form>
               <% } %>
             </div>
             <div class="ic-main" style="flex:1;min-width:0;">
               <div class="ic-name" style="<%= t.status === 'done' ? 'text-decoration:line-through;opacity:0.5;' : '' %>"><%= t.title %></div>
               <div class="ic-sub">
                 <% if (t.company_name) { %><strong><%= t.company_name %></strong> · <% } %>
-                <% if (t.assigned_to) { %>👤 <%= t.assigned_to %> · <% } %>
-                <% if (t.due_date) { %>📅 <%= t.due_date %> · <% } %>
-                <% if (t.created_by === 'client') { %><span class="badge sent">Client Request</span> · <% } %>
+                <% if (t.assigned_to) { %><i class="ti ti-user" style="font-size:10px;"></i> <%= t.assigned_to %> · <% } %>
+                <% if (t.due_date) { %><i class="ti ti-calendar" style="font-size:10px;"></i> <%= t.due_date %> · <% } %>
+                <% if (t.created_by === 'client') { %><span class="badge sent">Client</span> · <% } %>
+                <% if (t.created_by === 'website') { %><span class="badge prospect">Website</span> · <% } %>
+                <% if (t.related_table) { %><span class="badge draft"><%= t.related_table %></span> · <% } %>
                 <span class="badge <%= t.priority === 'urgent' ? 'overdue' : t.priority === 'high' ? 'sent' : t.priority === 'low' ? 'inactive' : 'active' %>"><%= t.priority %></span>
                 <span class="badge <%= t.status === 'done' ? 'paid' : t.status === 'in-progress' ? 'sent' : 'prospect' %>"><%= t.status %></span>
               </div>
-              <% if (t.description) { %><div style="font-size:11px;color:#475569;margin-top:4px;white-space:pre-wrap;"><%= t.description %></div><% } %>
+              <% if (t.description) { %><div style="font-size:11px;color:#475569;margin-top:4px;white-space:pre-wrap;max-height:60px;overflow:hidden;"><%= t.description %></div><% } %>
+              <!-- SLA timing -->
+              <div style="display:flex;gap:12px;margin-top:6px;font-size:10px;color:var(--muted);">
+                <span><i class="ti ti-clock" style="font-size:10px;"></i> Created: <%= t.created_at ? t.created_at.replace('T',' ').substring(0,16) : '—' %></span>
+                <% if (t.status === 'done') { %>
+                  <% if (t.sla_response_min != null) { %><span style="color:<%= t.sla_response_min <= 60 ? 'var(--success)' : t.sla_response_min <= 240 ? 'var(--accent)' : 'var(--danger)' %>;font-weight:700;"><i class="ti ti-message-dots" style="font-size:10px;"></i> Response: <%= fmtMin(t.sla_response_min) %></span><% } %>
+                  <% if (t.sla_resolve_min != null) { %><span style="color:<%= t.sla_resolve_min <= 1440 ? 'var(--success)' : t.sla_resolve_min <= 4320 ? 'var(--accent)' : 'var(--danger)' %>;font-weight:700;"><i class="ti ti-circle-check" style="font-size:10px;"></i> Resolved: <%= fmtMin(t.sla_resolve_min) %></span><% } %>
+                <% } else { %>
+                  <span style="color:<%= ageMin <= 240 ? 'var(--muted)' : ageMin <= 1440 ? 'var(--accent)' : 'var(--danger)' %>;font-weight:700;"><i class="ti ti-hourglass" style="font-size:10px;"></i> Open: <%= fmtMin(ageMin) %></span>
+                  <% if (t.first_response_at) { %><span style="color:var(--success);font-weight:700;"><i class="ti ti-message-dots" style="font-size:10px;"></i> Responded: <%= fmtMin(t.sla_response_min) %></span><% } else { %><span style="color:var(--danger);font-weight:700;">No response yet</span><% } %>
+                <% } %>
+              </div>
             </div>
-            <div style="display:flex;gap:4px;flex-shrink:0;">
+            <div style="display:flex;gap:4px;flex-shrink:0;flex-direction:column;">
               <% if (t.status !== 'done' && t.status !== 'in-progress') { %>
-                <form method="POST" action="/admin/tasks/<%= t.id %>/status" style="display:inline"><input type="hidden" name="status" value="in-progress"><button type="submit" class="btn btn-sm" title="Start">▶</button></form>
+                <form method="POST" action="/admin/tasks/<%= t.id %>/status" style="display:inline"><input type="hidden" name="status" value="in-progress"><button type="submit" class="btn btn-sm" title="Start working"><i class="ti ti-player-play"></i></button></form>
               <% } %>
-              <a href="/admin/tasks/<%= t.id %>/edit" class="btn btn-sm" title="Edit">✏️</a>
-              <form method="POST" action="/admin/tasks/<%= t.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Delete task?')">🗑️</button></form>
+              <% if (t.status === 'in-progress') { %>
+                <form method="POST" action="/admin/tasks/<%= t.id %>/status" style="display:inline"><input type="hidden" name="status" value="done"><button type="submit" class="btn btn-sm" title="Complete" style="background:var(--success);color:#fff;border-color:var(--success);"><i class="ti ti-check"></i></button></form>
+              <% } %>
+              <a href="/admin/tasks/<%= t.id %>/edit" class="btn btn-sm" title="Edit"><i class="ti ti-edit"></i></a>
+              <form method="POST" action="/admin/tasks/<%= t.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Delete?')" style="color:var(--danger);"><i class="ti ti-trash"></i></button></form>
             </div>
           </div>
         <% }) %>

@@ -201,8 +201,29 @@ module.exports = function(db) {
   });
 
   router.post('/tasks/:id/status', (req, res) => {
-    db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run(req.body.status, req.params.id);
-    if (req.body.status === 'done') awardXP(db, xpUser(req), 'complete_task', null, req);
+    const newStatus = req.body.status;
+    const task = safeGet('SELECT * FROM tasks WHERE id = ?', [req.params.id]);
+    db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run(newStatus, req.params.id);
+
+    // Track SLA timestamps
+    if (task) {
+      // First response (any status change from 'todo')
+      if (!task.first_response_at && task.status === 'todo' && newStatus !== 'todo') {
+        const responseMin = task.created_at ? Math.round((Date.now() - new Date(task.created_at + 'Z').getTime()) / 60000) : null;
+        try { db.prepare("UPDATE tasks SET first_response_at = datetime('now'), sla_response_min = ? WHERE id = ?").run(responseMin, req.params.id); } catch(e) {}
+      }
+      // Started
+      if (!task.started_at && newStatus === 'in-progress') {
+        try { db.prepare("UPDATE tasks SET started_at = datetime('now') WHERE id = ?").run(req.params.id); } catch(e) {}
+      }
+      // Completed
+      if (newStatus === 'done' && !task.completed_at) {
+        const resolveMin = task.created_at ? Math.round((Date.now() - new Date(task.created_at + 'Z').getTime()) / 60000) : null;
+        try { db.prepare("UPDATE tasks SET completed_at = datetime('now'), sla_resolve_min = ? WHERE id = ?").run(resolveMin, req.params.id); } catch(e) {}
+        awardXP(db, xpUser(req), 'complete_task', null, req);
+      }
+    }
+
     res.redirect(req.body.redirect || '/admin/tasks');
   });
 
@@ -623,6 +644,112 @@ module.exports = function(db) {
     res.download(filePath, agr.attachment_name);
   });
 
+  // === FLEET MANAGEMENT ===
+  router.get('/companies/:cid/fleet', (req, res) => {
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.cid);
+    if (!company) return res.redirect('/admin/companies');
+    const vehicles = safeAll('SELECT v.*, cu.name as driver_name FROM fleet_vehicles v LEFT JOIN company_users cu ON v.driver_id = cu.id WHERE v.company_id = ? ORDER BY v.unit_number', [company.id]);
+    const trailers = safeAll('SELECT t.*, fv.unit_number as vehicle_unit FROM fleet_trailers t LEFT JOIN fleet_vehicles fv ON t.assigned_vehicle_id = fv.id WHERE t.company_id = ? ORDER BY t.unit_number', [company.id]);
+    const maintenance = safeAll('SELECT m.*, fv.unit_number as vehicle_unit, ft.unit_number as trailer_unit FROM fleet_maintenance m LEFT JOIN fleet_vehicles fv ON m.vehicle_id = fv.id LEFT JOIN fleet_trailers ft ON m.trailer_id = ft.id WHERE m.company_id = ? ORDER BY m.date DESC LIMIT 50', [company.id]);
+    const fuel = safeAll('SELECT f.*, fv.unit_number as vehicle_unit FROM fleet_fuel f LEFT JOIN fleet_vehicles fv ON f.vehicle_id = fv.id WHERE f.company_id = ? ORDER BY f.date DESC LIMIT 50', [company.id]);
+    const drivers = safeAll('SELECT id, name FROM company_users WHERE company_id = ? AND is_active = 1 ORDER BY name', [company.id]);
+    res.render(V('fleet'), { user: req.session.user, company, vehicles, trailers, maintenance, fuel, drivers, settings: getSettings(), page: 'companies' });
+  });
+
+  router.post('/companies/:cid/fleet/vehicles', (req, res) => {
+    const b = req.body;
+    try {
+      db.prepare('INSERT INTO fleet_vehicles (company_id, unit_number, type, make, model, year, vin, license_plate, state, color, status, driver_id, fuel_type, odometer, purchase_date, purchase_price, insurance_policy, insurance_expires, registration_expires, inspection_expires, gps_unit, eld_provider, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+        req.params.cid, b.unit_number, b.type||'truck', b.make, b.model, parseInt(b.year)||null, b.vin, b.license_plate, b.state, b.color, b.status||'active', b.driver_id||null, b.fuel_type||'diesel', parseInt(b.odometer)||0, b.purchase_date||null, parseFloat(b.purchase_price)||0, b.insurance_policy, b.insurance_expires||null, b.registration_expires||null, b.inspection_expires||null, b.gps_unit, b.eld_provider, b.notes
+      );
+    } catch(e) { console.error('Fleet vehicle error:', e.message); }
+    res.redirect('/admin/companies/' + req.params.cid + '/fleet');
+  });
+
+  router.post('/companies/:cid/fleet/vehicles/:vid/edit', (req, res) => {
+    const b = req.body;
+    try {
+      db.prepare('UPDATE fleet_vehicles SET unit_number=?, type=?, make=?, model=?, year=?, vin=?, license_plate=?, state=?, color=?, status=?, driver_id=?, fuel_type=?, odometer=?, purchase_date=?, purchase_price=?, insurance_policy=?, insurance_expires=?, registration_expires=?, inspection_expires=?, gps_unit=?, eld_provider=?, notes=? WHERE id=? AND company_id=?').run(
+        b.unit_number, b.type, b.make, b.model, parseInt(b.year)||null, b.vin, b.license_plate, b.state, b.color, b.status, b.driver_id||null, b.fuel_type, parseInt(b.odometer)||0, b.purchase_date||null, parseFloat(b.purchase_price)||0, b.insurance_policy, b.insurance_expires||null, b.registration_expires||null, b.inspection_expires||null, b.gps_unit, b.eld_provider, b.notes, req.params.vid, req.params.cid
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/fleet');
+  });
+
+  router.post('/companies/:cid/fleet/vehicles/:vid/delete', (req, res) => {
+    try { db.prepare('DELETE FROM fleet_vehicles WHERE id = ? AND company_id = ?').run(req.params.vid, req.params.cid); } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/fleet');
+  });
+
+  router.post('/companies/:cid/fleet/trailers', (req, res) => {
+    const b = req.body;
+    try {
+      db.prepare('INSERT INTO fleet_trailers (company_id, unit_number, type, make, model, year, vin, license_plate, state, length_ft, status, assigned_vehicle_id, purchase_date, purchase_price, registration_expires, inspection_expires, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+        req.params.cid, b.unit_number, b.type||'dry-van', b.make, b.model, parseInt(b.year)||null, b.vin, b.license_plate, b.state, parseInt(b.length_ft)||53, b.status||'active', b.assigned_vehicle_id||null, b.purchase_date||null, parseFloat(b.purchase_price)||0, b.registration_expires||null, b.inspection_expires||null, b.notes
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/fleet');
+  });
+
+  router.post('/companies/:cid/fleet/trailers/:tid/delete', (req, res) => {
+    try { db.prepare('DELETE FROM fleet_trailers WHERE id = ? AND company_id = ?').run(req.params.tid, req.params.cid); } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/fleet');
+  });
+
+  router.post('/companies/:cid/fleet/maintenance', (req, res) => {
+    const b = req.body;
+    try {
+      db.prepare('INSERT INTO fleet_maintenance (company_id, vehicle_id, trailer_id, type, description, vendor, cost, odometer, date, next_due_date, next_due_miles, status, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+        req.params.cid, b.vehicle_id||null, b.trailer_id||null, b.type||'repair', b.description, b.vendor, parseFloat(b.cost)||0, parseInt(b.odometer)||null, b.date||null, b.next_due_date||null, parseInt(b.next_due_miles)||null, b.status||'completed', b.notes
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/fleet');
+  });
+
+  router.post('/companies/:cid/fleet/fuel', (req, res) => {
+    const b = req.body;
+    const total = (parseFloat(b.gallons)||0) * (parseFloat(b.cost_per_gallon)||0);
+    try {
+      db.prepare('INSERT INTO fleet_fuel (company_id, vehicle_id, date, gallons, cost_per_gallon, total_cost, odometer, station, city, state, fuel_card, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(
+        req.params.cid, b.vehicle_id||null, b.date||null, parseFloat(b.gallons)||0, parseFloat(b.cost_per_gallon)||0, total, parseInt(b.odometer)||null, b.station, b.city, b.state, b.fuel_card, b.notes
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/fleet');
+  });
+
+  // === DOMAIN MANAGEMENT ===
+  router.get('/companies/:cid/domains', (req, res) => {
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.cid);
+    if (!company) return res.redirect('/admin/companies');
+    const domainList = safeAll('SELECT * FROM domains WHERE company_id = ? ORDER BY domain', [company.id]);
+    res.render(V('domains'), { user: req.session.user, company, domainList, settings: getSettings(), page: 'companies' });
+  });
+
+  router.post('/companies/:cid/domains', (req, res) => {
+    const b = req.body;
+    try {
+      db.prepare('INSERT INTO domains (company_id, domain, registrar, dns_provider, hosting_provider, ssl_provider, ssl_expires, domain_expires, nameservers, a_records, mx_records, auto_renew, admin_url, login_email, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+        req.params.cid, b.domain, b.registrar, b.dns_provider, b.hosting_provider, b.ssl_provider, b.ssl_expires||null, b.domain_expires||null, b.nameservers, b.a_records, b.mx_records, b.auto_renew?1:0, b.admin_url, b.login_email, b.notes
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/domains');
+  });
+
+  router.post('/companies/:cid/domains/:did/edit', (req, res) => {
+    const b = req.body;
+    try {
+      db.prepare('UPDATE domains SET domain=?, registrar=?, dns_provider=?, hosting_provider=?, ssl_provider=?, ssl_expires=?, domain_expires=?, nameservers=?, a_records=?, mx_records=?, auto_renew=?, admin_url=?, login_email=?, notes=? WHERE id=? AND company_id=?').run(
+        b.domain, b.registrar, b.dns_provider, b.hosting_provider, b.ssl_provider, b.ssl_expires||null, b.domain_expires||null, b.nameservers, b.a_records, b.mx_records, b.auto_renew?1:0, b.admin_url, b.login_email, b.notes, req.params.did, req.params.cid
+      );
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/domains');
+  });
+
+  router.post('/companies/:cid/domains/:did/delete', (req, res) => {
+    try { db.prepare('DELETE FROM domains WHERE id = ? AND company_id = ?').run(req.params.did, req.params.cid); } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/domains');
+  });
+
   // === INVENTORY LOCATIONS (must be before generic /:id/:table) ===
   router.post('/companies/:cid/locations', (req, res) => {
     const { name, type, address, parent_id, notes } = req.body;
@@ -706,8 +833,10 @@ module.exports = function(db) {
       return res.redirect('/admin/companies/' + req.params.id + '?tab=tasks');
     }
     if (table === 'agreements') {
-      const { service_id, custom_price, billing_cycle, start_date, notes } = req.body;
-      db.prepare('INSERT INTO agreements (company_id, service_id, custom_price, billing_cycle, start_date, notes, is_active) VALUES (?,?,?,?,?,?,1)').run(req.params.id, service_id, custom_price || null, billing_cycle, start_date, notes);
+      const { service_id, title, custom_price, billing_cycle, start_date, sla_response, sla_resolution, scope, notes } = req.body;
+      db.prepare('INSERT INTO agreements (company_id, service_id, title, custom_price, billing_cycle, start_date, sla_response, sla_resolution, scope, notes, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,1)').run(
+        req.params.id, service_id || null, title || null, custom_price ? parseFloat(custom_price) : null, billing_cycle, start_date || null, sla_response || null, sla_resolution || null, scope || null, notes || null
+      );
       return res.redirect('/admin/companies/' + req.params.id + '?tab=agreements');
     }
     if (table === 'client-users') {

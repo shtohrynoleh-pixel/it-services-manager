@@ -332,6 +332,11 @@ function initDB() {
       assigned_to TEXT,
       created_by TEXT DEFAULT 'admin',
       created_at TEXT DEFAULT (datetime('now')),
+      started_at TEXT,
+      completed_at TEXT,
+      first_response_at TEXT,
+      sla_response_min INTEGER,
+      sla_resolve_min INTEGER,
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
     );
@@ -682,6 +687,127 @@ function initDB() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    -- Fleet: Vehicles (trucks)
+    CREATE TABLE IF NOT EXISTS fleet_vehicles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      unit_number TEXT,
+      type TEXT DEFAULT 'truck',
+      make TEXT,
+      model TEXT,
+      year INTEGER,
+      vin TEXT,
+      license_plate TEXT,
+      state TEXT,
+      color TEXT,
+      status TEXT DEFAULT 'active',
+      driver_id INTEGER,
+      fuel_type TEXT DEFAULT 'diesel',
+      odometer INTEGER DEFAULT 0,
+      purchase_date TEXT,
+      purchase_price REAL DEFAULT 0,
+      insurance_policy TEXT,
+      insurance_expires TEXT,
+      registration_expires TEXT,
+      inspection_expires TEXT,
+      gps_unit TEXT,
+      eld_provider TEXT,
+      notes TEXT,
+      photo_url TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+      FOREIGN KEY (driver_id) REFERENCES company_users(id) ON DELETE SET NULL
+    );
+
+    -- Fleet: Trailers
+    CREATE TABLE IF NOT EXISTS fleet_trailers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      unit_number TEXT,
+      type TEXT DEFAULT 'dry-van',
+      make TEXT,
+      model TEXT,
+      year INTEGER,
+      vin TEXT,
+      license_plate TEXT,
+      state TEXT,
+      length_ft INTEGER,
+      status TEXT DEFAULT 'active',
+      assigned_vehicle_id INTEGER,
+      purchase_date TEXT,
+      purchase_price REAL DEFAULT 0,
+      registration_expires TEXT,
+      inspection_expires TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+      FOREIGN KEY (assigned_vehicle_id) REFERENCES fleet_vehicles(id) ON DELETE SET NULL
+    );
+
+    -- Fleet: Maintenance logs
+    CREATE TABLE IF NOT EXISTS fleet_maintenance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      vehicle_id INTEGER,
+      trailer_id INTEGER,
+      type TEXT DEFAULT 'repair',
+      description TEXT NOT NULL,
+      vendor TEXT,
+      cost REAL DEFAULT 0,
+      odometer INTEGER,
+      date TEXT,
+      next_due_date TEXT,
+      next_due_miles INTEGER,
+      status TEXT DEFAULT 'completed',
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+      FOREIGN KEY (vehicle_id) REFERENCES fleet_vehicles(id) ON DELETE SET NULL,
+      FOREIGN KEY (trailer_id) REFERENCES fleet_trailers(id) ON DELETE SET NULL
+    );
+
+    -- Fleet: Fuel logs
+    CREATE TABLE IF NOT EXISTS fleet_fuel (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      vehicle_id INTEGER,
+      date TEXT,
+      gallons REAL DEFAULT 0,
+      cost_per_gallon REAL DEFAULT 0,
+      total_cost REAL DEFAULT 0,
+      odometer INTEGER,
+      station TEXT,
+      city TEXT,
+      state TEXT,
+      fuel_card TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+      FOREIGN KEY (vehicle_id) REFERENCES fleet_vehicles(id) ON DELETE SET NULL
+    );
+
+    -- Domain / Hosting management
+    CREATE TABLE IF NOT EXISTS domains (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      domain TEXT NOT NULL,
+      registrar TEXT,
+      dns_provider TEXT,
+      hosting_provider TEXT,
+      ssl_provider TEXT,
+      ssl_expires TEXT,
+      domain_expires TEXT,
+      nameservers TEXT,
+      a_records TEXT,
+      mx_records TEXT,
+      auto_renew INTEGER DEFAULT 1,
+      admin_url TEXT,
+      login_email TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    );
+
     -- Service schedule (recurring service visits/tasks per company)
     CREATE TABLE IF NOT EXISTS service_schedule (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -750,6 +876,15 @@ function initDB() {
   if (hasDepts.c === 0) {
     const di = db.prepare('INSERT INTO departments (name, description, sort_order) VALUES (?,?,?)');
     [['Executive','Leadership and ownership',1],['Operations','Dispatch, logistics, and daily operations',2],['Driving','CDL drivers and fleet operators',3],['Maintenance','Truck and equipment maintenance',4],['Accounting','Finance, billing, and payroll',5],['Safety','Safety compliance and training',6],['HR','Hiring, onboarding, and employee management',7],['Administration','Office support and front desk',8],['IT','Technology and systems',9],['Warehouse','Loading, unloading, and yard operations',10]].forEach(d => di.run(...d));
+  }
+
+  // Add SLA columns to tasks if missing
+  try { db.prepare('SELECT started_at FROM tasks LIMIT 1').get(); } catch(e) {
+    try { db.exec('ALTER TABLE tasks ADD COLUMN started_at TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE tasks ADD COLUMN completed_at TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE tasks ADD COLUMN first_response_at TEXT'); } catch(e2) {}
+    try { db.exec('ALTER TABLE tasks ADD COLUMN sla_response_min INTEGER'); } catch(e2) {}
+    try { db.exec('ALTER TABLE tasks ADD COLUMN sla_resolve_min INTEGER'); } catch(e2) {}
   }
 
   // Add agreement columns if missing

@@ -1,0 +1,88 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>" style="opacity:0.4;text-decoration:none;"><i class="ti ti-building"></i></a> → <i class="ti ti-world"></i> Domains — <%= company.name %></h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <% domainList.forEach(d => {
+        var sslWarn = d.ssl_expires && d.ssl_expires <= new Date(Date.now()+30*86400000).toISOString().slice(0,10);
+        var domWarn = d.domain_expires && d.domain_expires <= new Date(Date.now()+30*86400000).toISOString().slice(0,10);
+      %>
+        <div class="card" style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div>
+              <h3 style="margin-bottom:2px;"><i class="ti ti-world" style="color:var(--primary);"></i> <%= d.domain %></h3>
+              <div style="font-size:12px;color:var(--muted);">
+                <%= d.registrar ? 'Registrar: ' + d.registrar : '' %>
+                <%= d.hosting_provider ? ' · Hosting: ' + d.hosting_provider : '' %>
+                <%= d.dns_provider ? ' · DNS: ' + d.dns_provider : '' %>
+              </div>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-sm" onclick="document.getElementById('editD-<%= d.id %>').classList.add('open')"><i class="ti ti-edit"></i></button>
+              <form method="POST" action="/admin/companies/<%= company.id %>/domains/<%= d.id %>/delete" style="display:inline" onsubmit="return confirm('Delete?')"><button type="submit" class="btn btn-sm btn-danger"><i class="ti ti-trash"></i></button></form>
+            </div>
+          </div>
+          <div class="metrics" style="margin-top:12px;">
+            <div class="metric <%= domWarn ? 'bad' : '' %>"><div class="m-label">Domain Expires</div><div class="m-val" style="font-size:14px;<%= domWarn ? 'color:var(--danger);' : '' %>"><%= d.domain_expires || '—' %></div></div>
+            <div class="metric <%= sslWarn ? 'bad' : 'ok' %>"><div class="m-label">SSL Expires</div><div class="m-val" style="font-size:14px;<%= sslWarn ? 'color:var(--danger);' : '' %>"><%= d.ssl_expires || '—' %></div></div>
+            <div class="metric"><div class="m-label">Auto-Renew</div><div class="m-val"><%= d.auto_renew ? 'Yes' : 'No' %></div></div>
+          </div>
+          <% if (d.nameservers) { %><div class="card-row"><span class="label">Nameservers</span><span class="value" style="font-size:11px;font-family:monospace;"><%= d.nameservers %></span></div><% } %>
+          <% if (d.a_records) { %><div class="card-row"><span class="label">A Records</span><span class="value" style="font-size:11px;font-family:monospace;"><%= d.a_records %></span></div><% } %>
+          <% if (d.mx_records) { %><div class="card-row"><span class="label">MX Records</span><span class="value" style="font-size:11px;font-family:monospace;"><%= d.mx_records %></span></div><% } %>
+          <% if (d.ssl_provider) { %><div class="card-row"><span class="label">SSL Provider</span><span class="value"><%= d.ssl_provider %></span></div><% } %>
+          <% if (d.admin_url) { %><div class="card-row"><span class="label">Admin Panel</span><span class="value"><a href="<%= d.admin_url %>" target="_blank"><%= d.admin_url %></a></span></div><% } %>
+          <% if (d.login_email) { %><div class="card-row"><span class="label">Login Email</span><span class="value"><%= d.login_email %></span></div><% } %>
+          <% if (d.notes) { %><div style="font-size:11px;color:var(--muted);margin-top:8px;font-style:italic;"><%= d.notes %></div><% } %>
+
+          <!-- Edit modal -->
+          <div class="modal-bg" id="editD-<%= d.id %>" onclick="if(event.target===this)this.classList.remove('open')">
+            <div class="modal">
+              <h3>Edit Domain</h3>
+              <form method="POST" action="/admin/companies/<%= company.id %>/domains/<%= d.id %>/edit">
+                <div class="form-group"><label>Domain</label><input type="text" name="domain" value="<%= d.domain %>" required></div>
+                <div class="form-row"><div class="form-group"><label>Registrar</label><input type="text" name="registrar" value="<%= d.registrar||'' %>"></div><div class="form-group"><label>DNS Provider</label><input type="text" name="dns_provider" value="<%= d.dns_provider||'' %>"></div></div>
+                <div class="form-row"><div class="form-group"><label>Hosting</label><input type="text" name="hosting_provider" value="<%= d.hosting_provider||'' %>"></div><div class="form-group"><label>SSL Provider</label><input type="text" name="ssl_provider" value="<%= d.ssl_provider||'' %>"></div></div>
+                <div class="form-row"><div class="form-group"><label>Domain Expires</label><input type="date" name="domain_expires" value="<%= d.domain_expires||'' %>"></div><div class="form-group"><label>SSL Expires</label><input type="date" name="ssl_expires" value="<%= d.ssl_expires||'' %>"></div></div>
+                <div class="form-group"><label>Nameservers</label><input type="text" name="nameservers" value="<%= d.nameservers||'' %>" placeholder="ns1.example.com, ns2.example.com"></div>
+                <div class="form-row"><div class="form-group"><label>A Records</label><input type="text" name="a_records" value="<%= d.a_records||'' %>"></div><div class="form-group"><label>MX Records</label><input type="text" name="mx_records" value="<%= d.mx_records||'' %>"></div></div>
+                <div class="form-check"><input type="checkbox" name="auto_renew" value="1" <%= d.auto_renew ? 'checked' : '' %>> Auto-renew</div>
+                <div class="form-row"><div class="form-group"><label>Admin URL</label><input type="text" name="admin_url" value="<%= d.admin_url||'' %>"></div><div class="form-group"><label>Login Email</label><input type="text" name="login_email" value="<%= d.login_email||'' %>"></div></div>
+                <div class="form-group"><label>Notes</label><textarea name="notes"><%= d.notes||'' %></textarea></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('editD-<%= d.id %>').classList.remove('open')">Cancel</button></div>
+              </form>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+
+      <% if (domainList.length === 0) { %>
+        <div class="empty"><span class="e-icon"><i class="ti ti-world" style="font-size:40px;"></i></span><div class="e-text">No domains tracked</div></div>
+      <% } %>
+
+      <!-- Add domain -->
+      <div class="card">
+        <h3><i class="ti ti-plus"></i> Add Domain</h3>
+        <form method="POST" action="/admin/companies/<%= company.id %>/domains">
+          <div class="form-group"><label>Domain *</label><input type="text" name="domain" required placeholder="company.com"></div>
+          <div class="form-row"><div class="form-group"><label>Registrar</label><input type="text" name="registrar" placeholder="GoDaddy, Namecheap, Cloudflare..."></div><div class="form-group"><label>DNS Provider</label><input type="text" name="dns_provider" placeholder="Cloudflare, Route 53..."></div></div>
+          <div class="form-row"><div class="form-group"><label>Hosting</label><input type="text" name="hosting_provider" placeholder="AWS, GoDaddy, Bluehost..."></div><div class="form-group"><label>SSL Provider</label><input type="text" name="ssl_provider" placeholder="Let's Encrypt, Cloudflare..."></div></div>
+          <div class="form-row"><div class="form-group"><label>Domain Expires</label><input type="date" name="domain_expires"></div><div class="form-group"><label>SSL Expires</label><input type="date" name="ssl_expires"></div></div>
+          <div class="form-group"><label>Nameservers</label><input type="text" name="nameservers" placeholder="ns1.example.com, ns2.example.com"></div>
+          <div class="form-row"><div class="form-group"><label>A Records</label><input type="text" name="a_records" placeholder="@ → 1.2.3.4"></div><div class="form-group"><label>MX Records</label><input type="text" name="mx_records" placeholder="mx.example.com"></div></div>
+          <div class="form-check"><input type="checkbox" name="auto_renew" value="1" checked> Auto-renew</div>
+          <div class="form-row"><div class="form-group"><label>Admin Panel URL</label><input type="text" name="admin_url" placeholder="https://..."></div><div class="form-group"><label>Login Email</label><input type="text" name="login_email"></div></div>
+          <div class="form-group"><label>Notes</label><textarea name="notes"></textarea></div>
+          <button type="submit" class="btn btn-primary">Add Domain</button>
+        </form>
+      </div>
+
+      <div style="margin-top:12px;"><a href="/admin/companies/<%= company.id %>" class="btn btn-sm">← Back to <%= company.name %></a></div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

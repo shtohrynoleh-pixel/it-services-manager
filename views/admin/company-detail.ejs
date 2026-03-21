@@ -15,8 +15,11 @@
         <% ['overview','contacts','users','servers','subscriptions','assets','inventory','agreements','invoices','tasks'].forEach(t => { %>
           <a class="tab <%= tab === t ? 'active' : '' %>" href="/admin/companies/<%= company.id %>?tab=<%= t %>"><%= t.charAt(0).toUpperCase() + t.slice(1) %></a>
         <% }) %>
-        <a class="tab" href="/admin/companies/<%= company.id %>/files" style="color:var(--primary);">📁 Files</a>
-        <a class="tab" href="/admin/companies/<%= company.id %>/email-security" style="color:var(--primary);">📧 Email</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/fleet" style="color:var(--primary);"><i class="ti ti-truck"></i> Fleet</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/domains" style="color:var(--primary);"><i class="ti ti-world"></i> Domains</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/files" style="color:var(--primary);"><i class="ti ti-folder"></i> Files</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/rdp" style="color:var(--primary);"><i class="ti ti-remote"></i> RDP</a>
+        <a class="tab" href="/admin/companies/<%= company.id %>/email-security" style="color:var(--primary);"><i class="ti ti-mail"></i> Email</a>
       </div>
 
       <% if (tab === 'overview') { %>
@@ -478,32 +481,36 @@
       <% } else if (tab === 'agreements') { %>
         <button class="btn btn-primary btn-sm" onclick="document.getElementById('addAgrModal').classList.add('open')" style="margin-bottom:16px;">+ Add Agreement</button>
         <% if (agreements.length === 0) { %>
-          <div class="empty"><span class="e-icon">📋</span><div class="e-text">No service agreements</div></div>
+          <div class="empty"><span class="e-icon"><i class="ti ti-file-check" style="font-size:40px;"></i></span><div class="e-text">No service agreements</div></div>
         <% } else { %>
-          <table class="tbl">
-            <thead><tr><th>Service</th><th>Price</th><th>Billing</th><th>Start</th><th>Status</th><th></th></tr></thead>
-            <tbody>
-            <% agreements.forEach(a => { %>
-              <tr>
-                <td><strong><%= a.service_name || '?' %></strong></td>
-                <td>$<%= (a.custom_price || a.base_price || 0).toFixed(2) %></td>
-                <td><%= a.billing_cycle || '—' %></td>
-                <td><%= a.start_date || '—' %></td>
-                <td><span class="badge <%= a.is_active ? 'active' : 'inactive' %>"><%= a.is_active ? 'Active' : 'Inactive' %></span></td>
-                <td><form method="POST" action="/admin/companies/<%= company.id %>/agreements/<%= a.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Delete?')">🗑️</button></form></td>
-              </tr>
-            <% }) %>
-            </tbody>
-          </table>
+          <% agreements.forEach(a => { %>
+            <a href="/admin/companies/<%= company.id %>/agreements/<%= a.id %>" class="item-card" style="text-decoration:none;color:inherit;">
+              <div class="ic-main">
+                <div class="ic-name"><%= a.title || a.service_name || 'Agreement' %></div>
+                <div class="ic-sub">
+                  $<%= (a.custom_price || a.base_price || 0).toFixed(2) %>/<%= a.billing_cycle || '—' %>
+                  · Started: <%= a.start_date || '—' %>
+                  <% if (a.sla_response) { %> · SLA: <%= a.sla_response %><% } %>
+                  <% if (a.attachment_name) { %> · <i class="ti ti-paperclip" style="font-size:11px;"></i> <%= a.attachment_name %><% } %>
+                </div>
+              </div>
+              <div class="ic-right">
+                <span class="badge <%= a.is_active ? 'active' : 'inactive' %>"><%= a.is_active ? 'Active' : 'Inactive' %></span>
+              </div>
+            </a>
+          <% }) %>
         <% } %>
         <div class="modal-bg" id="addAgrModal" onclick="if(event.target===this)this.classList.remove('open')">
           <div class="modal">
             <h3>Add Service Agreement</h3>
             <form method="POST" action="/admin/companies/<%= company.id %>/agreements">
-              <div class="form-group"><label>Service</label><select name="service_id"><% allServices.forEach(s => { %><option value="<%= s.id %>"><%= s.name %> ($<%= s.base_price.toFixed(2) %>/<%= s.price_type %>)</option><% }) %><% if (allServices.length === 0) { %><option value="">No services — add in Services page first</option><% } %></select></div>
-              <div class="form-row-3"><div class="form-group"><label>Custom Price</label><input type="number" name="custom_price" step="0.01" placeholder="Leave blank for default"></div><div class="form-group"><label>Billing Cycle</label><select name="billing_cycle"><option>Monthly</option><option>Yearly</option><option>One-time</option></select></div><div class="form-group"><label>Start Date</label><input type="date" name="start_date"></div></div>
+              <div class="form-group"><label>Service</label><select name="service_id"><option value="">— Custom agreement —</option><% allServices.forEach(s => { %><option value="<%= s.id %>"><%= s.name %> ($<%= s.base_price.toFixed(2) %>/<%= s.price_type %>)</option><% }) %></select></div>
+              <div class="form-group"><label>Agreement Title</label><input type="text" name="title" placeholder="e.g. Managed IT - Monthly Plan"></div>
+              <div class="form-row-3"><div class="form-group"><label>Price</label><input type="number" name="custom_price" step="0.01" placeholder="Monthly price"></div><div class="form-group"><label>Billing</label><select name="billing_cycle"><option>Monthly</option><option>Yearly</option><option>Quarterly</option><option>One-time</option></select></div><div class="form-group"><label>Start Date</label><input type="date" name="start_date" value="<%= new Date().toISOString().slice(0,10) %>"></div></div>
+              <div class="form-row"><div class="form-group"><label>SLA Response</label><input type="text" name="sla_response" placeholder="e.g. 1 hour, 4 hours"></div><div class="form-group"><label>SLA Resolution</label><input type="text" name="sla_resolution" placeholder="e.g. 24 hours, 3 days"></div></div>
+              <div class="form-group"><label>Scope</label><textarea name="scope" rows="2" placeholder="What's included in this agreement..."></textarea></div>
               <div class="form-group"><label>Notes</label><textarea name="notes"></textarea></div>
-              <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('addAgrModal').classList.remove('open')">Cancel</button></div>
+              <div class="form-actions"><button type="submit" class="btn btn-primary">Create Agreement</button><button type="button" class="btn" onclick="document.getElementById('addAgrModal').classList.remove('open')">Cancel</button></div>
             </form>
           </div>
         </div>

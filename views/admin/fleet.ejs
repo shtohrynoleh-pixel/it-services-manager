@@ -1,0 +1,224 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>" style="opacity:0.4;text-decoration:none;"><i class="ti ti-building"></i></a> → <i class="ti ti-truck"></i> Fleet — <%= company.name %></h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <!-- Tabs -->
+      <div class="tabs">
+        <a class="tab active" href="#" onclick="showFTab('vehicles')"><i class="ti ti-truck"></i> Trucks (<%= vehicles.length %>)</a>
+        <a class="tab" href="#" onclick="showFTab('trailers')"><i class="ti ti-container"></i> Trailers (<%= trailers.length %>)</a>
+        <a class="tab" href="#" onclick="showFTab('maintenance')"><i class="ti ti-tool"></i> Maintenance</a>
+        <a class="tab" href="#" onclick="showFTab('fuel')"><i class="ti ti-gas-station"></i> Fuel</a>
+      </div>
+
+      <!-- Metrics -->
+      <%
+        var activeV = vehicles.filter(v => v.status === 'active').length;
+        var totalValue = vehicles.reduce((s,v) => s + (v.purchase_price||0), 0) + trailers.reduce((s,t) => s + (t.purchase_price||0), 0);
+        var maintCost = maintenance.reduce((s,m) => s + (m.cost||0), 0);
+        var fuelCost = fuel.reduce((s,f) => s + (f.total_cost||0), 0);
+        var expiringSoon = vehicles.filter(v => v.registration_expires && v.registration_expires <= new Date(Date.now()+30*86400000).toISOString().slice(0,10)).length + vehicles.filter(v => v.insurance_expires && v.insurance_expires <= new Date(Date.now()+30*86400000).toISOString().slice(0,10)).length + vehicles.filter(v => v.inspection_expires && v.inspection_expires <= new Date(Date.now()+30*86400000).toISOString().slice(0,10)).length;
+      %>
+      <div class="metrics">
+        <div class="metric hi"><div class="m-label">Trucks</div><div class="m-val pri"><%= activeV %>/<%= vehicles.length %></div></div>
+        <div class="metric"><div class="m-label">Trailers</div><div class="m-val"><%= trailers.length %></div></div>
+        <div class="metric ok"><div class="m-label">Fleet Value</div><div class="m-val green">$<%= totalValue.toLocaleString() %></div></div>
+        <div class="metric <%= expiringSoon > 0 ? 'bad' : '' %>"><div class="m-label">Expiring (30d)</div><div class="m-val <%= expiringSoon > 0 ? 'red' : '' %>"><%= expiringSoon %></div></div>
+      </div>
+
+      <!-- VEHICLES TAB -->
+      <div id="ftab-vehicles">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('addVehicleModal').classList.add('open')" style="margin-bottom:12px;">+ Add Truck</button>
+        <% if (vehicles.length === 0) { %>
+          <div class="empty"><span class="e-icon"><i class="ti ti-truck" style="font-size:40px;"></i></span><div class="e-text">No trucks yet</div></div>
+        <% } else { %>
+          <div style="overflow-x:auto;">
+          <table class="tbl">
+            <thead><tr><th>Unit #</th><th>Vehicle</th><th>VIN</th><th>Plate</th><th>Driver</th><th>Status</th><th>Reg Exp</th><th>Insp Exp</th><th></th></tr></thead>
+            <tbody>
+            <% vehicles.forEach(v => {
+              var regWarn = v.registration_expires && v.registration_expires <= new Date(Date.now()+30*86400000).toISOString().slice(0,10);
+              var inspWarn = v.inspection_expires && v.inspection_expires <= new Date(Date.now()+30*86400000).toISOString().slice(0,10);
+            %>
+              <tr>
+                <td><strong><%= v.unit_number || '—' %></strong></td>
+                <td><%= [v.year, v.make, v.model].filter(Boolean).join(' ') || '—' %><% if (v.color) { %> <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:<%= v.color %>;vertical-align:middle;"></span><% } %></td>
+                <td style="font-size:10px;font-family:monospace;"><%= v.vin || '—' %></td>
+                <td><%= v.license_plate || '—' %><% if (v.state) { %> (<%= v.state %>)<% } %></td>
+                <td><%= v.driver_name || '—' %></td>
+                <td><span class="badge <%= v.status==='active'?'active':v.status==='in-shop'?'sent':'inactive' %>"><%= v.status %></span></td>
+                <td style="<%= regWarn ? 'color:var(--danger);font-weight:700;' : '' %>"><%= v.registration_expires || '—' %></td>
+                <td style="<%= inspWarn ? 'color:var(--danger);font-weight:700;' : '' %>"><%= v.inspection_expires || '—' %></td>
+                <td style="white-space:nowrap;">
+                  <button class="btn-ghost" onclick="document.getElementById('editV-<%= v.id %>').classList.add('open')"><i class="ti ti-edit"></i></button>
+                  <form method="POST" action="/admin/companies/<%= company.id %>/fleet/vehicles/<%= v.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Delete?')" style="color:var(--danger);"><i class="ti ti-trash"></i></button></form>
+                </td>
+              </tr>
+              <!-- Edit modal -->
+              <div class="modal-bg" id="editV-<%= v.id %>" onclick="if(event.target===this)this.classList.remove('open')">
+                <div class="modal">
+                  <h3>Edit Truck — <%= v.unit_number || '' %></h3>
+                  <form method="POST" action="/admin/companies/<%= company.id %>/fleet/vehicles/<%= v.id %>/edit">
+                    <div class="form-row"><div class="form-group"><label>Unit #</label><input type="text" name="unit_number" value="<%= v.unit_number||'' %>"></div><div class="form-group"><label>Type</label><select name="type"><% ['truck','daycab','sleeper','straight','box-truck','pickup','van','other'].forEach(t=>{%><option <%=v.type===t?'selected':''%>><%= t %></option><%})%></select></div></div>
+                    <div class="form-row-3"><div class="form-group"><label>Year</label><input type="number" name="year" value="<%= v.year||'' %>"></div><div class="form-group"><label>Make</label><input type="text" name="make" value="<%= v.make||'' %>"></div><div class="form-group"><label>Model</label><input type="text" name="model" value="<%= v.model||'' %>"></div></div>
+                    <div class="form-row"><div class="form-group"><label>VIN</label><input type="text" name="vin" value="<%= v.vin||'' %>"></div><div class="form-group"><label>Color</label><input type="text" name="color" value="<%= v.color||'' %>"></div></div>
+                    <div class="form-row"><div class="form-group"><label>Plate</label><input type="text" name="license_plate" value="<%= v.license_plate||'' %>"></div><div class="form-group"><label>State</label><input type="text" name="state" value="<%= v.state||'' %>" maxlength="2"></div></div>
+                    <div class="form-row"><div class="form-group"><label>Driver</label><select name="driver_id"><option value="">—</option><% drivers.forEach(d=>{%><option value="<%=d.id%>" <%=v.driver_id===d.id?'selected':''%>><%=d.name%></option><%})%></select></div><div class="form-group"><label>Status</label><select name="status"><% ['active','in-shop','parked','out-of-service','sold'].forEach(s=>{%><option <%=v.status===s?'selected':''%>><%= s %></option><%})%></select></div></div>
+                    <div class="form-row"><div class="form-group"><label>Fuel Type</label><select name="fuel_type"><% ['diesel','gas','electric','hybrid','cng'].forEach(f=>{%><option <%=v.fuel_type===f?'selected':''%>><%= f %></option><%})%></select></div><div class="form-group"><label>Odometer</label><input type="number" name="odometer" value="<%= v.odometer||0 %>"></div></div>
+                    <div class="form-row"><div class="form-group"><label>Registration Exp</label><input type="date" name="registration_expires" value="<%= v.registration_expires||'' %>"></div><div class="form-group"><label>Inspection Exp</label><input type="date" name="inspection_expires" value="<%= v.inspection_expires||'' %>"></div></div>
+                    <div class="form-row"><div class="form-group"><label>Insurance Policy</label><input type="text" name="insurance_policy" value="<%= v.insurance_policy||'' %>"></div><div class="form-group"><label>Insurance Exp</label><input type="date" name="insurance_expires" value="<%= v.insurance_expires||'' %>"></div></div>
+                    <div class="form-row"><div class="form-group"><label>GPS Unit</label><input type="text" name="gps_unit" value="<%= v.gps_unit||'' %>"></div><div class="form-group"><label>ELD Provider</label><input type="text" name="eld_provider" value="<%= v.eld_provider||'' %>"></div></div>
+                    <div class="form-group"><label>Notes</label><textarea name="notes"><%= v.notes||'' %></textarea></div>
+                    <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('editV-<%= v.id %>').classList.remove('open')">Cancel</button></div>
+                  </form>
+                </div>
+              </div>
+            <% }) %>
+            </tbody>
+          </table>
+          </div>
+        <% } %>
+      </div>
+
+      <!-- TRAILERS TAB -->
+      <div id="ftab-trailers" style="display:none;">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('addTrailerModal').classList.add('open')" style="margin-bottom:12px;">+ Add Trailer</button>
+        <% if (trailers.length === 0) { %>
+          <div class="empty"><span class="e-icon"><i class="ti ti-container" style="font-size:40px;"></i></span><div class="e-text">No trailers</div></div>
+        <% } else { %>
+          <div style="overflow-x:auto;">
+          <table class="tbl">
+            <thead><tr><th>Unit #</th><th>Type</th><th>Info</th><th>Plate</th><th>Assigned Truck</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            <% trailers.forEach(t => { %>
+              <tr>
+                <td><strong><%= t.unit_number || '—' %></strong></td>
+                <td><span class="badge draft"><%= t.type %></span></td>
+                <td><%= [t.year, t.make, t.model].filter(Boolean).join(' ') || '—' %> · <%= t.length_ft || 53 %>'</td>
+                <td><%= t.license_plate || '—' %></td>
+                <td><%= t.vehicle_unit || '—' %></td>
+                <td><span class="badge <%= t.status==='active'?'active':'inactive' %>"><%= t.status %></span></td>
+                <td><form method="POST" action="/admin/companies/<%= company.id %>/fleet/trailers/<%= t.id %>/delete" style="display:inline"><button type="submit" class="btn-ghost" onclick="return confirm('Delete?')" style="color:var(--danger);"><i class="ti ti-trash"></i></button></form></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+          </div>
+        <% } %>
+      </div>
+
+      <!-- MAINTENANCE TAB -->
+      <div id="ftab-maintenance" style="display:none;">
+        <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('addMaintModal').classList.add('open')">+ Log Maintenance</button>
+          <div style="font-size:12px;color:var(--muted);">Total cost: <strong style="color:var(--danger);">$<%= maintCost.toFixed(2) %></strong></div>
+        </div>
+        <% if (maintenance.length === 0) { %>
+          <div class="empty"><span class="e-icon"><i class="ti ti-tool" style="font-size:40px;"></i></span><div class="e-text">No maintenance records</div></div>
+        <% } else { %>
+          <table class="tbl">
+            <thead><tr><th>Date</th><th>Unit</th><th>Type</th><th>Description</th><th>Vendor</th><th>Cost</th><th>Status</th></tr></thead>
+            <tbody>
+            <% maintenance.forEach(m => { %>
+              <tr><td><%= m.date||'—' %></td><td><%= m.vehicle_unit||m.trailer_unit||'—' %></td><td><span class="badge draft"><%= m.type %></span></td><td><%= m.description %></td><td><%= m.vendor||'—' %></td><td style="font-weight:700;">$<%= (m.cost||0).toFixed(2) %></td><td><span class="badge <%= m.status==='completed'?'active':m.status==='scheduled'?'sent':'prospect' %>"><%= m.status %></span></td></tr>
+            <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+
+      <!-- FUEL TAB -->
+      <div id="ftab-fuel" style="display:none;">
+        <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('addFuelModal').classList.add('open')">+ Log Fuel</button>
+          <div style="font-size:12px;color:var(--muted);">Total fuel cost: <strong style="color:var(--danger);">$<%= fuelCost.toFixed(2) %></strong> · <%= fuel.reduce((s,f)=>s+(f.gallons||0),0).toFixed(1) %> gal</div>
+        </div>
+        <% if (fuel.length === 0) { %>
+          <div class="empty"><span class="e-icon"><i class="ti ti-gas-station" style="font-size:40px;"></i></span><div class="e-text">No fuel logs</div></div>
+        <% } else { %>
+          <table class="tbl">
+            <thead><tr><th>Date</th><th>Unit</th><th>Gallons</th><th>$/Gal</th><th>Total</th><th>Station</th><th>Odometer</th></tr></thead>
+            <tbody>
+            <% fuel.forEach(f => { %>
+              <tr><td><%= f.date||'—' %></td><td><%= f.vehicle_unit||'—' %></td><td><%= (f.gallons||0).toFixed(1) %></td><td>$<%= (f.cost_per_gallon||0).toFixed(3) %></td><td style="font-weight:700;">$<%= (f.total_cost||0).toFixed(2) %></td><td><%= [f.station,f.city,f.state].filter(Boolean).join(', ')||'—' %></td><td><%= f.odometer ? f.odometer.toLocaleString() : '—' %></td></tr>
+            <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+
+      <!-- ADD MODALS -->
+      <!-- Vehicle -->
+      <div class="modal-bg" id="addVehicleModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal">
+          <h3><i class="ti ti-truck"></i> Add Truck</h3>
+          <form method="POST" action="/admin/companies/<%= company.id %>/fleet/vehicles">
+            <div class="form-row"><div class="form-group"><label>Unit # *</label><input type="text" name="unit_number" required placeholder="T001"></div><div class="form-group"><label>Type</label><select name="type"><option>truck</option><option>daycab</option><option>sleeper</option><option>straight</option><option>box-truck</option><option>pickup</option><option>van</option></select></div></div>
+            <div class="form-row-3"><div class="form-group"><label>Year</label><input type="number" name="year" placeholder="2024"></div><div class="form-group"><label>Make</label><input type="text" name="make" placeholder="Freightliner"></div><div class="form-group"><label>Model</label><input type="text" name="model" placeholder="Cascadia"></div></div>
+            <div class="form-row"><div class="form-group"><label>VIN</label><input type="text" name="vin" maxlength="17"></div><div class="form-group"><label>Plate / State</label><div style="display:flex;gap:6px;"><input type="text" name="license_plate" placeholder="ABC1234" style="flex:1;"><input type="text" name="state" placeholder="TX" maxlength="2" style="width:50px;"></div></div></div>
+            <div class="form-row"><div class="form-group"><label>Driver</label><select name="driver_id"><option value="">— Unassigned —</option><% drivers.forEach(d => { %><option value="<%= d.id %>"><%= d.name %></option><% }) %></select></div><div class="form-group"><label>Fuel Type</label><select name="fuel_type"><option>diesel</option><option>gas</option><option>electric</option><option>cng</option></select></div></div>
+            <div class="form-row"><div class="form-group"><label>Registration Exp</label><input type="date" name="registration_expires"></div><div class="form-group"><label>Inspection Exp</label><input type="date" name="inspection_expires"></div></div>
+            <div class="form-group"><label>Notes</label><textarea name="notes"></textarea></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Add Truck</button><button type="button" class="btn" onclick="document.getElementById('addVehicleModal').classList.remove('open')">Cancel</button></div>
+          </form>
+        </div>
+      </div>
+      <!-- Trailer -->
+      <div class="modal-bg" id="addTrailerModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal">
+          <h3><i class="ti ti-container"></i> Add Trailer</h3>
+          <form method="POST" action="/admin/companies/<%= company.id %>/fleet/trailers">
+            <div class="form-row"><div class="form-group"><label>Unit # *</label><input type="text" name="unit_number" required placeholder="TR001"></div><div class="form-group"><label>Type</label><select name="type"><option>dry-van</option><option>reefer</option><option>flatbed</option><option>step-deck</option><option>lowboy</option><option>tanker</option><option>container</option><option>dump</option><option>other</option></select></div></div>
+            <div class="form-row-3"><div class="form-group"><label>Year</label><input type="number" name="year"></div><div class="form-group"><label>Make</label><input type="text" name="make" placeholder="Utility, Wabash..."></div><div class="form-group"><label>Length (ft)</label><input type="number" name="length_ft" value="53"></div></div>
+            <div class="form-row"><div class="form-group"><label>VIN</label><input type="text" name="vin" maxlength="17"></div><div class="form-group"><label>Plate</label><input type="text" name="license_plate"></div></div>
+            <div class="form-group"><label>Assigned Truck</label><select name="assigned_vehicle_id"><option value="">—</option><% vehicles.forEach(v => { %><option value="<%= v.id %>">#<%= v.unit_number %> — <%= [v.year,v.make,v.model].filter(Boolean).join(' ') %></option><% }) %></select></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Add Trailer</button><button type="button" class="btn" onclick="document.getElementById('addTrailerModal').classList.remove('open')">Cancel</button></div>
+          </form>
+        </div>
+      </div>
+      <!-- Maintenance -->
+      <div class="modal-bg" id="addMaintModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal">
+          <h3><i class="ti ti-tool"></i> Log Maintenance</h3>
+          <form method="POST" action="/admin/companies/<%= company.id %>/fleet/maintenance">
+            <div class="form-row"><div class="form-group"><label>Truck</label><select name="vehicle_id"><option value="">—</option><% vehicles.forEach(v=>{%><option value="<%=v.id%>">#<%=v.unit_number%></option><%})%></select></div><div class="form-group"><label>Trailer</label><select name="trailer_id"><option value="">—</option><% trailers.forEach(t=>{%><option value="<%=t.id%>">#<%=t.unit_number%></option><%})%></select></div></div>
+            <div class="form-row"><div class="form-group"><label>Type</label><select name="type"><option>oil-change</option><option>tire</option><option>brakes</option><option>engine</option><option>transmission</option><option>electrical</option><option>inspection</option><option>preventive</option><option>repair</option><option>bodywork</option><option>other</option></select></div><div class="form-group"><label>Date</label><input type="date" name="date" value="<%= new Date().toISOString().slice(0,10) %>"></div></div>
+            <div class="form-group"><label>Description *</label><input type="text" name="description" required placeholder="What was done"></div>
+            <div class="form-row"><div class="form-group"><label>Vendor</label><input type="text" name="vendor"></div><div class="form-group"><label>Cost ($)</label><input type="number" name="cost" step="0.01"></div></div>
+            <div class="form-row"><div class="form-group"><label>Odometer</label><input type="number" name="odometer"></div><div class="form-group"><label>Status</label><select name="status"><option>completed</option><option>scheduled</option><option>in-progress</option></select></div></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('addMaintModal').classList.remove('open')">Cancel</button></div>
+          </form>
+        </div>
+      </div>
+      <!-- Fuel -->
+      <div class="modal-bg" id="addFuelModal" onclick="if(event.target===this)this.classList.remove('open')">
+        <div class="modal">
+          <h3><i class="ti ti-gas-station"></i> Log Fuel</h3>
+          <form method="POST" action="/admin/companies/<%= company.id %>/fleet/fuel">
+            <div class="form-row"><div class="form-group"><label>Truck</label><select name="vehicle_id"><option value="">—</option><% vehicles.forEach(v=>{%><option value="<%=v.id%>">#<%=v.unit_number%></option><%})%></select></div><div class="form-group"><label>Date</label><input type="date" name="date" value="<%= new Date().toISOString().slice(0,10) %>"></div></div>
+            <div class="form-row-3"><div class="form-group"><label>Gallons</label><input type="number" name="gallons" step="0.01"></div><div class="form-group"><label>$/Gallon</label><input type="number" name="cost_per_gallon" step="0.001"></div><div class="form-group"><label>Odometer</label><input type="number" name="odometer"></div></div>
+            <div class="form-row"><div class="form-group"><label>Station</label><input type="text" name="station"></div><div class="form-group"><label>City, State</label><div style="display:flex;gap:6px;"><input type="text" name="city" style="flex:1;"><input type="text" name="state" maxlength="2" style="width:50px;"></div></div></div>
+            <div class="form-group"><label>Fuel Card</label><input type="text" name="fuel_card" placeholder="Card # or name"></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('addFuelModal').classList.remove('open')">Cancel</button></div>
+          </form>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;"><a href="/admin/companies/<%= company.id %>" class="btn btn-sm">← Back to <%= company.name %></a></div>
+
+      <script>
+      function showFTab(name){
+        document.querySelectorAll('[id^="ftab-"]').forEach(el=>el.style.display='none');
+        document.getElementById('ftab-'+name).style.display='';
+        document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
+        event.target.closest('.tab').classList.add('active');
+      }
+      </script>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>
