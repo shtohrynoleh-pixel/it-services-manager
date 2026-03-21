@@ -35,7 +35,11 @@
       <div id="ftab-vehicles">
         <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
           <button class="btn btn-primary btn-sm" onclick="document.getElementById('addVehicleModal').classList.add('open')">+ Add Truck</button>
-          <% if ((eldVehicles||[]).length > 0) { %><button class="btn btn-sm" onclick="document.getElementById('importEldModal').classList.add('open')"><i class="ti ti-download"></i> Import from ELD (<%= eldVehicles.length %>)</button><% } %>
+          <% if ((eldVehicles||[]).length > 0) { %>
+            <button class="btn btn-sm" onclick="document.getElementById('importEldModal').classList.add('open')"><i class="ti ti-download"></i> Import from ELD (<%= eldVehicles.length %>)</button>
+          <% } else { %>
+            <a href="/admin/companies/<%= company.id %>/eld" class="btn btn-sm"><i class="ti ti-plug-connected"></i> Connect ELD to import trucks</a>
+          <% } %>
         </div>
         <% if (vehicles.length === 0) { %>
           <div class="empty"><span class="e-icon"><i class="ti ti-truck" style="font-size:40px;"></i></span><div class="e-text">No trucks yet</div></div>
