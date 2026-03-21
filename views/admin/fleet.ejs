@@ -262,11 +262,19 @@
                 var linkedEldIds = new Set(vehicles.filter(v => v.eld_vehicle_id).map(v => v.eld_vehicle_id));
                 var availableCount = 0;
               %>
-              <% (eldVehicles||[]).forEach(ev => { var alreadyLinked = linkedEldIds.has(ev.id); if (!alreadyLinked) availableCount++; %>
+              <%
+                // Also check trailers for linked
+                var linkedTrailerEldIds = new Set((trailers||[]).filter(t => t.eld_vehicle_id).map(t => t.eld_vehicle_id));
+              %>
+              <% (eldVehicles||[]).forEach(ev => {
+                var isTrailer = (ev.asset_type === 'trailer');
+                var alreadyLinked = isTrailer ? linkedTrailerEldIds.has(ev.id) : linkedEldIds.has(ev.id);
+                if (!alreadyLinked) availableCount++;
+              %>
                 <label style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid #f1f5f9;cursor:<%= alreadyLinked ? 'default' : 'pointer' %>;font-size:12px;<%= alreadyLinked ? 'opacity:0.4;' : '' %>">
                   <div style="width:30px;"><input type="checkbox" name="eld_ids" value="<%= ev.id %>" <%= alreadyLinked ? 'disabled' : 'checked' %> style="width:auto;"></div>
                   <div style="flex:1;min-width:0;">
-                    <div style="font-weight:700;"><%= ev.name || '—' %></div>
+                    <div style="font-weight:700;"><%= ev.name || '—' %> <span class="badge <%= isTrailer ? 'sent' : ev.asset_type === 'asset' ? 'prospect' : 'active' %>" style="font-size:8px;"><i class="ti ti-<%= isTrailer ? 'container' : ev.asset_type === 'asset' ? 'tag' : 'truck' %>" style="font-size:9px;"></i> <%= ev.asset_type || 'vehicle' %></span></div>
                     <div style="font-size:10px;color:var(--muted);"><%= [ev.make, ev.model].filter(Boolean).join(' ') %><%= ev.vin ? ' · VIN: ...' + ev.vin.slice(-6) : '' %></div>
                   </div>
                   <div style="width:100px;"><span class="badge draft" style="font-size:9px;"><%= ev.provider %></span></div>

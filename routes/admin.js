@@ -785,21 +785,45 @@ module.exports = function(db) {
   // Bulk import ELD vehicles into fleet
   router.post('/companies/:cid/fleet/import-eld', (req, res) => {
     let eldIds = req.body.eld_ids;
-    if (!eldIds) return res.redirect('/admin/companies/' + req.params.cid + '/fleet');
+    console.log('ELD Import - raw body:', req.body);
+    console.log('ELD Import - eld_ids:', eldIds);
+    if (!eldIds) {
+      console.log('ELD Import - No eld_ids received!');
+      return res.redirect('/admin/companies/' + req.params.cid + '/fleet');
+    }
     if (!Array.isArray(eldIds)) eldIds = [eldIds];
+    console.log('ELD Import - Processing', eldIds.length, 'IDs:', eldIds);
 
+    let imported = 0, skipped = 0;
     for (const eid of eldIds) {
       const ev = safeGet('SELECT * FROM eld_vehicles WHERE id = ? AND company_id = ?', [parseInt(eid), req.params.cid]);
-      if (!ev) continue;
-      // Check if already linked
-      const existing = safeGet('SELECT id FROM fleet_vehicles WHERE eld_vehicle_id = ? AND company_id = ?', [ev.id, req.params.cid]);
-      if (existing) continue;
-      try {
-        db.prepare('INSERT INTO fleet_vehicles (company_id, unit_number, type, make, model, year, vin, license_plate, status, eld_vehicle_id) VALUES (?,?,?,?,?,?,?,?,?,?)').run(
-          req.params.cid, ev.name || 'ELD-' + ev.id, 'truck', ev.make || null, ev.model || null, ev.year || null, ev.vin || null, ev.license_plate || null, 'active', ev.id
-        );
-      } catch(e) { console.error('Import ELD error:', e.message); }
+      if (!ev) { console.log('ELD Import - Not found:', eid); skipped++; continue; }
+
+      const assetType = ev.asset_type || 'vehicle';
+
+      if (assetType === 'trailer') {
+        // Import as trailer
+        const existing = safeGet('SELECT id FROM fleet_trailers WHERE eld_vehicle_id = ? AND company_id = ?', [ev.id, req.params.cid]);
+        if (existing) { skipped++; continue; }
+        try {
+          db.prepare('INSERT INTO fleet_trailers (company_id, unit_number, type, make, model, year, vin, license_plate, status, eld_vehicle_id) VALUES (?,?,?,?,?,?,?,?,?,?)').run(
+            req.params.cid, ev.name || 'TR-' + ev.id, 'dry-van', ev.make || null, ev.model || null, ev.year || null, ev.vin || null, ev.license_plate || null, 'active', ev.id
+          );
+          imported++;
+        } catch(e) { console.error('ELD Trailer Import error:', e.message); }
+      } else {
+        // Import as truck
+        const existing = safeGet('SELECT id FROM fleet_vehicles WHERE eld_vehicle_id = ? AND company_id = ?', [ev.id, req.params.cid]);
+        if (existing) { skipped++; continue; }
+        try {
+          db.prepare('INSERT INTO fleet_vehicles (company_id, unit_number, type, make, model, year, vin, license_plate, status, eld_vehicle_id) VALUES (?,?,?,?,?,?,?,?,?,?)').run(
+            req.params.cid, ev.name || 'ELD-' + ev.id, 'truck', ev.make || null, ev.model || null, ev.year || null, ev.vin || null, ev.license_plate || null, 'active', ev.id
+          );
+          imported++;
+        } catch(e) { console.error('ELD Vehicle Import error:', e.message); }
+      }
     }
+    console.log('ELD Import - Done. Imported:', imported, 'Skipped:', skipped);
     res.redirect('/admin/companies/' + req.params.cid + '/fleet');
   });
 
@@ -812,8 +836,7 @@ module.exports = function(db) {
 
   // API endpoint for live map data (AJAX polling)
   router.get('/companies/:cid/fleet/map-data', (req, res) => {
-    // All ELD vehicles with GPS
-    const eldWithGps = safeAll("SELECT ev.*, ei.provider, ei.label as integration_label, fv.unit_number as fleet_unit, fv.make as fleet_make, fv.model as fleet_model, fv.type as fleet_type FROM eld_vehicles ev LEFT JOIN eld_integrations ei ON ev.integration_id = ei.id LEFT JOIN fleet_vehicles fv ON fv.eld_vehicle_id = ev.id WHERE ev.company_id = ? AND ev.last_lat IS NOT NULL AND ev.last_lat != 0", [req.params.cid]);
+    const eldWithGps = safeAll("SELECT ev.*, ei.provider, ei.label as integration_label, fv.unit_number as fleet_unit, fv.make as fleet_make, fv.model as fleet_model, fv.type as fleet_type, ft.unit_number as trailer_unit FROM eld_vehicles ev LEFT JOIN eld_integrations ei ON ev.integration_id = ei.id LEFT JOIN fleet_vehicles fv ON fv.eld_vehicle_id = ev.id LEFT JOIN fleet_trailers ft ON ft.eld_vehicle_id = ev.id WHERE ev.company_id = ? AND ev.last_lat IS NOT NULL AND ev.last_lat != 0", [req.params.cid]);
     res.json(eldWithGps);
   });
 

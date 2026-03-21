@@ -919,9 +919,18 @@ function initDB() {
     [['Executive','Leadership and ownership',1],['Operations','Dispatch, logistics, and daily operations',2],['Driving','CDL drivers and fleet operators',3],['Maintenance','Truck and equipment maintenance',4],['Accounting','Finance, billing, and payroll',5],['Safety','Safety compliance and training',6],['HR','Hiring, onboarding, and employee management',7],['Administration','Office support and front desk',8],['IT','Technology and systems',9],['Warehouse','Loading, unloading, and yard operations',10]].forEach(d => di.run(...d));
   }
 
+  // Add asset_type to eld_vehicles if missing
+  try { db.prepare('SELECT asset_type FROM eld_vehicles LIMIT 1').get(); } catch(e) {
+    try { db.exec("ALTER TABLE eld_vehicles ADD COLUMN asset_type TEXT DEFAULT 'vehicle'"); } catch(e2) {}
+  }
+
   // Add eld_vehicle_id to fleet_vehicles if missing
   try { db.prepare('SELECT eld_vehicle_id FROM fleet_vehicles LIMIT 1').get(); } catch(e) {
     try { db.exec('ALTER TABLE fleet_vehicles ADD COLUMN eld_vehicle_id INTEGER'); } catch(e2) {}
+  }
+  // Add eld_vehicle_id to fleet_trailers if missing
+  try { db.prepare('SELECT eld_vehicle_id FROM fleet_trailers LIMIT 1').get(); } catch(e) {
+    try { db.exec('ALTER TABLE fleet_trailers ADD COLUMN eld_vehicle_id INTEGER'); } catch(e2) {}
   }
 
   // Add SLA columns to tasks if missing

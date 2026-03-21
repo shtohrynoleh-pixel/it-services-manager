@@ -27,8 +27,9 @@
       <div id="fleetMap"></div>
       <div class="map-counter" id="mapCounter">Loading...</div>
       <div class="map-sidebar" id="mapSidebar">
-        <div style="font-weight:800;margin-bottom:8px;"><i class="ti ti-truck"></i> Vehicles</div>
-        <input type="text" id="mapSearch" placeholder="Search..." oninput="filterMapList()" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;margin-bottom:8px;">
+        <div style="font-weight:800;margin-bottom:6px;"><i class="ti ti-truck"></i> Vehicles</div>
+        <div style="display:flex;gap:3px;margin-bottom:6px;flex-wrap:wrap;" id="mapFilters"></div>
+        <input type="text" id="mapSearch" placeholder="Search..." oninput="filterMapList()" style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:10px;margin-bottom:6px;">
         <div id="mapVehicleList"></div>
       </div>
 
@@ -73,30 +74,19 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 18
 }).addTo(map);
 
-// Custom truck icon
-var truckIcon = L.divIcon({
-  className: 'truck-marker',
-  html: '<div style="background:var(--primary);color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px solid #fff;"><i class="ti ti-truck"></i></div>',
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
-  popupAnchor: [0, -18]
-});
-
-var movingIcon = L.divIcon({
-  className: 'truck-marker',
-  html: '<div style="background:#10b981;color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(16,185,129,0.4);border:2px solid #fff;"><i class="ti ti-truck"></i></div>',
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
-  popupAnchor: [0, -18]
-});
-
-var stoppedIcon = L.divIcon({
-  className: 'truck-marker',
-  html: '<div style="background:#94a3b8;color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2px solid #fff;"><i class="ti ti-truck"></i></div>',
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
-  popupAnchor: [0, -18]
-});
+// Icons by type and state
+function makeIcon(type, moving) {
+  var icons = { vehicle: 'ti-truck', trailer: 'ti-container', asset: 'ti-tag' };
+  var colors = { vehicle: moving ? '#10b981' : '#0891b2', trailer: moving ? '#10b981' : '#8b5cf6', asset: moving ? '#10b981' : '#f59e0b' };
+  var bg = moving ? '#10b981' : (type === 'trailer' ? '#8b5cf6' : type === 'asset' ? '#f59e0b' : '#0891b2');
+  if (!moving && (!type || type === 'vehicle')) bg = '#94a3b8'; // stopped truck = gray
+  return L.divIcon({
+    className: 'truck-marker',
+    html: '<div style="background:' + bg + ';color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px solid #fff;"><i class="' + (icons[type] || 'ti-truck') + '"></i></div>',
+    iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -18]
+  });
+}
+var currentFilter = '';
 
 function loadVehicles() {
   fetch('/admin/companies/' + CID + '/fleet/map-data')
@@ -106,12 +96,22 @@ function loadVehicles() {
       var listHtml = '';
       var count = { total: 0, moving: 0, stopped: 0 };
 
+      // Build filter buttons
+      var typeCounts = {};
+      vehicles.forEach(v => { var t = v.asset_type || 'vehicle'; typeCounts[t] = (typeCounts[t]||0) + 1; });
+      var filterHtml = '<button onclick="setMapFilter(\'\')" style="padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:' + (!currentFilter ? 'var(--primary)' : '#fff') + ';color:' + (!currentFilter ? '#fff' : 'var(--muted)') + ';">All ' + vehicles.length + '</button>';
+      Object.keys(typeCounts).forEach(function(t) {
+        filterHtml += '<button onclick="setMapFilter(\'' + t + '\')" style="padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:' + (currentFilter===t ? 'var(--primary)' : '#fff') + ';color:' + (currentFilter===t ? '#fff' : 'var(--muted)') + ';">' + t + ' ' + typeCounts[t] + '</button>';
+      });
+      document.getElementById('mapFilters').innerHTML = filterHtml;
+
       vehicles.forEach(v => {
         if (!v.last_lat || !v.last_lng) return;
         var lat = v.last_lat, lng = v.last_lng;
+        var assetType = v.asset_type || 'vehicle';
         var isMoving = v.last_speed && v.last_speed > 2;
-        var icon = isMoving ? movingIcon : stoppedIcon;
-        var name = v.fleet_unit ? '#' + v.fleet_unit : v.name;
+        var icon = makeIcon(assetType, isMoving);
+        var name = v.fleet_unit || v.trailer_unit ? '#' + (v.fleet_unit || v.trailer_unit) : v.name;
         var vehicle = v.fleet_make && v.fleet_model ? v.fleet_make + ' ' + v.fleet_model : [v.make, v.model].filter(Boolean).join(' ');
 
         count.total++;
@@ -128,16 +128,23 @@ function loadVehicles() {
           '<div style="font-size:9px;color:#94a3b8;margin-top:4px;">' + v.provider + (v.integration_label ? ' · ' + v.integration_label : '') + '</div>' +
           '</div>';
 
+        // Apply filter
+        var visible = !currentFilter || assetType === currentFilter;
+
         if (markers[v.id]) {
           markers[v.id].setLatLng([lat, lng]).setIcon(icon).setPopupContent(popup);
+          if (visible) { markers[v.id].addTo(map); } else { map.removeLayer(markers[v.id]); }
         } else {
-          markers[v.id] = L.marker([lat, lng], { icon: icon }).addTo(map).bindPopup(popup);
+          markers[v.id] = L.marker([lat, lng], { icon: icon }).bindPopup(popup);
+          if (visible) markers[v.id].addTo(map);
         }
-        bounds.push([lat, lng]);
+        markers[v.id]._assetType = assetType;
+        if (visible) bounds.push([lat, lng]);
 
-        listHtml += '<div class="map-v-item" data-search="' + (name + ' ' + vehicle + ' ' + (v.driver_name||'')).toLowerCase() + '" onclick="map.setView([' + lat + ',' + lng + '],14);markers[' + v.id + '].openPopup();">' +
-          '<h4>' + (name || '—') + '</h4>' +
-          '<div class="mv-sub">' + vehicle + (v.driver_name ? ' · ' + v.driver_name : '') + '</div>' +
+        var typeIcon = assetType === 'trailer' ? 'ti-container' : assetType === 'asset' ? 'ti-tag' : 'ti-truck';
+        listHtml += '<div class="map-v-item" data-search="' + (name + ' ' + vehicle + ' ' + (v.driver_name||'') + ' ' + assetType).toLowerCase() + '" data-type="' + assetType + '" style="' + (visible ? '' : 'display:none;') + '" onclick="map.setView([' + lat + ',' + lng + '],14);markers[' + v.id + '].openPopup();">' +
+          '<h4><i class="' + typeIcon + '" style="font-size:12px;color:var(--primary);"></i> ' + (name || '—') + '</h4>' +
+          '<div class="mv-sub">' + vehicle + (v.driver_name ? ' · ' + v.driver_name : '') + ' · <span style="font-size:9px;color:var(--muted);">' + assetType + '</span></div>' +
           '<div class="mv-loc">' + (isMoving ? '🟢 ' + Math.round(v.last_speed) + ' mph' : '⚫ Stopped') + (v.last_location ? ' · ' + v.last_location : '') + '</div>' +
           '</div>';
       });
@@ -154,6 +161,21 @@ function loadVehicles() {
 
 function refreshMap() {
   window._mapFitted = false;
+  loadVehicles();
+}
+
+function setMapFilter(type) {
+  currentFilter = type;
+  // Toggle markers
+  Object.keys(markers).forEach(function(id) {
+    var m = markers[id];
+    if (!type || m._assetType === type) { m.addTo(map); } else { map.removeLayer(m); }
+  });
+  // Toggle list
+  document.querySelectorAll('#mapVehicleList .map-v-item').forEach(function(el) {
+    el.style.display = (!type || el.dataset.type === type) ? '' : 'none';
+  });
+  // Refresh to update filter button styles
   loadVehicles();
 }
 

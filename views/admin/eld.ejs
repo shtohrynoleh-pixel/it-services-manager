@@ -90,13 +90,17 @@
           <% var labels = [...new Set(eldVehicles.map(v => v.integration_label).filter(Boolean))]; labels.forEach(l => { var count = eldVehicles.filter(v => v.integration_label === l).length; %>
             <button class="btn btn-sm" onclick="filterEld('', '<%= l %>')"><%= l %> (<%= count %>)</button>
           <% }) %>
+          <span style="color:var(--border);">|</span>
+          <% var types = [...new Set(eldVehicles.map(v => v.asset_type || 'vehicle'))]; types.forEach(t => { var count = eldVehicles.filter(v => (v.asset_type||'vehicle') === t).length; %>
+            <button class="btn btn-sm" onclick="filterEld('','','<%= t %>')"><i class="ti ti-<%= t==='trailer'?'container':t==='asset'?'tag':'truck' %>"></i> <%= t %> (<%= count %>)</button>
+          <% }) %>
         </div>
 
         <div class="v-grid" id="eldGrid">
           <% eldVehicles.forEach(v => {
             var provClass = v.provider === 'samsara' ? 'eld-samsara' : v.provider === 'motive' ? 'eld-motive' : 'eld-other';
           %>
-            <div class="v-card" data-provider="<%= v.provider %>" data-label="<%= v.integration_label || '' %>">
+            <div class="v-card" data-provider="<%= v.provider %>" data-label="<%= v.integration_label || '' %>" data-type="<%= v.asset_type || 'vehicle' %>">
               <div class="v-card-head">
                 <div>
                   <h4><%= v.name || '—' %></h4>
@@ -128,7 +132,7 @@
             <% eldVehicles.forEach(v => {
               var provClass = v.provider === 'samsara' ? 'eld-samsara' : v.provider === 'motive' ? 'eld-motive' : 'eld-other';
             %>
-              <tr class="eld-trow" data-provider="<%= v.provider %>" data-label="<%= v.integration_label || '' %>">
+              <tr class="eld-trow" data-provider="<%= v.provider %>" data-label="<%= v.integration_label || '' %>" data-type="<%= v.asset_type || 'vehicle' %>">
                 <td><strong><%= v.name || '—' %></strong></td>
                 <td><%= [v.year, v.make, v.model].filter(Boolean).join(' ') || '—' %></td>
                 <td style="font-size:10px;font-family:monospace;"><%= v.vin || '—' %></td>
@@ -153,11 +157,12 @@
       <div style="margin-top:16px;"><a href="/admin/companies/<%= company.id %>" class="btn btn-sm">← Back to <%= company.name %></a></div>
 
       <script>
-      function filterEld(provider, label) {
+      function filterEld(provider, label, assetType) {
         document.querySelectorAll('#eldGrid .v-card, #eldTable .eld-trow').forEach(function(c) {
           var show = true;
           if (provider && c.dataset.provider !== provider) show = false;
           if (label && c.dataset.label !== label) show = false;
+          if (assetType && c.dataset.type !== assetType) show = false;
           c.style.display = show ? '' : 'none';
         });
       }
