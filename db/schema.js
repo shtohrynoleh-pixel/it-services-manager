@@ -1114,6 +1114,23 @@ function initDB() {
     try { db.exec('ALTER TABLE fleet_trailers ADD COLUMN eld_vehicle_id INTEGER'); } catch(e2) {}
   }
 
+  // Add driver pay fields to company_users if missing
+  try { db.prepare('SELECT pay_type FROM company_users LIMIT 1').get(); } catch(e) {
+    try { db.exec("ALTER TABLE company_users ADD COLUMN pay_type TEXT DEFAULT 'per-mile'"); } catch(e2) {}
+    try { db.exec('ALTER TABLE company_users ADD COLUMN pay_rate REAL DEFAULT 0'); } catch(e2) {}
+    try { db.exec('ALTER TABLE company_users ADD COLUMN is_driver INTEGER DEFAULT 0'); } catch(e2) {}
+  }
+
+  // Add trip_id to tms_loads if missing
+  try { db.prepare('SELECT trip_id FROM tms_loads LIMIT 1').get(); } catch(e) {
+    try { db.exec('ALTER TABLE tms_loads ADD COLUMN trip_id INTEGER'); } catch(e2) {}
+  }
+
+  // Add settlement_id to tms_trips if missing
+  try { db.prepare('SELECT settlement_id FROM tms_trips LIMIT 1').get(); } catch(e) {
+    try { db.exec('ALTER TABLE tms_trips ADD COLUMN settlement_id INTEGER'); } catch(e2) {}
+  }
+
   // Add SLA columns to tasks if missing
   try { db.prepare('SELECT started_at FROM tasks LIMIT 1').get(); } catch(e) {
     try { db.exec('ALTER TABLE tasks ADD COLUMN started_at TEXT'); } catch(e2) {}

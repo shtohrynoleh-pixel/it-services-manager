@@ -712,7 +712,7 @@ module.exports = function(db) {
     const loads = safeAll("SELECT l.*, d.name as driver_name, v.unit_number as vehicle_unit, t.unit_number as trailer_unit, disp.name as dispatcher_name FROM tms_loads l LEFT JOIN company_users d ON l.driver_id = d.id LEFT JOIN fleet_vehicles v ON l.vehicle_id = v.id LEFT JOIN fleet_trailers t ON l.trailer_id = t.id LEFT JOIN company_users disp ON l.dispatcher_id = disp.id WHERE l.company_id = ? ORDER BY CASE l.status WHEN 'in-transit' THEN 1 WHEN 'dispatched' THEN 2 WHEN 'available' THEN 3 WHEN 'at-pickup' THEN 4 WHEN 'at-delivery' THEN 5 ELSE 6 END, l.pickup_date ASC", [company.id]);
     const trips = safeAll("SELECT tr.*, d.name as driver_name, v.unit_number as vehicle_unit FROM tms_trips tr LEFT JOIN company_users d ON tr.driver_id = d.id LEFT JOIN fleet_vehicles v ON tr.vehicle_id = v.id WHERE tr.company_id = ? ORDER BY tr.start_date DESC LIMIT 50", [company.id]);
     const settlements = safeAll("SELECT s.*, d.name as driver_name FROM tms_driver_pay s LEFT JOIN company_users d ON s.driver_id = d.id WHERE s.company_id = ? ORDER BY s.period_end DESC LIMIT 50", [company.id]);
-    const drivers = safeAll("SELECT id, name, department, role FROM company_users WHERE company_id = ? AND is_active = 1 ORDER BY name", [company.id]);
+    const drivers = safeAll("SELECT id, name, department, role, pay_type, pay_rate, is_driver FROM company_users WHERE company_id = ? AND is_active = 1 ORDER BY name", [company.id]);
     const vehicles = safeAll("SELECT id, unit_number, make, model FROM fleet_vehicles WHERE company_id = ? AND status = 'active' ORDER BY unit_number", [company.id]);
     const trailers = safeAll("SELECT id, unit_number, type FROM fleet_trailers WHERE company_id = ? AND status = 'active' ORDER BY unit_number", [company.id]);
     const dispatchers = safeAll("SELECT d.*, u.name FROM tms_dispatchers d JOIN company_users u ON d.user_id = u.id WHERE d.company_id = ? AND d.is_active = 1", [company.id]);
@@ -852,6 +852,81 @@ module.exports = function(db) {
     res.redirect('/admin/companies/' + req.params.cid + '/tms');
   });
 
+  // Create trip (links loads together)
+  router.post('/companies/:cid/tms/trips', (req, res) => {
+    const b = req.body;
+    const tripNum = 'TR-' + Date.now().toString(36).toUpperCase();
+    try {
+      const r = db.prepare('INSERT INTO tms_trips (company_id, trip_number, driver_id, vehicle_id, trailer_id, status, start_date, end_date, start_odometer, end_odometer, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(
+        req.params.cid, tripNum, b.driver_id||null, b.vehicle_id||null, b.trailer_id||null, b.status||'planned', b.start_date||null, b.end_date||null, parseInt(b.start_odometer)||null, parseInt(b.end_odometer)||null, b.notes||null
+      );
+      // Link selected loads to this trip
+      let loadIds = b.load_ids;
+      if (loadIds) {
+        if (!Array.isArray(loadIds)) loadIds = [loadIds];
+        let totalMiles = 0, totalRevenue = 0;
+        loadIds.forEach(lid => {
+          try {
+            db.prepare('UPDATE tms_loads SET trip_id = ? WHERE id = ? AND company_id = ?').run(r.lastInsertRowid, parseInt(lid), req.params.cid);
+            const ld = safeGet('SELECT total_miles, total_pay FROM tms_loads WHERE id = ?', [parseInt(lid)]);
+            if (ld) { totalMiles += (ld.total_miles||0); totalRevenue += (ld.total_pay||0); }
+          } catch(e2) {}
+        });
+        db.prepare('UPDATE tms_trips SET total_miles = ?, total_revenue = ? WHERE id = ?').run(totalMiles, totalRevenue, r.lastInsertRowid);
+      }
+    } catch(e) { console.error('Trip create:', e.message); }
+    res.redirect('/admin/companies/' + req.params.cid + '/tms?tab=loads');
+  });
+
+  // Generate settlement from trips
+  router.post('/companies/:cid/tms/generate-settlement', (req, res) => {
+    const { driver_id, period_start, period_end } = req.body;
+    if (!driver_id) return res.redirect('/admin/companies/' + req.params.cid + '/tms?tab=pay');
+
+    // Get driver pay info
+    const driver = safeGet('SELECT * FROM company_users WHERE id = ? AND company_id = ?', [driver_id, req.params.cid]);
+    if (!driver) return res.redirect('/admin/companies/' + req.params.cid + '/tms?tab=pay');
+
+    // Find delivered loads for this driver in the period
+    let where = "l.driver_id = ? AND l.company_id = ? AND l.status = 'delivered'";
+    const params = [driver_id, req.params.cid];
+    if (period_start) { where += " AND l.delivered_at >= ?"; params.push(period_start); }
+    if (period_end) { where += " AND l.delivered_at <= ?"; params.push(period_end + 'T23:59:59'); }
+    const driverLoads = safeAll("SELECT * FROM tms_loads l WHERE " + where, params);
+
+    const totalMiles = driverLoads.reduce((s,l) => s + (l.total_miles||0), 0);
+    const totalRevenue = driverLoads.reduce((s,l) => s + (l.total_pay||0), 0);
+    const totalLoads = driverLoads.length;
+
+    // Calculate pay based on driver's pay type
+    let grossPay = 0;
+    const payType = driver.pay_type || 'per-mile';
+    const payRate = driver.pay_rate || 0;
+
+    if (payType === 'per-mile') {
+      grossPay = totalMiles * payRate;
+    } else if (payType === 'percentage') {
+      grossPay = totalRevenue * (payRate / 100);
+    } else if (payType === 'flat') {
+      grossPay = payRate;
+    } else if (payType === 'per-load') {
+      grossPay = totalLoads * payRate;
+    }
+
+    try {
+      const r = db.prepare('INSERT INTO tms_driver_pay (company_id, driver_id, period_start, period_end, pay_type, rate, total_miles, total_loads, gross_pay, net_pay, status, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(
+        req.params.cid, driver_id, period_start||null, period_end||null, payType, payRate, totalMiles, totalLoads, Math.round(grossPay*100)/100, Math.round(grossPay*100)/100, 'draft',
+        'Auto-generated: ' + totalLoads + ' loads, ' + totalMiles + ' miles, $' + totalRevenue.toFixed(2) + ' revenue'
+      );
+      // Link trips to this settlement
+      const tripIds = [...new Set(driverLoads.map(l => l.trip_id).filter(Boolean))];
+      tripIds.forEach(tid => {
+        try { db.prepare('UPDATE tms_trips SET settlement_id = ? WHERE id = ?').run(r.lastInsertRowid, tid); } catch(e2) {}
+      });
+    } catch(e) { console.error('Settlement generation:', e.message); }
+    res.redirect('/admin/companies/' + req.params.cid + '/tms?tab=pay');
+  });
+
   // Create settlement
   router.post('/companies/:cid/tms/settlements', (req, res) => {
     const b = req.body;
@@ -867,6 +942,17 @@ module.exports = function(db) {
 
   router.post('/companies/:cid/tms/settlements/:sid/pay', (req, res) => {
     try { db.prepare("UPDATE tms_driver_pay SET status = 'paid', paid_date = datetime('now') WHERE id = ? AND company_id = ?").run(req.params.sid, req.params.cid); } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/tms?tab=pay');
+  });
+
+  // Update driver pay rate
+  router.post('/companies/:cid/tms/driver-rate/:did', (req, res) => {
+    const { pay_type, pay_rate } = req.body;
+    try {
+      db.prepare('UPDATE company_users SET pay_type = ?, pay_rate = ?, is_driver = 1 WHERE id = ? AND company_id = ?').run(
+        pay_type || 'per-mile', parseFloat(pay_rate) || 0, req.params.did, req.params.cid
+      );
+    } catch(e) {}
     res.redirect('/admin/companies/' + req.params.cid + '/tms?tab=pay');
   });
 

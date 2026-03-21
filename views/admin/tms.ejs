@@ -195,7 +195,39 @@
 
       <% } else if (tab === 'pay') { %>
         <!-- DRIVER PAY -->
-        <button class="btn btn-primary btn-sm" onclick="document.getElementById('addPayModal').classList.add('open')" style="margin-bottom:12px;"><i class="ti ti-plus"></i> Create Settlement</button>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('genPayModal').classList.add('open')"><i class="ti ti-calculator"></i> Generate Settlement</button>
+          <button class="btn btn-sm" onclick="document.getElementById('addPayModal').classList.add('open')"><i class="ti ti-plus"></i> Manual Settlement</button>
+        </div>
+
+        <!-- Driver pay rates -->
+        <div class="card" style="margin-bottom:14px;">
+          <h3><i class="ti ti-user"></i> Driver Pay Rates</h3>
+          <table class="tbl">
+            <thead><tr><th>Driver</th><th>Pay Type</th><th>Rate</th><th></th></tr></thead>
+            <tbody>
+            <% drivers.forEach(d => { %>
+              <tr>
+                <td><strong><%= d.name %></strong></td>
+                <td><%= d.pay_type || 'per-mile' %></td>
+                <td><%= d.pay_type === 'percentage' ? (d.pay_rate||0)+'%' : '$'+(d.pay_rate||0) %></td>
+                <td><button class="btn-ghost" onclick="document.getElementById('editRate-<%= d.id %>').classList.add('open')" style="color:var(--primary);"><i class="ti ti-edit"></i></button></td>
+              </tr>
+              <!-- Edit rate modal -->
+              <div class="modal-bg" id="editRate-<%= d.id %>" onclick="if(event.target===this)this.classList.remove('open')">
+                <div class="modal" style="max-width:380px;">
+                  <h3>Pay Rate — <%= d.name %></h3>
+                  <form method="POST" action="/admin/companies/<%= company.id %>/tms/driver-rate/<%= d.id %>">
+                    <div class="form-group"><label>Pay Type</label><select name="pay_type"><% ['per-mile','percentage','flat','per-load','hourly'].forEach(t => { %><option value="<%= t %>" <%= d.pay_type === t ? 'selected' : '' %>><%= t === 'per-mile' ? 'Per Mile ($)' : t === 'percentage' ? 'Percentage of Load (%)' : t === 'flat' ? 'Flat Rate per Period ($)' : t === 'per-load' ? 'Per Load ($)' : 'Hourly ($)' %></option><% }) %></select></div>
+                    <div class="form-group"><label>Rate</label><input type="number" name="pay_rate" step="0.01" value="<%= d.pay_rate || 0 %>" placeholder="e.g. 0.55 per mile, 25% of load"></div>
+                    <div class="form-actions"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="document.getElementById('editRate-<%= d.id %>').classList.remove('open')">Cancel</button></div>
+                  </form>
+                </div>
+              </div>
+            <% }) %>
+            </tbody>
+          </table>
+        </div>
         <div class="metrics" style="margin-bottom:12px;">
           <div class="metric bad"><div class="m-label">Unpaid</div><div class="m-val red">$<%= stats.unpaidSettlements.toLocaleString() %></div></div>
           <div class="metric"><div class="m-label">Settlements</div><div class="m-val"><%= settlements.length %></div></div>
@@ -205,10 +237,10 @@
             <thead><tr><th>Driver</th><th>Period</th><th>Type</th><th>Miles</th><th>Loads</th><th>Gross</th><th>Deductions</th><th>Net Pay</th><th>Status</th><th></th></tr></thead>
             <tbody>
             <% settlements.forEach(s => { %>
-              <tr>
+              <tr style="cursor:pointer;" onclick="document.getElementById('settlDetail-<%= s.id %>').classList.add('open')">
                 <td><strong><%= s.driver_name || '—' %></strong></td>
                 <td style="font-size:11px;"><%= s.period_start || '' %> — <%= s.period_end || '' %></td>
-                <td><%= s.pay_type %></td>
+                <td><%= s.pay_type %> @ <%= s.pay_type === 'percentage' ? s.rate + '%' : '$' + s.rate %></td>
                 <td><%= s.total_miles ? s.total_miles.toLocaleString() : '—' %></td>
                 <td><%= s.total_loads || '—' %></td>
                 <td>$<%= (s.gross_pay||0).toFixed(2) %></td>
@@ -220,7 +252,45 @@
             <% }) %>
             </tbody>
           </table>
-        <% } else { %><div class="empty"><span class="e-icon"><i class="ti ti-cash" style="font-size:40px;"></i></span><div class="e-text">No settlements yet</div></div><% } %>
+        <% } else { %><div class="empty"><span class="e-icon"><i class="ti ti-cash" style="font-size:40px;"></i></span><div class="e-text">No settlements yet</div><div style="font-size:12px;color:var(--muted);">Set driver pay rates above, then generate a settlement.</div></div><% } %>
+
+        <!-- Settlement detail modals -->
+        <% settlements.forEach(s => { %>
+          <div class="modal-bg" id="settlDetail-<%= s.id %>" onclick="if(event.target===this)this.classList.remove('open')">
+            <div class="modal" style="max-width:560px;">
+              <h3><i class="ti ti-file-invoice"></i> Settlement — <%= s.driver_name %></h3>
+              <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+                <div style="font-size:12px;color:var(--muted);"><%= s.period_start||'' %> — <%= s.period_end||'' %></div>
+                <span class="badge <%= s.status==='paid'?'active':'draft' %>"><%= s.status %></span>
+              </div>
+              <div class="card-row"><span class="label">Pay Type</span><span class="value"><%= s.pay_type %> @ <%= s.pay_type === 'percentage' ? s.rate + '%' : '$' + s.rate %></span></div>
+              <div class="card-row"><span class="label">Total Miles</span><span class="value"><%= s.total_miles ? s.total_miles.toLocaleString() : '—' %></span></div>
+              <div class="card-row"><span class="label">Total Loads</span><span class="value"><%= s.total_loads || '—' %></span></div>
+              <div class="card-row"><span class="label">Gross Pay</span><span class="value">$<%= (s.gross_pay||0).toFixed(2) %></span></div>
+              <% if (s.bonus) { %><div class="card-row"><span class="label">Bonus</span><span class="value" style="color:var(--success);">+$<%= s.bonus.toFixed(2) %></span></div><% } %>
+              <% if (s.deductions) { %><div class="card-row"><span class="label">Deductions</span><span class="value" style="color:var(--danger);">-$<%= s.deductions.toFixed(2) %></span></div><% } %>
+              <% if (s.reimbursements) { %><div class="card-row"><span class="label">Reimbursements</span><span class="value">+$<%= s.reimbursements.toFixed(2) %></span></div><% } %>
+              <div class="card-row" style="font-weight:900;font-size:16px;border-top:2px solid var(--border);"><span class="label">Net Pay</span><span class="value" style="color:var(--primary);">$<%= (s.net_pay||0).toFixed(2) %></span></div>
+              <% if (s.notes) { %><div style="margin-top:10px;font-size:11px;color:var(--muted);padding:8px;background:var(--bg);border-radius:6px;"><%= s.notes %></div><% } %>
+              <% if (s.paid_date) { %><div style="margin-top:8px;font-size:11px;color:var(--success);font-weight:700;">Paid: <%= s.paid_date %></div><% } %>
+              <div class="form-actions"><button type="button" class="btn" onclick="document.getElementById('settlDetail-<%= s.id %>').classList.remove('open')">Close</button></div>
+            </div>
+          </div>
+        <% }) %>
+
+        <!-- Generate settlement modal -->
+        <div class="modal-bg" id="genPayModal" onclick="if(event.target===this)this.classList.remove('open')">
+          <div class="modal">
+            <h3><i class="ti ti-calculator"></i> Generate Settlement</h3>
+            <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Automatically calculate pay based on the driver's rate and delivered loads in the selected period.</p>
+            <form method="POST" action="/admin/companies/<%= company.id %>/tms/generate-settlement">
+              <div class="form-group"><label>Driver *</label><select name="driver_id" required><option value="">— Select driver —</option><% drivers.forEach(d => { %><option value="<%= d.id %>"><%= d.name %> (<%= d.pay_type || 'per-mile' %> @ <%= d.pay_type === 'percentage' ? (d.pay_rate||0)+'%' : '$'+(d.pay_rate||0) %>)</option><% }) %></select></div>
+              <div class="form-row"><div class="form-group"><label>Period Start</label><input type="date" name="period_start"></div><div class="form-group"><label>Period End</label><input type="date" name="period_end" value="<%= new Date().toISOString().slice(0,10) %>"></div></div>
+              <div style="padding:10px;background:#f0fdfa;border-radius:8px;font-size:11px;color:#065f46;margin-bottom:12px;"><i class="ti ti-info-circle"></i> The system will find all <strong>delivered</strong> loads for this driver in the period and calculate pay using their saved rate.</div>
+              <div class="form-actions"><button type="submit" class="btn btn-primary"><i class="ti ti-calculator"></i> Generate</button><button type="button" class="btn" onclick="document.getElementById('genPayModal').classList.remove('open')">Cancel</button></div>
+            </form>
+          </div>
+        </div>
 
       <% } else if (tab === 'profit') { %>
         <!-- PROFITABILITY -->
