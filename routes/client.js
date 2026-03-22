@@ -347,8 +347,6 @@ module.exports = function(db) {
   });
 
   // === DRIVER FUEL DASHBOARD ===
-  const safeGet = (sql, params) => { try { return params ? db.prepare(sql).get(...(Array.isArray(params)?params:[params])) : db.prepare(sql).get(); } catch(e) { return null; } };
-
   // Helper: get driver's company_users ID
   function getDriverId(req) {
     const cid = req.session.user.company_id;
