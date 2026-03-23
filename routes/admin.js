@@ -1347,6 +1347,58 @@ module.exports = function(db) {
     res.redirect('/admin/companies/' + req.params.id + '?tab=' + table.replace('company_', ''));
   });
 
+  // === BULK ACTIONS (mass delete / archive) — admin only ===
+  router.post('/companies/:id/:table/bulk-action', (req, res) => {
+    const u = req.session.user;
+    if (u.role !== 'admin' && !u.is_super) return res.status(403).send('Admin only');
+    const table = req.params.table;
+    const cid = req.params.id;
+    const action = req.body.action; // 'delete' or 'archive'
+    let ids = req.body.ids;
+    if (typeof ids === 'string') ids = [ids];
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return res.redirect('/admin/companies/' + cid + '?tab=' + table.replace('company_', ''));
+
+    // Validate table name
+    const dbTable = table === 'users' ? 'company_users' : table;
+    if (!tables[dbTable] && dbTable !== 'agreements') return res.status(400).send('Invalid table');
+
+    const safeIds = ids.map(id => parseInt(id)).filter(id => id > 0);
+    if (safeIds.length === 0) return res.redirect('/admin/companies/' + cid + '?tab=' + table.replace('company_', ''));
+
+    const placeholders = safeIds.map(() => '?').join(',');
+
+    try {
+      if (action === 'delete') {
+        db.prepare('DELETE FROM ' + dbTable + ' WHERE id IN (' + placeholders + ') AND company_id = ?').run(...safeIds, cid);
+        // Clean up related records for users
+        if (dbTable === 'company_users') {
+          db.prepare('DELETE FROM user_emails WHERE user_id IN (' + placeholders + ') AND company_id = ?').run(...safeIds, cid);
+          db.prepare('DELETE FROM user_phones WHERE user_id IN (' + placeholders + ') AND company_id = ?').run(...safeIds, cid);
+          db.prepare('DELETE FROM user_division_assignments WHERE user_id IN (' + placeholders + ') AND company_id = ?').run(...safeIds, cid);
+          db.prepare('DELETE FROM user_software WHERE user_id IN (' + placeholders + ') AND company_id = ?').run(...safeIds, cid);
+        }
+      } else if (action === 'archive') {
+        // For tables with is_active: set to 0
+        if (['company_users','servers','inventory','contacts'].includes(dbTable)) {
+          db.prepare('UPDATE ' + dbTable + ' SET is_active = 0 WHERE id IN (' + placeholders + ') AND company_id = ?').run(...safeIds, cid);
+        }
+        // For subscriptions/assets: set status to 'inactive'/'archived'
+        else if (['subscriptions','assets'].includes(dbTable)) {
+          db.prepare("UPDATE " + dbTable + " SET status = 'inactive' WHERE id IN (" + placeholders + ") AND company_id = ?").run(...safeIds, cid);
+        }
+      } else if (action === 'activate') {
+        if (['company_users','servers','inventory','contacts'].includes(dbTable)) {
+          db.prepare('UPDATE ' + dbTable + ' SET is_active = 1 WHERE id IN (' + placeholders + ') AND company_id = ?').run(...safeIds, cid);
+        } else if (['subscriptions','assets'].includes(dbTable)) {
+          db.prepare("UPDATE " + dbTable + " SET status = 'active' WHERE id IN (" + placeholders + ") AND company_id = ?").run(...safeIds, cid);
+        }
+      }
+    } catch(e) { console.error('Bulk action error:', e.message); }
+
+    const redirectTab = table === 'users' ? 'users' : table.replace('company_', '');
+    res.redirect('/admin/companies/' + cid + '?tab=' + redirectTab);
+  });
+
   router.post('/companies/:id/:table/:itemId/delete', (req, res) => {
     const table = req.params.table;
     if (table === 'client-users') {
