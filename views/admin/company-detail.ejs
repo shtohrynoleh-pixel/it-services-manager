@@ -334,12 +334,27 @@
         <% if (allItems.length === 0) { %>
           <div class="empty"><span class="e-icon">📭</span><div class="e-text">No <%= tab %> yet</div></div>
         <% } else { %>
+          <!-- Bulk action bar (hidden until items selected) -->
+          <% if (user.role === 'admin' || user.is_super) { %>
+          <div id="bulkBar" style="display:none;padding:10px 16px;background:var(--primary);color:#fff;border-radius:10px;margin-bottom:12px;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span style="font-size:13px;font-weight:700;"><span id="bulkCount">0</span> selected</span>
+            <form method="POST" action="/admin/companies/<%= company.id %>/<%= tab === 'users' ? 'users' : cfg.dbTable %>/bulk-action" id="bulkForm" style="display:flex;gap:6px;">
+              <div id="bulkIds"></div>
+              <button type="submit" name="action" value="archive" class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff;border-color:rgba(255,255,255,0.3);" onclick="return confirm('Archive selected items?')"><i class="ti ti-archive"></i> Archive</button>
+              <button type="submit" name="action" value="activate" class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff;border-color:rgba(255,255,255,0.3);" onclick="return confirm('Activate selected items?')"><i class="ti ti-check"></i> Activate</button>
+              <button type="submit" name="action" value="delete" class="btn btn-sm" style="background:#ef4444;color:#fff;border-color:#ef4444;" onclick="return confirm('Permanently delete selected items? This cannot be undone.')"><i class="ti ti-trash"></i> Delete</button>
+            </form>
+            <button onclick="uncheckAll()" class="btn btn-sm" style="background:transparent;color:rgba(255,255,255,0.8);border-color:rgba(255,255,255,0.3);margin-left:auto;">Clear</button>
+          </div>
+          <% } %>
+
           <div style="overflow-x:auto;">
           <table class="tbl" id="dataTable">
-            <thead><tr><% cfg.cols.forEach(c => { %><th><%= c %></th><% }) %><th></th></tr></thead>
+            <thead><tr><% if (user.role === 'admin' || user.is_super) { %><th style="width:30px;"><input type="checkbox" id="selectAll" onchange="toggleAll(this)" style="width:auto;cursor:pointer;"></th><% } %><% cfg.cols.forEach(c => { %><th><%= c %></th><% }) %><th></th></tr></thead>
             <tbody>
             <% allItems.forEach(it => { %>
               <tr data-search="<%= cfg.fields.map(f => (it[f]||'')).join(' ').toLowerCase() %><%= it.manufacturer ? ' ' + it.manufacturer.toLowerCase() : '' %><%= it.model ? ' ' + it.model.toLowerCase() : '' %>" data-group="<%= (it[cfg.groupField]||'').toLowerCase() %>" <% if (cfg.extraGroups) { cfg.extraGroups.forEach(eg => { %>data-<%= eg.replace('_','-') %>="<%= (it[eg]||'').toString().toLowerCase() %>" <% }) } %>>
+                <% if (user.role === 'admin' || user.is_super) { %><td><input type="checkbox" class="bulk-check" value="<%= it.id %>" onchange="updateBulkBar()" style="width:auto;cursor:pointer;"></td><% } %>
                 <% cfg.fields.forEach((f, fi) => { %>
                   <td>
                     <% if (f === 'name' && tab === 'users') { %>
@@ -366,6 +381,46 @@
             </tbody>
           </table>
           </div>
+
+          <% if (user.role === 'admin' || user.is_super) { %>
+          <script>
+          function updateBulkBar(){
+            var checks=document.querySelectorAll('.bulk-check:checked');
+            var bar=document.getElementById('bulkBar');
+            var cnt=document.getElementById('bulkCount');
+            var idsDiv=document.getElementById('bulkIds');
+            if(checks.length>0){
+              bar.style.display='flex';
+              cnt.textContent=checks.length;
+              idsDiv.innerHTML='';
+              checks.forEach(function(c){
+                var inp=document.createElement('input');
+                inp.type='hidden';inp.name='ids';inp.value=c.value;
+                idsDiv.appendChild(inp);
+              });
+            } else {
+              bar.style.display='none';
+            }
+            // Update select-all checkbox
+            var all=document.querySelectorAll('.bulk-check');
+            var sa=document.getElementById('selectAll');
+            if(sa)sa.checked=checks.length===all.length&&all.length>0;
+          }
+          function toggleAll(master){
+            var checks=document.querySelectorAll('.bulk-check');
+            checks.forEach(function(c){
+              // Only toggle visible rows (respect search filter)
+              if(c.closest('tr').style.display!=='none') c.checked=master.checked;
+            });
+            updateBulkBar();
+          }
+          function uncheckAll(){
+            document.querySelectorAll('.bulk-check').forEach(function(c){c.checked=false;});
+            var sa=document.getElementById('selectAll');if(sa)sa.checked=false;
+            updateBulkBar();
+          }
+          </script>
+          <% } %>
 
           <!-- Grant portal access modals (one per user) -->
           <% if (tab === 'users') { allItems.forEach(it => { var uhp = clientUsers.find(cu => cu.full_name === it.name); if (!uhp) { %>
