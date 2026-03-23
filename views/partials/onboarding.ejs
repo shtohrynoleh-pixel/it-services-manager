@@ -1,0 +1,242 @@
+<% if (typeof user !== 'undefined' && user) { %>
+<style>
+.ob-overlay{position:fixed;inset:0;background:rgba(15,23,42,0.5);z-index:1500;display:none;align-items:center;justify-content:center;padding:20px;}
+.ob-overlay.show{display:flex;}
+.ob-card{background:#fff;border-radius:20px;box-shadow:0 24px 64px rgba(0,0,0,0.15);max-width:560px;width:100%;overflow:hidden;animation:obSlide 0.3s ease;}
+@keyframes obSlide{from{transform:translateY(30px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.ob-head{padding:28px 28px 0;display:flex;align-items:flex-start;gap:14px;}
+.ob-icon{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#ecfeff,#cffafe);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ob-icon i{font-size:24px;color:#0891b2;}
+.ob-title{font-size:20px;font-weight:900;margin-bottom:2px;}
+.ob-sub{font-size:13px;color:#64748b;line-height:1.5;}
+.ob-body{padding:20px 28px;}
+.ob-steps{counter-reset:obs;}
+.ob-step{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid #f1f5f9;font-size:13px;line-height:1.5;}
+.ob-step:last-child{border:none;}
+.ob-step::before{counter-increment:obs;content:counter(obs);width:24px;height:24px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex-shrink:0;margin-top:1px;}
+.ob-step strong{color:#0891b2;}
+.ob-tip{margin-top:12px;padding:12px 14px;background:#f0fdfa;border-radius:10px;font-size:12px;color:#065f46;line-height:1.5;}
+.ob-tip i{color:#10b981;margin-right:4px;}
+.ob-foot{padding:16px 28px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f1f5f9;}
+.ob-foot button{padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;border:none;}
+.ob-got-it{background:#0891b2;color:#fff;}
+.ob-got-it:hover{background:#0e7490;}
+.ob-skip{background:none;color:#94a3b8;font-size:12px;}
+.ob-skip:hover{color:#64748b;}
+/* Small inline hint banners */
+.ob-banner{padding:14px 20px;background:linear-gradient(135deg,#f0fdfa,#ecfeff);border:1px solid #a7f3d0;border-radius:12px;margin-bottom:16px;display:none;font-size:12px;line-height:1.6;color:#065f46;position:relative;}
+.ob-banner.show{display:block;}
+.ob-banner-close{position:absolute;top:8px;right:10px;background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px;}
+.ob-banner h4{font-size:13px;font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:6px;}
+</style>
+
+<div class="ob-overlay" id="obOverlay" onclick="if(event.target===this)closeOnboarding()">
+  <div class="ob-card">
+    <div class="ob-head">
+      <div class="ob-icon"><i id="obIcon" class="ti ti-info-circle"></i></div>
+      <div><div class="ob-title" id="obTitle"></div><div class="ob-sub" id="obSub"></div></div>
+    </div>
+    <div class="ob-body" id="obBody"></div>
+    <div class="ob-foot">
+      <button class="ob-skip" onclick="closeOnboarding()">Skip all guides</button>
+      <button class="ob-got-it" onclick="closeOnboarding()">Got it!</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var guides = {
+    '/admin': {
+      icon: 'ti-dashboard', title: 'Welcome to Your Dashboard',
+      sub: 'This is your command center — everything starts here.',
+      steps: [
+        'See <strong>active clients</strong>, revenue, unpaid invoices, and open tasks at a glance.',
+        'Click any <strong>metric card</strong> to jump directly to that section.',
+        'Open tasks and projects show below — click to manage them.',
+        '<strong>Notification bell</strong> (top right) shows overdue tasks, schedules, and client requests in real-time.'
+      ],
+      tip: 'Start by adding your first company in the Companies section. Everything else flows from there.'
+    },
+    '/admin/companies': {
+      icon: 'ti-building', title: 'Companies',
+      sub: 'Each company you manage gets its own space with all their data.',
+      steps: [
+        'Click <strong>+ Add Company</strong> to create a new client company.',
+        'Each company has <strong>tabs</strong>: Users, Servers, Subscriptions, Inventory, Invoices, and more.',
+        'Enable <strong>modules</strong> per company — TMS, Fleet, ELD, Fuel — only show what they need.',
+        'Click any company card to <strong>dive into their details</strong>.'
+      ],
+      tip: 'After creating a company, add team members and grant them portal access so they can log in.'
+    },
+    '/admin/dispatch': {
+      icon: 'ti-layout-board-split', title: 'Dispatch Center',
+      sub: 'See all loads, trucks, trailers, and drivers across every company in one view.',
+      steps: [
+        '<strong>Load Board</strong> shows active loads in Kanban columns — Available, Dispatched, In Transit.',
+        '<strong>Trucks tab</strong> shows which trucks are free or on a load, with GPS location.',
+        '<strong>Trailers tab</strong> — same for trailers. Green = free, red = on load.',
+        '<strong>Drivers tab</strong> shows who is available to take the next load.'
+      ],
+      tip: 'This is your cross-company dispatch view. For company-specific dispatch, go to that company\'s TMS tab.'
+    },
+    '/admin/tasks': {
+      icon: 'ti-checkbox', title: 'Tasks & Tickets',
+      sub: 'Every request, to-do, and action item lives here.',
+      steps: [
+        'Tasks come from <strong>3 sources</strong>: you create them, clients submit requests, or the website contact form.',
+        'Click the <strong>checkbox</strong> to mark done, or <strong>▶ Start</strong> to begin working.',
+        '<strong>SLA tracking</strong> shows response time and resolution time automatically.',
+        'Use <strong>filters</strong> to sort by company, priority, or assigned person.'
+      ],
+      tip: 'Clients see a "Client Request" badge on their tickets. Website inquiries show a "Website" badge.'
+    },
+    '/admin/billing': {
+      icon: 'ti-file-invoice', title: 'Billing & Invoices',
+      sub: 'Create invoices, track payments, and share professional PDF invoices.',
+      steps: [
+        'Click <strong>+ Create Invoice</strong> to bill a company.',
+        'Click an <strong>invoice number</strong> to open the detail view — add line items, tax, notes.',
+        'Click <strong>🖨 Print</strong> to generate a professional PDF — share the link with your client.',
+        'Click <strong>✓ Paid</strong> when payment is received.'
+      ],
+      tip: 'Clients can view and download their invoices from their portal — no need to email PDFs.'
+    },
+    '/admin/monitoring': {
+      icon: 'ti-activity', title: 'IT Monitoring',
+      sub: 'Watch servers, websites, and network devices 24/7 with automated alerts.',
+      steps: [
+        'Click <strong>+ Add Monitor</strong> — enter a URL or IP address.',
+        'Choose check type: <strong>HTTP</strong> for websites, <strong>TCP Port</strong> for servers, <strong>Ping</strong> for network devices.',
+        'Set the <strong>check interval</strong> — how often to test (1-60 minutes).',
+        'When something goes <strong>down</strong>, you get an alert + email + SMS (if configured).'
+      ],
+      tip: 'For local network devices, you need a VPN between your office and this server, or use public IPs.'
+    },
+    '/admin/policies': {
+      icon: 'ti-shield-check', title: 'Security Policies',
+      sub: 'Create, publish, and track acknowledgment of security policies.',
+      steps: [
+        '<strong>Templates</strong> (no company) are reusable — clone them to specific companies.',
+        'Assign a policy to a <strong>company</strong> and set it to "Published".',
+        'Track which employees have <strong>acknowledged</strong> it on the Compliance tab.',
+        'The compliance percentage shows how many people still need to read it.'
+      ],
+      tip: 'Clients can view and acknowledge policies from their portal under the Policies section.'
+    },
+    '/admin/vault': {
+      icon: 'ti-key', title: 'Password Vault',
+      sub: 'Store credentials securely and share them with the right people.',
+      steps: [
+        'Add entries with <strong>title, username, password, URL</strong>.',
+        'Set <strong>sharing</strong>: Private (admin only), Department, or Specific users.',
+        'Passwords are <strong>hidden by default</strong> — click the eye icon to reveal, clipboard icon to copy.',
+        'Shared passwords appear in the client portal for authorized users.'
+      ],
+      tip: 'Use categories (Email, WiFi, VPN, Server) to keep things organized.'
+    },
+    '/admin/sops': {
+      icon: 'ti-list-check', title: 'SOPs — Standard Operating Procedures',
+      sub: 'Build step-by-step procedures that your team can follow and acknowledge.',
+      steps: [
+        '<strong>Templates</strong> are pre-built SOPs — clone them to a company to customize.',
+        'Each SOP has <strong>numbered steps</strong> with descriptions and responsible roles.',
+        'Publish an SOP and it becomes visible to <strong>client portal users</strong>.',
+        'Track acknowledgments — see who read it and who hasn\'t.'
+      ],
+      tip: 'Start with the pre-built templates: Onboarding, Offboarding, Password Reset, Backup Verification, Incident Response.'
+    },
+    '/admin/flows': {
+      icon: 'ti-git-branch', title: 'Process Flows',
+      sub: 'Visual flowcharts for any business process — decisions, branches, and all.',
+      steps: [
+        'Create a flow and <strong>add nodes</strong>: Start, Process, Decision, End, and more.',
+        '<strong>Decision nodes</strong> split into Yes/No paths — you choose where each path goes.',
+        'Assign <strong>responsible roles</strong> and durations to each step.',
+        'The <strong>flowchart</strong> updates live on the right as you add nodes on the left.'
+      ],
+      tip: 'Use swimlanes to group steps by department (IT, HR, Employee).'
+    },
+    '/admin/chat': {
+      icon: 'ti-message-circle', title: 'Team Chat',
+      sub: 'Real-time messaging with channels, file sharing, and image paste.',
+      steps: [
+        'Create <strong>channels</strong> — group, support, or announcement type.',
+        '<strong>Ctrl+V</strong> to paste screenshots directly into chat.',
+        'Click <strong>📎</strong> to attach files (images, PDFs, docs — up to 10MB).',
+        'The <strong>chat bubble</strong> (bottom right) works on every page — no need to leave what you\'re doing.'
+      ],
+      tip: 'Company channels are automatically visible to all users in that company. Admin sees all channels.'
+    },
+    // Client pages
+    '/client': {
+      icon: 'ti-dashboard', title: 'Welcome to Your Portal',
+      sub: 'Everything about your company — team, equipment, invoices, and support — in one place.',
+      steps: [
+        'Click any <strong>metric card</strong> at the top to jump to that section.',
+        'Use the <strong>+ Add</strong> button on any tab to add team members, servers, equipment, etc.',
+        'Submit <strong>support tickets</strong> from the Requests tab — or use the 🎫 button (bottom of screen).',
+        'Open the <strong>chat bubble</strong> (bottom right) to message your team or IT admin.'
+      ],
+      tip: 'Your IT admin can see everything you add. When you submit a ticket, they get an instant notification.'
+    },
+    '/client/fuel': {
+      icon: 'ti-gas-station', title: 'Fuel Incentive Program',
+      sub: 'Earn money by driving fuel-efficiently. Beat your baseline, get paid.',
+      steps: [
+        'Your <strong>baseline MPG</strong> is your average — set by your fleet manager based on your truck class.',
+        'Drive above your <strong>target MPG</strong> and you earn a KPI bonus per gallon saved.',
+        'The <strong>progress bar</strong> shows how close you are to hitting target this period.',
+        'Check <strong>History</strong> to see past payouts and <strong>Calculator</strong> to estimate future earnings.'
+      ],
+      tip: 'Tips to improve MPG: maintain steady speed around 62-65 mph, reduce idling, check tire pressure weekly.'
+    },
+    '/client/fuel/calculator': {
+      icon: 'ti-calculator', title: 'Fuel What-If Calculator',
+      sub: 'See exactly how much you\'d earn at different MPG levels.',
+      steps: [
+        'Enter the <strong>miles</strong> you expect to drive this period.',
+        'Adjust <strong>Your MPG</strong> to see how savings change.',
+        'The <strong>result card</strong> updates instantly — gallons saved, your share, KPI bonus, total payout.',
+        'This uses the <strong>exact same formula</strong> as the real payout calculation.'
+      ],
+      tip: 'Try increasing your MPG by just 0.5 — you might be surprised how much it adds up over a month.'
+    }
+  };
+
+  var path = window.location.pathname.replace(/\/+$/, '') || '/';
+  // Also match company-specific pages
+  var cleanPath = path.replace(/\/companies\/\d+/, '/companies/:id');
+
+  var guide = guides[path];
+  if (!guide) return;
+
+  // Check if user has seen this guide
+  var seenKey = 'ob_seen_' + (typeof user !== 'undefined' ? '<%= user.username %>' : 'anon');
+  var seen = {};
+  try { seen = JSON.parse(localStorage.getItem(seenKey) || '{}'); } catch(e) {}
+  if (seen[path]) return;
+
+  // Show guide after a short delay
+  setTimeout(function() {
+    document.getElementById('obIcon').className = 'ti ' + guide.icon;
+    document.getElementById('obTitle').textContent = guide.title;
+    document.getElementById('obSub').textContent = guide.sub;
+
+    var body = '<div class="ob-steps">';
+    guide.steps.forEach(function(s) { body += '<div class="ob-step"><div>' + s + '</div></div>'; });
+    body += '</div>';
+    if (guide.tip) body += '<div class="ob-tip"><i class="ti ti-bulb"></i> ' + guide.tip + '</div>';
+    document.getElementById('obBody').innerHTML = body;
+
+    document.getElementById('obOverlay').classList.add('show');
+  }, 800);
+
+  window.closeOnboarding = function() {
+    document.getElementById('obOverlay').classList.remove('show');
+    seen[path] = true;
+    try { localStorage.setItem(seenKey, JSON.stringify(seen)); } catch(e) {}
+  };
+})();
+</script>
+<% } %>
