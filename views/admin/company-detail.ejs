@@ -41,9 +41,12 @@
             <span class="badge <%= company.status %>"><%= company.status %></span>
           </div>
           <details style="width:100%;"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--primary);">🖼️ Change Logo</summary>
-            <form method="POST" action="/admin/companies/<%= company.id %>/logo" style="margin-top:8px;">
-              <div class="form-group"><label>Logo URL (paste image link)</label><input type="text" name="logo_url" value="<%= company.logo || '' %>" placeholder="https://example.com/logo.png"></div>
-              <button type="submit" class="btn btn-sm btn-primary">Save Logo</button>
+            <form method="POST" action="/admin/companies/<%= company.id %>/logo" enctype="multipart/form-data" style="margin-top:8px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+              <div class="form-group" style="margin-bottom:0;flex:1;min-width:200px;"><label>Upload logo (max 5MB, png/jpg/gif/webp/svg)</label><input type="file" name="logo" accept="image/*" required></div>
+              <button type="submit" class="btn btn-sm btn-primary">Upload</button>
+              <% if (company.logo) { %>
+                <form method="POST" action="/admin/companies/<%= company.id %>/logo/remove" style="display:inline;" onsubmit="return confirm('Remove logo?')"><button type="submit" class="btn btn-sm" style="color:#ef4444;">Remove</button></form>
+              <% } %>
             </form>
           </details>
         </div>

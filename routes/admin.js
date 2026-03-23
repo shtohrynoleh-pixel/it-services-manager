@@ -16,6 +16,16 @@ const upload = multer({ dest: uploadDir, limits: { fileSize: 5 * 1024 * 1024 }, 
 }});
 // General file upload (50MB limit)
 const fileUpload = multer({ dest: uploadDir, limits: { fileSize: 50 * 1024 * 1024 } });
+// Logo upload (5MB, images only)
+const logoDir = path.join(__dirname, '..', 'uploads', 'logos');
+if (!fs.existsSync(logoDir)) fs.mkdirSync(logoDir, { recursive: true });
+const logoUpload = multer({
+  dest: logoDir, limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (/^image\/(png|jpeg|jpg|gif|webp|svg\+xml)$/.test(file.mimetype)) cb(null, true);
+    else cb(new Error('Only image files allowed (png, jpg, gif, webp, svg)'));
+  }
+});
 
 // Simple CSV parser (handles quoted fields with commas)
 function parseCSV(text) {
@@ -1251,10 +1261,31 @@ module.exports = function(db) {
     res.redirect('/admin/companies/' + req.params.id + '?tab=overview');
   });
 
-  // === COMPANY LOGO ===
-  router.post('/companies/:id/logo', (req, res) => {
-    const { logo_url } = req.body;
-    db.prepare('UPDATE companies SET logo = ? WHERE id = ?').run(logo_url || null, req.params.id);
+  // === COMPANY LOGO (file upload) ===
+  router.post('/companies/:id/logo', logoUpload.single('logo'), (req, res) => {
+    if (!req.file) return res.redirect('/admin/companies/' + req.params.id + '?tab=overview');
+    const ext = path.extname(req.file.originalname).toLowerCase() || '.png';
+    const newName = 'logo-' + req.params.id + '-' + Date.now() + ext;
+    const newPath = path.join(logoDir, newName);
+    try {
+      fs.renameSync(req.file.path, newPath);
+      // Delete old logo file if it exists
+      const old = db.prepare('SELECT logo FROM companies WHERE id = ?').get(req.params.id);
+      if (old && old.logo && old.logo.startsWith('/uploads/logos/')) {
+        const oldPath = path.join(__dirname, '..', old.logo);
+        try { fs.unlinkSync(oldPath); } catch(e) {}
+      }
+      db.prepare('UPDATE companies SET logo = ? WHERE id = ?').run('/uploads/logos/' + newName, req.params.id);
+    } catch(e) { console.error('Logo upload error:', e.message); }
+    res.redirect('/admin/companies/' + req.params.id + '?tab=overview');
+  });
+
+  router.post('/companies/:id/logo/remove', (req, res) => {
+    const old = db.prepare('SELECT logo FROM companies WHERE id = ?').get(req.params.id);
+    if (old && old.logo && old.logo.startsWith('/uploads/logos/')) {
+      try { fs.unlinkSync(path.join(__dirname, '..', old.logo)); } catch(e) {}
+    }
+    db.prepare('UPDATE companies SET logo = NULL WHERE id = ?').run(req.params.id);
     res.redirect('/admin/companies/' + req.params.id + '?tab=overview');
   });
 
@@ -1440,14 +1471,27 @@ module.exports = function(db) {
     res.render(V('settings'), { user: req.session.user, has2fa, adminEmail, adminPhone, settings: getSettings(), page: 'settings' });
   });
 
-  router.post('/settings', (req, res) => {
-    const { business_name, business_email, business_phone, business_logo, business_address } = req.body;
+  router.post('/settings', logoUpload.single('business_logo_file'), (req, res) => {
+    const { business_name, business_email, business_phone, business_address } = req.body;
     const set = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
     set.run('business_name', business_name || '');
     set.run('business_email', business_email || '');
     set.run('business_phone', business_phone || '');
-    set.run('business_logo', business_logo || '');
     set.run('business_address', business_address || '');
+    if (req.file) {
+      const ext = path.extname(req.file.originalname).toLowerCase() || '.png';
+      const newName = 'biz-logo-' + Date.now() + ext;
+      const newPath = path.join(logoDir, newName);
+      try {
+        fs.renameSync(req.file.path, newPath);
+        // Delete old file
+        const old = safeGet("SELECT value FROM settings WHERE key = 'business_logo'");
+        if (old && old.value && old.value.startsWith('/uploads/logos/')) {
+          try { fs.unlinkSync(path.join(__dirname, '..', old.value)); } catch(e) {}
+        }
+        set.run('business_logo', '/uploads/logos/' + newName);
+      } catch(e) { console.error('Biz logo upload:', e.message); }
+    }
     res.redirect('/admin/settings');
   });
 
