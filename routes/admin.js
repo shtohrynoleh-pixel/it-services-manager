@@ -1289,7 +1289,7 @@ module.exports = function(db) {
       return res.redirect('/admin/companies/' + req.params.id + '?tab=overview');
     }
     const cols = tables[table];
-    if (!cols) return res.status(400).send('Invalid table');
+    if (!cols || !/^[a-z_]+$/.test(table)) return res.status(400).send('Invalid table');
     const vals = cols.map(c => {
       if (c === 'company_id') return req.params.id;
       if (c === 'quantity') return parseInt(req.body[c]) || 1;

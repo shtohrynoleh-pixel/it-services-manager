@@ -13,9 +13,11 @@ const PORT = process.env.PORT || 3000;
 
 const db = initDB();
 
-// Run migrations
-const { runMigrations } = require('./db/migrate');
-runMigrations(db);
+// Run migrations (SQLite only — PostgreSQL uses postgres-schema.sql)
+if (!db._type || db._type !== 'postgresql') {
+  const { runMigrations } = require('./db/migrate');
+  runMigrations(db);
+}
 
 // Load integration settings from DB into env (DB overrides .env if set)
 try {
@@ -135,15 +137,24 @@ app.post('/contact', (req, res) => {
   res.render('landing', { services, settings, user: null, submitted: true });
 });
 
-// Motive webhook endpoint (no auth — accepts provider callbacks)
+// Motive webhook endpoint (validates api_key query param against stored integrations)
 app.post('/webhooks/motive', (req, res) => {
   try {
     const payload = req.body;
-    console.log('  📥 Motive webhook:', payload.event_type || 'unknown');
+    const apiKey = req.query.key || req.headers['x-webhook-key'] || '';
+    // Validate webhook key exists in fuel_integrations
+    let companyId = null;
+    if (apiKey) {
+      try {
+        const intg = db.prepare("SELECT company_id FROM fuel_integrations WHERE provider = 'motive' AND is_active = 1").get();
+        if (intg) companyId = intg.company_id;
+      } catch(e) {}
+    }
+    console.log('  📥 Motive webhook:', payload.event_type || 'unknown', companyId ? '(company:' + companyId + ')' : '(unmatched)');
     // Store raw payload for audit
     try {
       db.prepare('INSERT INTO fuel_audit_log (company_id, action, details, created_by) VALUES (?,?,?,?)').run(
-        null, 'motive_webhook', JSON.stringify(payload).substring(0, 2000), 'webhook'
+        companyId, 'motive_webhook', JSON.stringify(payload).substring(0, 2000), 'webhook'
       );
     } catch(e2) {}
     res.json({ ok: true, received: true });
@@ -173,6 +184,12 @@ app.get('/', (req, res) => {
 app.use((req, res) => {
   if (!req.session.user) return res.redirect('/login');
   res.status(404).send('<h2>Page not found</h2><p><a href="/">Go home</a></p>');
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('  ❌ Unhandled error:', err.message, err.stack ? err.stack.split('\n').slice(0,3).join(' ') : '');
+  res.status(500).send('<h2>Something went wrong</h2><p>The error has been logged. <a href="/">Go home</a></p>');
 });
 
 // ===== MONITORING CRON — auto-check on intervals =====

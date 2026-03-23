@@ -1,13 +1,32 @@
 // Database schema and initialization
 const path = require('path');
-const Database = require('better-sqlite3');
+const { createAdapter } = require('./adapter');
 
 const DB_PATH = path.join(__dirname, 'app.db');
 
 function initDB() {
-  const db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
+  const db = createAdapter();
+  const isPG = db._type === 'postgresql';
+
+  // Skip SQLite schema creation if using PostgreSQL
+  // PostgreSQL schema is managed via db/postgres-schema.sql
+  if (isPG) {
+    console.log('  🐘 PostgreSQL mode — skipping SQLite schema creation');
+    console.log('  📋 Run: psql -d YOUR_DB -f db/postgres-schema.sql');
+    // Still run seeds if needed
+    try {
+      const hasAdmin = db.prepare('SELECT id FROM users WHERE role = $1').get('admin');
+      if (!hasAdmin) {
+        const bcrypt = require('bcryptjs');
+        const hash = bcrypt.hashSync('admin', 10);
+        db.prepare('INSERT INTO users (username, password, role, full_name, is_super) VALUES ($1, $2, $3, $4, $5)').run('admin', hash, 'admin', 'Administrator', 1);
+        console.log('  👤 Admin user created (admin/admin)');
+      }
+    } catch(e) { console.log('  ⚠️  Seed check:', e.message); }
+    return db;
+  }
+
+  // SQLite schema creation below (unchanged)
 
   db.exec(`
     -- Admin / Settings

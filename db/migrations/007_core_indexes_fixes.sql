@@ -1,0 +1,30 @@
+-- Core table indexes for scalability (500+ companies)
+CREATE INDEX IF NOT EXISTS idx_company_users_company ON company_users(company_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_fleet_vehicles_company ON fleet_vehicles(company_id, status);
+CREATE INDEX IF NOT EXISTS idx_fleet_trailers_company ON fleet_trailers(company_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_company ON tasks(company_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to, status);
+CREATE INDEX IF NOT EXISTS idx_invoices_company ON invoices(company_id, status);
+CREATE INDEX IF NOT EXISTS idx_inventory_company ON inventory(company_id);
+CREATE INDEX IF NOT EXISTS idx_servers_company ON servers(company_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_company ON subscriptions(company_id);
+CREATE INDEX IF NOT EXISTS idx_assets_company ON assets(company_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(company_id);
+CREATE INDEX IF NOT EXISTS idx_agreements_company ON agreements(company_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_channel ON chat_messages(channel_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_chat_members_channel ON chat_members(channel_id, user_name);
+CREATE INDEX IF NOT EXISTS idx_chat_channels_company ON chat_channels(company_id);
+CREATE INDEX IF NOT EXISTS idx_company_files_company ON company_files(company_id, folder_id);
+CREATE INDEX IF NOT EXISTS idx_file_folders_company ON file_folders(company_id, parent_id);
+CREATE INDEX IF NOT EXISTS idx_tms_loads_company ON tms_loads(company_id, status);
+CREATE INDEX IF NOT EXISTS idx_tms_loads_driver ON tms_loads(driver_id, status);
+CREATE INDEX IF NOT EXISTS idx_monitor_logs_monitor ON monitor_logs(monitor_id, checked_at);
+CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_user_xp_username ON user_xp(username);
+CREATE INDEX IF NOT EXISTS idx_sops_company ON sops(company_id, status);
+CREATE INDEX IF NOT EXISTS idx_policies_company ON security_policies(company_id, status);
+CREATE INDEX IF NOT EXISTS idx_eld_vehicles_company ON eld_vehicles(company_id, integration_id);
+CREATE INDEX IF NOT EXISTS idx_rdp_company ON rdp_connections(company_id);
+CREATE INDEX IF NOT EXISTS idx_domains_company ON domains(company_id);
+CREATE INDEX IF NOT EXISTS idx_password_vault_company ON password_vault(company_id, share_type);
+CREATE INDEX IF NOT EXISTS idx_users_login ON users(username, role, is_active)

@@ -386,7 +386,8 @@ module.exports = function(db) {
         const vehicles = safeAll('SELECT id FROM fleet_vehicles WHERE company_id = ? AND driver_id = ?', [cid, driverId]);
         if (vehicles.length > 0) {
           const vids = vehicles.map(v => v.id);
-          const agg2 = safeGet("SELECT SUM(miles) as miles, SUM(gallons) as gal FROM fuel_measurements_daily WHERE company_id = ? AND vehicle_id IN (" + vids.join(',') + ") AND date >= ? AND date <= ?", [cid, period.period_start, period.period_end]);
+          var vidPh = vids.map(() => '?').join(',');
+          const agg2 = safeGet("SELECT SUM(miles) as miles, SUM(gallons) as gal FROM fuel_measurements_daily WHERE company_id = ? AND vehicle_id IN (" + vidPh + ") AND date >= ? AND date <= ?", [cid, ...vids, period.period_start, period.period_end]);
           if (agg2) { currentMiles = agg2.miles || 0; currentGallons = agg2.gal || 0; }
         }
       } else {

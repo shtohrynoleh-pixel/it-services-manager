@@ -5,6 +5,16 @@ const { requireAdmin } = require('../middleware/auth');
 module.exports = function(db) {
   router.use(requireAdmin);
 
+  // Company scope check for all fuel routes
+  router.use('/companies/:cid/fuel*', (req, res, next) => {
+    const u = req.session.user;
+    if (u.is_super) return next();
+    if (u.assignedCompanies && !u.assignedCompanies.includes(parseInt(req.params.cid))) {
+      return res.status(403).send('Access denied');
+    }
+    next();
+  });
+
   const safeAll = (sql, params) => { try { return params ? db.prepare(sql).all(...(Array.isArray(params)?params:[params])) : db.prepare(sql).all(); } catch(e) { return []; } };
   const safeGet = (sql, params) => { try { return params ? db.prepare(sql).get(...(Array.isArray(params)?params:[params])) : db.prepare(sql).get(); } catch(e) { return null; } };
   const getSettings = () => { const s = {}; try { db.prepare('SELECT key, value FROM settings').all().forEach(r => { s[r.key] = r.value; }); } catch(e) {} return s; };
@@ -283,7 +293,8 @@ module.exports = function(db) {
     groups.forEach(g => {
       const vids = safeAll('SELECT vehicle_id FROM fuel_truck_group_map WHERE group_id = ? AND company_id = ?', [g.id, company.id]).map(r => r.vehicle_id);
       if (vids.length === 0) return;
-      groupTrends[g.name] = safeAll("SELECT strftime('%Y-%m', date) as month, ROUND(SUM(miles)/NULLIF(SUM(gallons),0), 2) as mpg, SUM(miles) as miles FROM fuel_measurements_daily WHERE company_id = ? AND vehicle_id IN (" + vids.join(',') + ") AND miles > 0 GROUP BY month ORDER BY month DESC LIMIT 12", [company.id]).reverse();
+      var vidPh = vids.map(() => '?').join(',');
+      groupTrends[g.name] = safeAll("SELECT strftime('%Y-%m', date) as month, ROUND(SUM(miles)/NULLIF(SUM(gallons),0), 2) as mpg, SUM(miles) as miles FROM fuel_measurements_daily WHERE company_id = ? AND vehicle_id IN (" + vidPh + ") AND miles > 0 GROUP BY month ORDER BY month DESC LIMIT 12", [company.id, ...vids]).reverse();
     });
 
     // Driver ranking within groups
@@ -291,7 +302,8 @@ module.exports = function(db) {
     groups.forEach(g => {
       const dids = safeAll('SELECT driver_id FROM fuel_driver_group_map WHERE group_id = ? AND company_id = ?', [g.id, company.id]).map(r => r.driver_id);
       if (dids.length === 0) return;
-      driverRankings[g.name] = safeAll("SELECT d.name, SUM(m.miles) as miles, SUM(m.gallons) as gallons, CASE WHEN SUM(m.gallons) > 0 THEN ROUND(SUM(m.miles)/SUM(m.gallons), 2) ELSE 0 END as mpg FROM fuel_measurements_daily m JOIN company_users d ON m.driver_id = d.id WHERE m.company_id = ? AND m.driver_id IN (" + dids.join(',') + ") AND m.miles > 0 AND m.date >= date('now', '-30 days') GROUP BY m.driver_id ORDER BY mpg DESC", [company.id]);
+      var didPh = dids.map(() => '?').join(',');
+      driverRankings[g.name] = safeAll("SELECT d.name, SUM(m.miles) as miles, SUM(m.gallons) as gallons, CASE WHEN SUM(m.gallons) > 0 THEN ROUND(SUM(m.miles)/SUM(m.gallons), 2) ELSE 0 END as mpg FROM fuel_measurements_daily m JOIN company_users d ON m.driver_id = d.id WHERE m.company_id = ? AND m.driver_id IN (" + didPh + ") AND m.miles > 0 AND m.date >= date('now', '-30 days') GROUP BY m.driver_id ORDER BY mpg DESC", [company.id, ...dids]);
     });
 
     // Data freshness
