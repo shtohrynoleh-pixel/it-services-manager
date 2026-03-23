@@ -322,7 +322,7 @@
         <% } %>
 
         <% if (tab === 'users' && allItems.length > 0) { %>
-          <div style="margin-bottom:12px;"><a href="/admin/companies/<%= company.id %>/org-chart" class="btn btn-sm">🏛️ Org Chart</a></div>
+          <div style="margin-bottom:12px;display:flex;gap:6px;"><a href="/admin/companies/<%= company.id %>/org-chart" class="btn btn-sm"><i class="ti ti-hierarchy-3"></i> Org Chart</a><a href="/admin/companies/<%= company.id %>/divisions" class="btn btn-sm"><i class="ti ti-hierarchy-2"></i> Divisions</a></div>
           <div class="metrics" style="margin-bottom:14px;">
             <div class="metric hi"><div class="m-label">Total Users</div><div class="m-val pri"><%= allItems.length %></div></div>
             <div class="metric ok"><div class="m-label">Active</div><div class="m-val green"><%= allItems.filter(x => x.is_active).length %></div></div>

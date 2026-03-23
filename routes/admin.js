@@ -2233,7 +2233,12 @@ module.exports = function(db) {
     const assignedSubs = safeAll("SELECT * FROM subscriptions WHERE company_id = ? AND notes LIKE '%' || ? || '%'", [company.id, usr.name]);
     const tasks = safeAll("SELECT * FROM tasks WHERE company_id = ? AND assigned_to = ? ORDER BY status ASC, due_date ASC", [company.id, usr.name]);
     const allUsers = safeAll('SELECT id, name, title FROM company_users WHERE company_id = ? AND id != ? ORDER BY name', [company.id, usr.id]);
-    res.render(V('user-profile'), { user: req.session.user, company, usr, manager, directReports, assignedEquip, assignedSoftware, assignedSubs, tasks, allUsers, settings: getSettings(), page: 'companies' });
+    // Multi-contact data
+    const userEmails = safeAll('SELECT * FROM user_emails WHERE user_id = ? AND company_id = ? ORDER BY is_primary DESC, type', [usr.id, company.id]);
+    const userPhones = safeAll('SELECT * FROM user_phones WHERE user_id = ? AND company_id = ? ORDER BY is_primary DESC, type', [usr.id, company.id]);
+    const userDivisions = safeAll('SELECT uda.*, d.name as division_name, d.code as division_code FROM user_division_assignments uda JOIN divisions d ON uda.division_id = d.id WHERE uda.user_id = ? AND uda.company_id = ?', [usr.id, company.id]);
+    const allDivisions = safeAll('SELECT * FROM divisions WHERE company_id = ? AND is_active = 1 ORDER BY name', [company.id]);
+    res.render(V('user-profile'), { user: req.session.user, company, usr, manager, directReports, assignedEquip, assignedSoftware, assignedSubs, tasks, allUsers, userEmails, userPhones, userDivisions, allDivisions, settings: getSettings(), page: 'companies' });
   });
 
   // Assign equipment to user
@@ -2271,6 +2276,84 @@ module.exports = function(db) {
     res.redirect('/admin/companies/' + req.params.cid + '/users/' + req.params.uid + '/profile');
   });
 
+  // === USER EMAILS ===
+  router.post('/companies/:cid/users/:uid/emails', (req, res) => {
+    const { email, type, is_primary, notes } = req.body;
+    if (!email) return res.redirect('/admin/companies/' + req.params.cid + '/users/' + req.params.uid + '/profile');
+    if (is_primary) { try { db.prepare('UPDATE user_emails SET is_primary = 0 WHERE user_id = ? AND company_id = ?').run(req.params.uid, req.params.cid); } catch(e) {} }
+    try { db.prepare('INSERT INTO user_emails (company_id, user_id, email, type, is_primary, notes) VALUES (?,?,?,?,?,?)').run(req.params.cid, req.params.uid, email, type || 'work', is_primary ? 1 : 0, notes || null); } catch(e) { console.error('Add email:', e.message); }
+    res.redirect('/admin/companies/' + req.params.cid + '/users/' + req.params.uid + '/profile');
+  });
+  router.post('/companies/:cid/users/:uid/emails/:eid/delete', (req, res) => {
+    try { db.prepare('DELETE FROM user_emails WHERE id = ? AND user_id = ? AND company_id = ?').run(req.params.eid, req.params.uid, req.params.cid); } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/users/' + req.params.uid + '/profile');
+  });
+  router.post('/companies/:cid/users/:uid/emails/:eid/primary', (req, res) => {
+    try {
+      db.prepare('UPDATE user_emails SET is_primary = 0 WHERE user_id = ? AND company_id = ?').run(req.params.uid, req.params.cid);
+      db.prepare('UPDATE user_emails SET is_primary = 1 WHERE id = ? AND user_id = ? AND company_id = ?').run(req.params.eid, req.params.uid, req.params.cid);
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/users/' + req.params.uid + '/profile');
+  });
+
+  // === USER PHONES ===
+  router.post('/companies/:cid/users/:uid/phones', (req, res) => {
+    const { phone, ext, type, is_primary, notes } = req.body;
+    if (!phone) return res.redirect('/admin/companies/' + req.params.cid + '/users/' + req.params.uid + '/profile');
+    if (is_primary) { try { db.prepare('UPDATE user_phones SET is_primary = 0 WHERE user_id = ? AND company_id = ?').run(req.params.uid, req.params.cid); } catch(e) {} }
+    try { db.prepare('INSERT INTO user_phones (company_id, user_id, phone, ext, type, is_primary, notes) VALUES (?,?,?,?,?,?,?)').run(req.params.cid, req.params.uid, phone, ext || null, type || 'work', is_primary ? 1 : 0, notes || null); } catch(e) { console.error('Add phone:', e.message); }
+    res.redirect('/admin/companies/' + req.params.cid + '/users/' + req.params.uid + '/profile');
+  });
+  router.post('/companies/:cid/users/:uid/phones/:pid/delete', (req, res) => {
+    try { db.prepare('DELETE FROM user_phones WHERE id = ? AND user_id = ? AND company_id = ?').run(req.params.pid, req.params.uid, req.params.cid); } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/users/' + req.params.uid + '/profile');
+  });
+  router.post('/companies/:cid/users/:uid/phones/:pid/primary', (req, res) => {
+    try {
+      db.prepare('UPDATE user_phones SET is_primary = 0 WHERE user_id = ? AND company_id = ?').run(req.params.uid, req.params.cid);
+      db.prepare('UPDATE user_phones SET is_primary = 1 WHERE id = ? AND user_id = ? AND company_id = ?').run(req.params.pid, req.params.uid, req.params.cid);
+    } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/users/' + req.params.uid + '/profile');
+  });
+
+  // === DIVISIONS (company-level) ===
+  router.get('/companies/:cid/divisions', (req, res) => {
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(req.params.cid);
+    if (!company) return res.redirect('/admin/companies');
+    const divisions = safeAll('SELECT d.*, h.name as head_name, p.name as parent_name, (SELECT COUNT(*) FROM user_division_assignments WHERE division_id = d.id) as member_count FROM divisions d LEFT JOIN company_users h ON d.head_id = h.id LEFT JOIN divisions p ON d.parent_id = p.id WHERE d.company_id = ? ORDER BY d.name', [company.id]);
+    const allUsers = safeAll('SELECT id, name, title FROM company_users WHERE company_id = ? AND is_active = 1 ORDER BY name', [company.id]);
+    res.render(V('divisions'), { user: req.session.user, company, divisions, allUsers, settings: getSettings(), page: 'companies' });
+  });
+  router.post('/companies/:cid/divisions', (req, res) => {
+    const { name, code, parent_id, head_id, notes } = req.body;
+    if (!name) return res.redirect('/admin/companies/' + req.params.cid + '/divisions');
+    try { db.prepare('INSERT INTO divisions (company_id, name, code, parent_id, head_id, notes) VALUES (?,?,?,?,?,?)').run(req.params.cid, name, code || null, parent_id || null, head_id || null, notes || null); } catch(e) { console.error('Division create:', e.message); }
+    res.redirect('/admin/companies/' + req.params.cid + '/divisions');
+  });
+  router.post('/companies/:cid/divisions/:did/edit', (req, res) => {
+    const { name, code, parent_id, head_id, notes } = req.body;
+    try { db.prepare('UPDATE divisions SET name=?, code=?, parent_id=?, head_id=?, notes=? WHERE id=? AND company_id=?').run(name, code || null, parent_id || null, head_id || null, notes || null, req.params.did, req.params.cid); } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/divisions');
+  });
+  router.post('/companies/:cid/divisions/:did/deactivate', (req, res) => {
+    const old = safeGet('SELECT is_active FROM divisions WHERE id = ? AND company_id = ?', [req.params.did, req.params.cid]);
+    if (old) { try { db.prepare('UPDATE divisions SET is_active = ? WHERE id = ? AND company_id = ?').run(old.is_active ? 0 : 1, req.params.did, req.params.cid); } catch(e) {} }
+    res.redirect('/admin/companies/' + req.params.cid + '/divisions');
+  });
+
+  // === USER DIVISION ASSIGNMENTS ===
+  router.post('/companies/:cid/users/:uid/divisions', (req, res) => {
+    const { division_id, role_in_division, is_primary } = req.body;
+    if (!division_id) return res.redirect('/admin/companies/' + req.params.cid + '/users/' + req.params.uid + '/profile');
+    if (is_primary) { try { db.prepare('UPDATE user_division_assignments SET is_primary = 0 WHERE user_id = ? AND company_id = ?').run(req.params.uid, req.params.cid); } catch(e) {} }
+    try { db.prepare('INSERT INTO user_division_assignments (company_id, user_id, division_id, role_in_division, is_primary) VALUES (?,?,?,?,?)').run(req.params.cid, req.params.uid, division_id, role_in_division || null, is_primary ? 1 : 0); } catch(e) { console.error('Assign division:', e.message); }
+    res.redirect('/admin/companies/' + req.params.cid + '/users/' + req.params.uid + '/profile');
+  });
+  router.post('/companies/:cid/users/:uid/divisions/:aid/delete', (req, res) => {
+    try { db.prepare('DELETE FROM user_division_assignments WHERE id = ? AND user_id = ? AND company_id = ?').run(req.params.aid, req.params.uid, req.params.cid); } catch(e) {}
+    res.redirect('/admin/companies/' + req.params.cid + '/users/' + req.params.uid + '/profile');
+  });
+
   // === CSV IMPORT / EXPORT ===
   const csvTableConfig = {
     contacts:      { fields: ['name','role','email','phone','is_primary'], label: 'Contacts' },
@@ -2295,8 +2378,31 @@ module.exports = function(db) {
   router.get('/companies/:cid/:table/csv-export', (req, res) => {
     const cfg = csvTableConfig[req.params.table];
     if (!cfg) return res.status(404).send('Unknown table');
+    const cid = req.params.cid;
     const dbTable = cfg.dbTable || req.params.table;
-    const rows = safeAll('SELECT * FROM ' + dbTable + ' WHERE company_id = ? ORDER BY name', [req.params.cid]);
+    const rows = safeAll('SELECT * FROM ' + dbTable + ' WHERE company_id = ? ORDER BY name', [cid]);
+
+    // For users: enrich with multi-contact data
+    if (req.params.table === 'users') {
+      const allEmails = safeAll('SELECT user_id, email, type, ext FROM user_emails WHERE company_id = ? ORDER BY is_primary DESC', [cid]);
+      const allPhones = safeAll('SELECT user_id, phone, ext, type FROM user_phones WHERE company_id = ? ORDER BY is_primary DESC', [cid]);
+      const allDivAssign = safeAll('SELECT uda.user_id, d.name as division_name, uda.role_in_division FROM user_division_assignments uda JOIN divisions d ON uda.division_id = d.id WHERE uda.company_id = ?', [cid]);
+      const emailMap = {}, phoneMap = {}, divMap = {};
+      allEmails.forEach(e => { if (!emailMap[e.user_id]) emailMap[e.user_id] = []; emailMap[e.user_id].push(e.email + (e.type ? ' (' + e.type + ')' : '')); });
+      allPhones.forEach(p => { if (!phoneMap[p.user_id]) phoneMap[p.user_id] = []; phoneMap[p.user_id].push(p.phone + (p.ext ? ' x' + p.ext : '') + (p.type ? ' (' + p.type + ')' : '')); });
+      allDivAssign.forEach(d => { if (!divMap[d.user_id]) divMap[d.user_id] = []; divMap[d.user_id].push(d.division_name + (d.role_in_division ? ' (' + d.role_in_division + ')' : '')); });
+      rows.forEach(r => {
+        r.all_emails = (emailMap[r.id] || []).join('; ');
+        r.all_phones = (phoneMap[r.id] || []).join('; ');
+        r.divisions = (divMap[r.id] || []).join('; ');
+      });
+      const enrichedFields = [...cfg.fields, 'all_emails', 'all_phones', 'divisions'];
+      const csv = toCSV(enrichedFields, rows);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=users-export.csv');
+      return res.send(csv);
+    }
+
     const csv = toCSV(cfg.fields, rows);
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename=' + req.params.table + '-export.csv');

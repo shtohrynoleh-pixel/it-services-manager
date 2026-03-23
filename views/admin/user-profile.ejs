@@ -27,13 +27,109 @@
 
       <!-- Contact info -->
       <div class="card">
-        <h3>📋 Contact Info</h3>
+        <h3><i class="ti ti-address-book"></i> Contact Info</h3>
         <div class="card-row"><span class="label">Company</span><span class="value"><a href="/admin/companies/<%= company.id %>"><%= company.name %></a></span></div>
-        <div class="card-row"><span class="label">Personal Email</span><span class="value"><%= usr.email || '—' %></span></div>
+        <div class="card-row"><span class="label">Primary Email</span><span class="value"><%= usr.email || '—' %></span></div>
         <div class="card-row"><span class="label">Company Email</span><span class="value" style="color:var(--primary);font-weight:700;"><%= usr.email_account || '—' %></span></div>
-        <div class="card-row"><span class="label">Phone</span><span class="value"><%= usr.phone || '—' %></span></div>
+        <div class="card-row"><span class="label">Primary Phone</span><span class="value"><%= usr.phone || '—' %></span></div>
         <div class="card-row"><span class="label">Hire Date</span><span class="value"><%= usr.hire_date || '—' %></span></div>
         <% if (manager) { %><div class="card-row"><span class="label">Reports To</span><span class="value"><a href="/admin/companies/<%= company.id %>/users/<%= manager.id %>/profile"><%= manager.name %></a><% if (manager.title) { %> (<%= manager.title %>)<% } %></span></div><% } %>
+      </div>
+
+      <!-- Additional Emails -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3 style="margin:0;"><i class="ti ti-mail"></i> Emails (<%= userEmails.length %>)</h3>
+          <button class="btn btn-sm" onclick="document.getElementById('add-email').style.display=document.getElementById('add-email').style.display==='none'?'':'none'"><i class="ti ti-plus"></i></button>
+        </div>
+        <div id="add-email" style="display:none;margin-bottom:10px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">
+          <form method="POST" action="/admin/companies/<%= company.id %>/users/<%= usr.id %>/emails" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;">
+            <div class="form-group" style="flex:1;margin-bottom:0;min-width:180px;"><label>Email *</label><input type="email" name="email" required placeholder="user@company.com"></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Type</label><select name="type"><option value="work">Work</option><option value="personal">Personal</option><option value="other">Other</option></select></div>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="is_primary" value="1" style="width:auto;"> Primary</label>
+            <div class="form-group" style="margin-bottom:0;"><label>Notes</label><input type="text" name="notes" placeholder="Optional" style="width:120px;"></div>
+            <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i></button>
+          </form>
+        </div>
+        <% if (userEmails.length > 0) { %>
+          <% userEmails.forEach(em => { %>
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+              <span style="flex:1;font-weight:<%= em.is_primary ? '700' : '400' %>;"><%= em.email %></span>
+              <span class="badge" style="font-size:9px;"><%= em.type %></span>
+              <% if (em.is_primary) { %><span style="font-size:9px;color:#16a34a;font-weight:700;">PRIMARY</span><% } else { %>
+                <form method="POST" action="/admin/companies/<%= company.id %>/users/<%= usr.id %>/emails/<%= em.id %>/primary" style="display:inline;"><button type="submit" class="btn btn-sm" style="padding:1px 4px;font-size:9px;" title="Set primary"><i class="ti ti-star"></i></button></form>
+              <% } %>
+              <% if (em.notes) { %><span style="font-size:10px;color:var(--muted);" title="<%= em.notes %>"><i class="ti ti-note"></i></span><% } %>
+              <form method="POST" action="/admin/companies/<%= company.id %>/users/<%= usr.id %>/emails/<%= em.id %>/delete" style="display:inline;" onsubmit="return confirm('Remove?')"><button type="submit" class="btn btn-sm" style="padding:1px 4px;color:#ef4444;"><i class="ti ti-x"></i></button></form>
+            </div>
+          <% }) %>
+        <% } else { %>
+          <div style="font-size:12px;color:var(--muted);">No additional emails. Click + to add.</div>
+        <% } %>
+      </div>
+
+      <!-- Additional Phones -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3 style="margin:0;"><i class="ti ti-phone"></i> Phones (<%= userPhones.length %>)</h3>
+          <button class="btn btn-sm" onclick="document.getElementById('add-phone').style.display=document.getElementById('add-phone').style.display==='none'?'':'none'"><i class="ti ti-plus"></i></button>
+        </div>
+        <div id="add-phone" style="display:none;margin-bottom:10px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">
+          <form method="POST" action="/admin/companies/<%= company.id %>/users/<%= usr.id %>/phones" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;">
+            <div class="form-group" style="flex:1;margin-bottom:0;min-width:140px;"><label>Phone *</label><input type="text" name="phone" required placeholder="555-0100"></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Ext</label><input type="text" name="ext" placeholder="1234" style="width:70px;"></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Type</label><select name="type"><option value="work">Work</option><option value="mobile">Mobile</option><option value="home">Home</option><option value="fax">Fax</option><option value="other">Other</option></select></div>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="is_primary" value="1" style="width:auto;"> Primary</label>
+            <div class="form-group" style="margin-bottom:0;"><label>Notes</label><input type="text" name="notes" placeholder="Optional" style="width:120px;"></div>
+            <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i></button>
+          </form>
+        </div>
+        <% if (userPhones.length > 0) { %>
+          <% userPhones.forEach(ph => { %>
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+              <span style="flex:1;font-weight:<%= ph.is_primary ? '700' : '400' %>;"><%= ph.phone %><% if (ph.ext) { %> <span style="font-size:11px;color:var(--muted);">x<%= ph.ext %></span><% } %></span>
+              <span class="badge" style="font-size:9px;"><%= ph.type %></span>
+              <% if (ph.is_primary) { %><span style="font-size:9px;color:#16a34a;font-weight:700;">PRIMARY</span><% } else { %>
+                <form method="POST" action="/admin/companies/<%= company.id %>/users/<%= usr.id %>/phones/<%= ph.id %>/primary" style="display:inline;"><button type="submit" class="btn btn-sm" style="padding:1px 4px;font-size:9px;" title="Set primary"><i class="ti ti-star"></i></button></form>
+              <% } %>
+              <% if (ph.notes) { %><span style="font-size:10px;color:var(--muted);" title="<%= ph.notes %>"><i class="ti ti-note"></i></span><% } %>
+              <form method="POST" action="/admin/companies/<%= company.id %>/users/<%= usr.id %>/phones/<%= ph.id %>/delete" style="display:inline;" onsubmit="return confirm('Remove?')"><button type="submit" class="btn btn-sm" style="padding:1px 4px;color:#ef4444;"><i class="ti ti-x"></i></button></form>
+            </div>
+          <% }) %>
+        <% } else { %>
+          <div style="font-size:12px;color:var(--muted);">No additional phones. Click + to add.</div>
+        <% } %>
+      </div>
+
+      <!-- Divisions -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3 style="margin:0;"><i class="ti ti-hierarchy-2"></i> Divisions (<%= userDivisions.length %>)</h3>
+          <div style="display:flex;gap:4px;">
+            <a href="/admin/companies/<%= company.id %>/divisions" class="btn btn-sm" title="Manage Divisions"><i class="ti ti-settings"></i></a>
+            <button class="btn btn-sm" onclick="document.getElementById('add-div').style.display=document.getElementById('add-div').style.display==='none'?'':'none'"><i class="ti ti-plus"></i></button>
+          </div>
+        </div>
+        <div id="add-div" style="display:none;margin-bottom:10px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">
+          <form method="POST" action="/admin/companies/<%= company.id %>/users/<%= usr.id %>/divisions" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;">
+            <div class="form-group" style="flex:1;margin-bottom:0;min-width:160px;"><label>Division *</label><select name="division_id" required><option value="">— Select —</option><% allDivisions.forEach(d => { %><option value="<%= d.id %>"><%= d.name %><%= d.code ? ' (' + d.code + ')' : '' %></option><% }) %></select></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Role in Division</label><input type="text" name="role_in_division" placeholder="e.g. Lead, Member" style="width:140px;"></div>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="is_primary" value="1" style="width:auto;"> Primary</label>
+            <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i></button>
+          </form>
+        </div>
+        <% if (userDivisions.length > 0) { %>
+          <% userDivisions.forEach(ud => { %>
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+              <span style="flex:1;font-weight:700;"><%= ud.division_name %><% if (ud.division_code) { %> <span style="font-size:11px;color:var(--muted);">(<%= ud.division_code %>)</span><% } %></span>
+              <% if (ud.role_in_division) { %><span class="badge" style="font-size:9px;"><%= ud.role_in_division %></span><% } %>
+              <% if (ud.is_primary) { %><span style="font-size:9px;color:#16a34a;font-weight:700;">PRIMARY</span><% } %>
+              <form method="POST" action="/admin/companies/<%= company.id %>/users/<%= usr.id %>/divisions/<%= ud.id %>/delete" style="display:inline;" onsubmit="return confirm('Remove from division?')"><button type="submit" class="btn btn-sm" style="padding:1px 4px;color:#ef4444;"><i class="ti ti-x"></i></button></form>
+            </div>
+          <% }) %>
+        <% } else { %>
+          <div style="font-size:12px;color:var(--muted);">Not assigned to any divisions. <% if (allDivisions.length === 0) { %><a href="/admin/companies/<%= company.id %>/divisions">Create divisions first</a>.<% } else { %>Click + to assign.<% } %></div>
+        <% } %>
       </div>
 
       <!-- Manager assignment -->

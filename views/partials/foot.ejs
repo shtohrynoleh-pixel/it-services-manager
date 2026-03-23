@@ -2,5 +2,22 @@
 <%- include('xp-bar') %>
 <%- include('quick-task') %>
 <%- include('chat-bubble') %>
+<script>
+// Ensure theme toggle exists on pages without notif-bell
+if(!document.getElementById('themeToggle')){
+  var fb=document.createElement('button');
+  fb.id='themeToggle';
+  fb.title='Toggle dark/light theme';
+  fb.style.cssText='position:fixed;bottom:20px;left:20px;z-index:900;width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--card);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.1);';
+  fb.innerHTML='<i class="ti" id="themeIcon"></i>';
+  fb.onclick=function(){toggleTheme();};
+  document.body.appendChild(fb);
+  if(typeof updateThemeIcon==='undefined'){
+    window.toggleTheme=function(){var h=document.documentElement;var d=h.getAttribute('data-theme')==='dark';if(d){h.removeAttribute('data-theme');localStorage.setItem('theme','light');}else{h.setAttribute('data-theme','dark');localStorage.setItem('theme','dark');}updateThemeIcon();};
+    window.updateThemeIcon=function(){var i=document.getElementById('themeIcon');if(i)i.className='ti '+(document.documentElement.getAttribute('data-theme')==='dark'?'ti-sun':'ti-moon');};
+  }
+  updateThemeIcon();
+}
+</script>
 </body>
 </html>

@@ -1,0 +1,68 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>?tab=users" style="opacity:0.4;text-decoration:none;"><i class="ti ti-building"></i></a> → <i class="ti ti-hierarchy-2"></i> Divisions — <%= company.name %></h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 style="margin:0;"><i class="ti ti-hierarchy-2"></i> Divisions (<%= divisions.length %>)</h3>
+          <button class="btn btn-sm" onclick="document.getElementById('add-div').style.display=document.getElementById('add-div').style.display==='none'?'':'none'"><i class="ti ti-plus"></i> Add Division</button>
+        </div>
+
+        <div id="add-div" style="display:none;margin-bottom:14px;padding:14px;background:#f8fafc;border-radius:10px;border:1px solid var(--border);">
+          <form method="POST" action="/admin/companies/<%= company.id %>/divisions" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;">
+            <div class="form-group" style="flex:1;margin-bottom:0;min-width:150px;"><label>Name *</label><input type="text" name="name" required placeholder="e.g. Operations"></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Code</label><input type="text" name="code" placeholder="OPS" style="width:80px;"></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Parent Division</label><select name="parent_id"><option value="">— None (top-level) —</option><% divisions.forEach(d => { %><option value="<%= d.id %>"><%= d.name %></option><% }) %></select></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Head</label><select name="head_id"><option value="">—</option><% allUsers.forEach(u => { %><option value="<%= u.id %>"><%= u.name %></option><% }) %></select></div>
+            <div class="form-group" style="flex:1;margin-bottom:0;"><label>Notes</label><input type="text" name="notes" placeholder="Optional"></div>
+            <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i> Add</button>
+          </form>
+        </div>
+
+        <% if (divisions.length === 0) { %>
+          <div style="padding:24px;text-align:center;color:var(--muted);font-size:12px;">No divisions yet. Divisions are organizational units like "Operations", "Safety", "Finance". A user can belong to multiple divisions.</div>
+        <% } else { %>
+          <table class="tbl">
+            <thead><tr><th>Name</th><th>Code</th><th>Parent</th><th>Head</th><th>Members</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+            <% divisions.forEach(d => { %>
+              <tr style="<%= !d.is_active ? 'opacity:0.5;' : '' %>">
+                <td><strong><%= d.name %></strong></td>
+                <td><%= d.code || '—' %></td>
+                <td style="font-size:11px;"><%= d.parent_name || '—' %></td>
+                <td style="font-size:11px;"><%= d.head_name || '—' %></td>
+                <td><%= d.member_count %></td>
+                <td><span class="badge <%= d.is_active ? 'active' : 'inactive' %>"><%= d.is_active ? 'Active' : 'Inactive' %></span></td>
+                <td style="white-space:nowrap;">
+                  <button class="btn btn-sm" style="padding:2px 6px;" onclick="document.getElementById('div-edit-<%= d.id %>').style.display=document.getElementById('div-edit-<%= d.id %>').style.display==='none'?'':'none'" title="Edit"><i class="ti ti-pencil"></i></button>
+                  <form method="POST" action="/admin/companies/<%= company.id %>/divisions/<%= d.id %>/deactivate" style="display:inline;"><button type="submit" class="btn btn-sm" style="padding:2px 6px;" title="<%= d.is_active ? 'Deactivate' : 'Reactivate' %>"><i class="ti ti-<%= d.is_active ? 'eye-off' : 'eye' %>"></i></button></form>
+                </td>
+              </tr>
+              <tr id="div-edit-<%= d.id %>" style="display:none;background:#f8fafc;">
+                <td colspan="7">
+                  <form method="POST" action="/admin/companies/<%= company.id %>/divisions/<%= d.id %>/edit" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;padding:6px 0;">
+                    <div class="form-group" style="flex:1;margin-bottom:0;"><label>Name</label><input type="text" name="name" value="<%= d.name %>" required></div>
+                    <div class="form-group" style="margin-bottom:0;"><label>Code</label><input type="text" name="code" value="<%= d.code || '' %>" style="width:80px;"></div>
+                    <div class="form-group" style="margin-bottom:0;"><label>Parent</label><select name="parent_id"><option value="">— None —</option><% divisions.forEach(p => { if (p.id !== d.id) { %><option value="<%= p.id %>" <%= d.parent_id == p.id ? 'selected' : '' %>><%= p.name %></option><% } }) %></select></div>
+                    <div class="form-group" style="margin-bottom:0;"><label>Head</label><select name="head_id"><option value="">—</option><% allUsers.forEach(u => { %><option value="<%= u.id %>" <%= d.head_id == u.id ? 'selected' : '' %>><%= u.name %></option><% }) %></select></div>
+                    <div class="form-group" style="flex:1;margin-bottom:0;"><label>Notes</label><input type="text" name="notes" value="<%= d.notes || '' %>"></div>
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i></button>
+                    <button type="button" class="btn btn-sm" onclick="document.getElementById('div-edit-<%= d.id %>').style.display='none'"><i class="ti ti-x"></i></button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+      <div style="margin-top:12px;"><a href="/admin/companies/<%= company.id %>?tab=users" class="btn btn-sm"><i class="ti ti-arrow-left"></i> Back to Users</a></div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>
