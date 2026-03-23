@@ -112,6 +112,32 @@ app.get('/invoice/:invNum/print', (req, res) => {
   } catch(e) { res.status(500).send('Error loading invoice'); }
 });
 
+// Self-signup
+app.post('/signup', (req, res) => {
+  const { company_name, full_name, email, phone, password } = req.body;
+  if (!company_name || !full_name || !email || !password || password.length < 4) {
+    return res.redirect('/#signup');
+  }
+  try {
+    const bcrypt = require('bcryptjs');
+    const companyResult = db.prepare('INSERT INTO companies (name, status) VALUES (?, ?)').run(company_name.trim(), 'active');
+    const companyId = companyResult.lastInsertRowid;
+    try { db.prepare('INSERT INTO company_modules (company_id) VALUES (?)').run(companyId); } catch(e) {}
+    const hash = bcrypt.hashSync(password, 10);
+    const username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9.]/g, '');
+    db.prepare('INSERT INTO users (username, password, role, company_id, full_name, email, phone, is_active) VALUES (?,?,?,?,?,?,?,1)').run(username, hash, 'client', companyId, full_name.trim(), email.trim(), phone||null);
+    try { db.prepare('INSERT INTO company_users (company_id, name, email, phone, is_active) VALUES (?,?,?,?,1)').run(companyId, full_name.trim(), email.trim(), phone||null); } catch(e) {}
+    try { db.prepare("INSERT INTO tasks (title, description, priority, status, assigned_to, created_by) VALUES (?,?,?,?,?,?)").run('🆕 New Signup: ' + company_name, 'Company: ' + company_name + '\nContact: ' + full_name + '\nEmail: ' + email + '\nUsername: ' + username, 'high', 'todo', 'admin', 'website'); } catch(e) {}
+    const services = db.prepare('SELECT * FROM services WHERE show_on_landing = 1 AND is_active = 1 ORDER BY base_price DESC').all();
+    const settings = {};
+    try { db.prepare('SELECT key, value FROM settings').all().forEach(r => { settings[r.key] = r.value; }); } catch(e) {}
+    res.render('landing', { services, settings, user: null, signedUp: true, newUsername: username });
+  } catch(e) {
+    console.error('Signup error:', e.message);
+    res.redirect('/#signup');
+  }
+});
+
 // Contact form → creates a task
 app.post('/contact', (req, res) => {
   try {
