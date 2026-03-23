@@ -1,28 +1,30 @@
 @echo off
-title IT Services Manager - Server Connection
+title IT Forge - Server Management
 color 0A
 echo.
 echo  ==========================================
-echo   IT Services Manager - Server Commands
+echo   IT Forge - Server Management
 echo  ==========================================
 echo.
-echo  Server IP: 54.161.122.55
-echo  App URL:   http://54.161.122.55:3000
-echo  Login:     admin / admin
+echo  Server: 54.161.122.55
+echo  App:    https://itforge.app
 echo.
 echo  ==========================================
 echo   COMMANDS:
 echo  ==========================================
 echo.
-echo   [1] Connect to server (SSH terminal)
-echo   [2] DEPLOY (push to GitHub + update server + restart)
+echo   [1] Connect to server (SSH)
+echo   [2] DEPLOY (push + update + restart)
 echo   [3] View server logs
-echo   [4] Restart app on server
-echo   [5] Check server status
-echo   [6] Quick push to GitHub only
-echo   [7] Quick update server only (git pull + restart)
+echo   [4] Restart app
+echo   [5] Server status
+echo   [6] Push to GitHub only
+echo   [7] Pull on server only
 echo   [8] Restart local app
-echo   [9] Force deploy (force push + hard reset server)
+echo   [9] Force deploy
+echo   [10] Switch to PostgreSQL
+echo   [11] Switch to SQLite
+echo   [12] Check which database
 echo.
 echo  ==========================================
 echo.
@@ -33,7 +35,7 @@ set PROJECT=F:\Projects\it-services-manager
 
 :menu
 echo.
-set /p choice="Enter number (1-9) or Q to quit: "
+set /p choice="Enter number (1-12) or Q to quit: "
 
 if "%choice%"=="1" goto connect
 if "%choice%"=="2" goto deploy
@@ -44,126 +46,157 @@ if "%choice%"=="6" goto pushonly
 if "%choice%"=="7" goto pullonly
 if "%choice%"=="8" goto localrestart
 if "%choice%"=="9" goto forcedeploy
+if "%choice%"=="10" goto switchpg
+if "%choice%"=="11" goto switchsqlite
+if "%choice%"=="12" goto checkdb
 if /i "%choice%"=="q" goto end
-echo Invalid choice. Try again.
+echo Invalid choice.
 goto menu
 
 :connect
 echo.
-echo Connecting to server... (type "exit" to come back)
-echo.
+echo Connecting to server...
 ssh -i "%KEY%" %SERVER%
 goto menu
 
 :deploy
 echo.
-echo ==========================================
-echo   FULL DEPLOY
-echo ==========================================
-echo.
+echo === DEPLOY ===
 cd /d %PROJECT%
-echo [1/4] Checking changes...
+echo Changed files:
 git status --short
 echo.
-set /p msg="Commit message (or press Enter for 'Update'): "
+set /p msg="Commit message (Enter for 'Update'): "
 if "%msg%"=="" set msg=Update
 echo.
-echo [2/4] Committing and pushing to GitHub...
+echo [1/3] Pushing to GitHub...
 git add -A
 git commit -m "%msg%"
 git push origin main
 echo.
-echo [3/4] Updating server (database safe)...
+echo [2/3] Updating server...
 ssh -i "%KEY%" %SERVER% "cd /opt/itm && git stash 2>/dev/null; git pull origin main && npm install --production 2>&1 | tail -3 && pm2 restart itm 2>/dev/null || pm2 start server.js --name itm && pm2 save"
 echo.
-echo [4/4] Verifying...
+echo [3/3] Done!
 ssh -i "%KEY%" %SERVER% "pm2 status"
 echo.
-echo ==========================================
-echo   Deploy complete!
-echo   App: http://54.161.122.55:3000
-echo ==========================================
+echo  App: https://itforge.app
 goto menu
 
 :logs
 echo.
-echo Showing last 50 lines of logs (Ctrl+C to stop)...
-echo.
-ssh -i "%KEY%" %SERVER% "pm2 logs itm --lines 50"
+ssh -i "%KEY%" %SERVER% "pm2 logs itm --lines 40"
 goto menu
 
 :restart
 echo.
-echo Restarting app on server...
 ssh -i "%KEY%" %SERVER% "cd /opt/itm && pm2 restart itm 2>/dev/null || pm2 start server.js --name itm && pm2 save && pm2 status"
-echo.
 goto menu
 
 :status
 echo.
-echo Checking server status...
-ssh -i "%KEY%" %SERVER% "echo '=== APP ===' && pm2 status && echo '' && echo '=== DISK ===' && df -h / && echo '' && echo '=== MEMORY ===' && free -h"
-echo.
+ssh -i "%KEY%" %SERVER% "echo '=== APP ===' && pm2 status && echo '' && echo '=== DB ===' && head -1 /opt/itm/.env 2>/dev/null; grep DATABASE_URL /opt/itm/.env 2>/dev/null || echo 'SQLite (no DATABASE_URL)' && echo '' && echo '=== DISK ===' && df -h / && echo '' && echo '=== MEMORY ===' && free -h"
 goto menu
 
 :pushonly
 echo.
 cd /d %PROJECT%
-echo Changed files:
-git status --short
-echo.
-set /p msg="Commit message (or press Enter for 'Update'): "
+set /p msg="Commit message (Enter for 'Update'): "
 if "%msg%"=="" set msg=Update
 git add -A
 git commit -m "%msg%"
 git push origin main
-echo.
-echo Pushed to GitHub!
+echo Pushed!
 goto menu
 
 :pullonly
 echo.
-echo Pulling latest code and restarting server...
-ssh -i "%KEY%" %SERVER% "cd /opt/itm && git pull origin main && npm install --production 2>&1 | tail -3 && pm2 restart itm 2>/dev/null || pm2 start server.js --name itm && pm2 save && pm2 status"
-echo.
+ssh -i "%KEY%" %SERVER% "cd /opt/itm && git stash 2>/dev/null; git pull origin main && npm install --production 2>&1 | tail -3 && pm2 restart itm 2>/dev/null || pm2 start server.js --name itm && pm2 save && pm2 status"
 goto menu
 
 :localrestart
 echo.
-echo Restarting local app...
 cd /d %PROJECT%
 taskkill /f /im node.exe 2>nul
-echo Starting server...
-start "ITM Local" cmd /c "cd /d %PROJECT% && node server.js"
-echo.
-echo Local app restarted at http://localhost:3000
+start "ITForge Local" cmd /c "cd /d %PROJECT% && node server.js"
+echo Local app started at http://localhost:3000
 goto menu
 
 :forcedeploy
 echo.
-echo ==========================================
-echo   FORCE DEPLOY (overwrites server)
-echo ==========================================
-echo.
+echo === FORCE DEPLOY ===
 cd /d %PROJECT%
-set /p msg="Commit message (or press Enter for 'Force update'): "
+set /p msg="Commit message (Enter for 'Force update'): "
 if "%msg%"=="" set msg=Force update
-echo.
-echo [1/3] Force pushing to GitHub...
+echo [1/3] Force pushing...
 git add -A
 git commit -m "%msg%"
 git push origin main --force
-echo.
-echo [2/3] Force updating server (keeping database + .env)...
+echo [2/3] Force updating server (keeping DB + .env)...
 ssh -i "%KEY%" %SERVER% "cd /opt/itm && cp db/app.db /tmp/itm-backup.db 2>/dev/null; cp .env /tmp/itm-backup.env 2>/dev/null; git fetch origin && git reset --hard origin/main && cp /tmp/itm-backup.db db/app.db 2>/dev/null; cp /tmp/itm-backup.env .env 2>/dev/null; npm install --production 2>&1 | tail -3 && pm2 restart itm 2>/dev/null || pm2 start server.js --name itm && pm2 save"
-echo.
-echo [3/3] Verifying...
+echo [3/3] Done!
 ssh -i "%KEY%" %SERVER% "pm2 status"
+goto menu
+
+:switchpg
 echo.
 echo ==========================================
-echo   Force deploy complete!
-echo   App: http://54.161.122.55:3000
+echo   SWITCH TO POSTGRESQL
 echo ==========================================
+echo.
+echo This will:
+echo   1. Install PostgreSQL on the server
+echo   2. Create database and user
+echo   3. Run the schema
+echo   4. Install Node packages (pg, deasync)
+echo   5. Set DATABASE_URL in .env
+echo   6. Restart the app
+echo.
+set /p pgpass="Enter PostgreSQL password for 'itforge' user: "
+if "%pgpass%"=="" (
+  echo Password required!
+  goto menu
+)
+echo.
+echo Installing PostgreSQL and setting up...
+ssh -i "%KEY%" %SERVER% "sudo dnf install -y postgresql15-server postgresql15 2>/dev/null || sudo amazon-linux-extras install postgresql15 2>/dev/null || sudo dnf install -y postgresql-server postgresql 2>/dev/null && sudo postgresql-setup --initdb 2>/dev/null; sudo systemctl enable postgresql && sudo systemctl start postgresql && echo 'PostgreSQL installed and started'"
+echo.
+echo Creating database...
+ssh -i "%KEY%" %SERVER% "sudo -u postgres psql -c \"CREATE USER itforge WITH PASSWORD '%pgpass%';\" 2>/dev/null; sudo -u postgres psql -c \"CREATE DATABASE itforge OWNER itforge;\" 2>/dev/null; sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE itforge TO itforge;\" 2>/dev/null && echo 'Database created'"
+echo.
+echo Configuring auth...
+ssh -i "%KEY%" %SERVER% "sudo sed -i 's/peer/md5/g; s/ident/md5/g' /var/lib/pgsql/data/pg_hba.conf 2>/dev/null; sudo sed -i 's/peer/md5/g; s/ident/md5/g' /var/lib/pgsql15/data/pg_hba.conf 2>/dev/null; sudo systemctl restart postgresql && echo 'Auth configured'"
+echo.
+echo Running schema...
+ssh -i "%KEY%" %SERVER% "cd /opt/itm && PGPASSWORD=%pgpass% psql -U itforge -d itforge -h localhost -f db/postgres-schema.sql && echo 'Schema created'"
+echo.
+echo Installing Node packages...
+ssh -i "%KEY%" %SERVER% "cd /opt/itm && npm install pg deasync --save 2>&1 | tail -3"
+echo.
+echo Setting DATABASE_URL...
+ssh -i "%KEY%" %SERVER% "grep -q DATABASE_URL /opt/itm/.env && sed -i 's|^DATABASE_URL=.*|DATABASE_URL=postgresql://itforge:%pgpass%@localhost:5432/itforge|' /opt/itm/.env || echo 'DATABASE_URL=postgresql://itforge:%pgpass%@localhost:5432/itforge' >> /opt/itm/.env && echo 'DATABASE_URL set'"
+echo.
+echo Restarting app...
+ssh -i "%KEY%" %SERVER% "cd /opt/itm && pm2 restart itm && sleep 2 && pm2 logs itm --lines 5 --nostream"
+echo.
+echo ==========================================
+echo   PostgreSQL setup complete!
+echo   Check logs above for confirmation.
+echo ==========================================
+goto menu
+
+:switchsqlite
+echo.
+echo Switching back to SQLite...
+ssh -i "%KEY%" %SERVER% "sed -i '/^DATABASE_URL/d' /opt/itm/.env && echo 'DATABASE_URL removed' && cd /opt/itm && pm2 restart itm && sleep 2 && pm2 logs itm --lines 5 --nostream"
+echo.
+echo Switched to SQLite!
+goto menu
+
+:checkdb
+echo.
+echo Checking database...
+ssh -i "%KEY%" %SERVER% "grep DATABASE_URL /opt/itm/.env 2>/dev/null && echo '==> PostgreSQL' || echo '==> SQLite (no DATABASE_URL in .env)'; echo ''; cd /opt/itm && pm2 logs itm --lines 3 --nostream 2>/dev/null"
 goto menu
 
 :end

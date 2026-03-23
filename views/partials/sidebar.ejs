@@ -10,38 +10,49 @@
   <div class="sb-nav" id="sbNav">
     <% if (user.role === 'admin') { %>
       <%
-        // Define all menu items with their default groups
         const menuItems = [
-          { id:'dashboard', icon:'ti ti-dashboard', label:'Dashboard', href:'/admin', group:'main' },
-          { id:'companies', icon:'ti ti-building', label:'Companies', href:'/admin/companies', group:'main' },
-          { id:'all-users', icon:'ti ti-users-group', label:'All Users', href:'/admin/all-users', group:'main' },
-          { id:'services', icon:'ti ti-settings-cog', label:'Services', href:'/admin/services', group:'main' },
-          { id:'billing', icon:'ti ti-file-invoice', label:'Billing', href:'/admin/billing', group:'main' },
-          { id:'tasks', icon:'ti ti-checkbox', label:'Tasks', href:'/admin/tasks', group:'work' },
-          { id:'projects', icon:'ti ti-folder', label:'Projects', href:'/admin/projects', group:'work' },
-          { id:'schedule', icon:'ti ti-calendar-event', label:'Schedule', href:'/admin/schedule', group:'work' },
-          { id:'dispatch', icon:'ti ti-layout-board-split', label:'Dispatch', href:'/admin/dispatch', group:'work' },
-          { id:'chat', icon:'ti ti-message-circle', label:'Chat', href:'/admin/chat', group:'work' },
-          { id:'leaderboard', icon:'ti ti-trophy', label:'Leaderboard', href:'/admin/leaderboard', group:'work' },
-          { id:'policies', icon:'ti ti-shield-check', label:'Security Policies', href:'/admin/policies', group:'docs' },
-          { id:'sops', icon:'ti ti-list-check', label:'SOPs', href:'/admin/sops', group:'docs' },
-          { id:'flows', icon:'ti ti-git-branch', label:'Process Flows', href:'/admin/flows', group:'docs' },
-          { id:'monitoring', icon:'ti ti-activity', label:'Monitoring', href:'/admin/monitoring', group:'monitor' },
-          { id:'alerts-page', icon:'ti ti-bell', label:'Alerts', href:'/admin/alerts', group:'monitor' },
-          { id:'vault', icon:'ti ti-key', label:'Password Vault', href:'/admin/vault', group:'system' },
-          { id:'users-manage', icon:'ti ti-user-shield', label:'User Accounts', href:'/admin/users-manage', group:'system' },
-          { id:'admins', icon:'ti ti-crown', label:'Admin Management', href:'/admin/admins', group:'system', superOnly:true },
-          { id:'settings', icon:'ti ti-settings', label:'Settings', href:'/admin/settings', group:'system' },
-          { id:'integrations', icon:'ti ti-plug', label:'Integrations', href:'/admin/integrations', group:'system' },
-          { id:'roles', icon:'ti ti-user-check', label:'Roles', href:'/admin/roles', group:'system' },
-          { id:'departments', icon:'ti ti-building-community', label:'Departments', href:'/admin/departments', group:'system' }
+          // --- OVERVIEW (what you see first) ---
+          { id:'dashboard', icon:'ti ti-dashboard', label:'Dashboard', href:'/admin', group:'overview' },
+          { id:'companies', icon:'ti ti-building', label:'Companies', href:'/admin/companies', group:'overview' },
+          { id:'dispatch', icon:'ti ti-layout-board-split', label:'Dispatch Center', href:'/admin/dispatch', group:'overview' },
+
+          // --- OPERATIONS (daily work) ---
+          { id:'tasks', icon:'ti ti-checkbox', label:'Tasks', href:'/admin/tasks', group:'ops' },
+          { id:'schedule', icon:'ti ti-calendar-event', label:'Schedule', href:'/admin/schedule', group:'ops' },
+          { id:'projects', icon:'ti ti-folder', label:'Projects', href:'/admin/projects', group:'ops' },
+          { id:'billing', icon:'ti ti-file-invoice', label:'Billing', href:'/admin/billing', group:'ops' },
+
+          // --- COMPANY TOOLS (things that belong to companies) ---
+          { id:'all-users', icon:'ti ti-users-group', label:'All People', href:'/admin/all-users', group:'company' },
+          { id:'services', icon:'ti ti-settings-cog', label:'Services', href:'/admin/services', group:'company' },
+          { id:'sops', icon:'ti ti-list-check', label:'SOPs', href:'/admin/sops', group:'company' },
+          { id:'flows', icon:'ti ti-git-branch', label:'Process Flows', href:'/admin/flows', group:'company' },
+          { id:'policies', icon:'ti ti-shield-check', label:'Policies', href:'/admin/policies', group:'company' },
+          { id:'vault', icon:'ti ti-key', label:'Passwords', href:'/admin/vault', group:'company' },
+
+          // --- MONITORING ---
+          { id:'monitoring', icon:'ti ti-activity', label:'Monitoring', href:'/admin/monitoring', group:'infra' },
+          { id:'alerts-page', icon:'ti ti-bell', label:'Alerts', href:'/admin/alerts', group:'infra' },
+
+          // --- COMMUNICATE ---
+          { id:'chat', icon:'ti ti-message-circle', label:'Chat', href:'/admin/chat', group:'comms' },
+          { id:'leaderboard', icon:'ti ti-trophy', label:'Leaderboard', href:'/admin/leaderboard', group:'comms' },
+
+          // --- ADMIN ---
+          { id:'users-manage', icon:'ti ti-user-shield', label:'User Accounts', href:'/admin/users-manage', group:'admin' },
+          { id:'admins', icon:'ti ti-crown', label:'Admin Team', href:'/admin/admins', group:'admin', superOnly:true },
+          { id:'settings', icon:'ti ti-settings', label:'Settings', href:'/admin/settings', group:'admin' },
+          { id:'integrations', icon:'ti ti-plug', label:'Integrations', href:'/admin/integrations', group:'admin' },
+          { id:'roles', icon:'ti ti-user-check', label:'Roles', href:'/admin/roles', group:'admin' },
+          { id:'departments', icon:'ti ti-building-community', label:'Departments', href:'/admin/departments', group:'admin' }
         ];
         const groups = [
-          { id:'main', label:'Main' },
-          { id:'work', label:'Work' },
-          { id:'docs', label:'Documentation' },
-          { id:'monitor', label:'Monitoring' },
-          { id:'system', label:'System' }
+          { id:'overview', label:'Overview' },
+          { id:'ops', label:'Operations' },
+          { id:'company', label:'Company Tools' },
+          { id:'infra', label:'Infrastructure' },
+          { id:'comms', label:'Communicate' },
+          { id:'admin', label:'Administration' }
         ];
       %>
 
@@ -64,36 +75,50 @@
       <% }) %>
 
     <% } else { %>
+      <%
+        // Client menu — organized by what they do most
+        var ci = 'style="font-size:17px;width:20px;text-align:center;"';
+      %>
       <div class="sb-section" data-group="myco">
-        <div class="sb-section-head" onclick="toggleGroup('myco')"><span>My Company</span><span class="sb-arrow">▾</span></div>
+        <div class="sb-section-head" onclick="toggleGroup('myco')"><span>Overview</span><span class="sb-arrow">▾</span></div>
         <div class="sb-section-body">
-          <a class="sb-item <%= !tab || tab === 'dashboard' ? 'active' : '' %>" href="/client"><i class="ti ti-dashboard" style="font-size:17px;width:20px;text-align:center;"></i> Dashboard</a>
-          <a class="sb-item <%= tab === 'users' ? 'active' : '' %>" href="/client?tab=users"><i class="ti ti-users-group" style="font-size:17px;width:20px;text-align:center;"></i> Team</a>
-          <a class="sb-item <%= tab === 'servers' ? 'active' : '' %>" href="/client?tab=servers"><i class="ti ti-server" style="font-size:17px;width:20px;text-align:center;"></i> Servers</a>
-          <a class="sb-item <%= tab === 'subscriptions' ? 'active' : '' %>" href="/client?tab=subscriptions"><i class="ti ti-package" style="font-size:17px;width:20px;text-align:center;"></i> Subscriptions</a>
-          <a class="sb-item <%= tab === 'assets' ? 'active' : '' %>" href="/client?tab=assets"><i class="ti ti-world" style="font-size:17px;width:20px;text-align:center;"></i> Digital Assets</a>
-          <a class="sb-item <%= tab === 'inventory' ? 'active' : '' %>" href="/client?tab=inventory"><i class="ti ti-device-desktop" style="font-size:17px;width:20px;text-align:center;"></i> Inventory</a>
-          <a class="sb-item <%= tab === 'invoices' ? 'active' : '' %>" href="/client?tab=invoices"><i class="ti ti-file-invoice" style="font-size:17px;width:20px;text-align:center;"></i> Invoices</a>
-          <a class="sb-item <%= tab === 'tasks' ? 'active' : '' %>" href="/client?tab=tasks"><i class="ti ti-ticket" style="font-size:17px;width:20px;text-align:center;"></i> Requests</a>
-          <a class="sb-item <%= page === 'chat' ? 'active' : '' %>" href="/client/chat"><i class="ti ti-message-circle" style="font-size:17px;width:20px;text-align:center;"></i> Chat</a>
+          <a class="sb-item <%= !tab || tab === 'dashboard' ? 'active' : '' %>" href="/client"><i class="ti ti-dashboard" <%= ci %>></i> Dashboard</a>
+          <a class="sb-item <%= tab === 'tasks' ? 'active' : '' %>" href="/client?tab=tasks"><i class="ti ti-ticket" <%= ci %>></i> Support Tickets</a>
+          <a class="sb-item <%= page === 'chat' ? 'active' : '' %>" href="/client/chat"><i class="ti ti-message-circle" <%= ci %>></i> Chat</a>
         </div>
       </div>
-      <div class="sb-section" data-group="work">
-        <div class="sb-section-head" onclick="toggleGroup('work')"><span>Work</span><span class="sb-arrow">▾</span></div>
+      <div class="sb-section" data-group="team">
+        <div class="sb-section-head" onclick="toggleGroup('team')"><span>People & Assets</span><span class="sb-arrow">▾</span></div>
         <div class="sb-section-body">
-          <a class="sb-item <%= page === 'fuel' ? 'active' : '' %>" href="/client/fuel"><i class="ti ti-gas-station" style="font-size:17px;width:20px;text-align:center;"></i> Fuel Incentive</a>
-          <a class="sb-item <%= page === 'projects' ? 'active' : '' %>" href="/client/projects"><i class="ti ti-folder" style="font-size:17px;width:20px;text-align:center;"></i> Projects</a>
-          <a class="sb-item <%= page === 'sops' ? 'active' : '' %>" href="/client/sops"><i class="ti ti-list-check" style="font-size:17px;width:20px;text-align:center;"></i> SOPs</a>
-          <a class="sb-item <%= page === 'policies' ? 'active' : '' %>" href="/client/policies"><i class="ti ti-shield-check" style="font-size:17px;width:20px;text-align:center;"></i> Policies</a>
-          <a class="sb-item <%= page === 'passwords' ? 'active' : '' %>" href="/client/passwords"><i class="ti ti-key" style="font-size:17px;width:20px;text-align:center;"></i> Passwords</a>
+          <a class="sb-item <%= tab === 'users' ? 'active' : '' %>" href="/client?tab=users"><i class="ti ti-users-group" <%= ci %>></i> Team</a>
+          <a class="sb-item <%= tab === 'inventory' ? 'active' : '' %>" href="/client?tab=inventory"><i class="ti ti-device-desktop" <%= ci %>></i> Equipment</a>
+          <a class="sb-item <%= tab === 'servers' ? 'active' : '' %>" href="/client?tab=servers"><i class="ti ti-server" <%= ci %>></i> Servers</a>
+          <a class="sb-item <%= tab === 'subscriptions' ? 'active' : '' %>" href="/client?tab=subscriptions"><i class="ti ti-package" <%= ci %>></i> Subscriptions</a>
+          <a class="sb-item <%= tab === 'assets' ? 'active' : '' %>" href="/client?tab=assets"><i class="ti ti-world" <%= ci %>></i> Digital Assets</a>
         </div>
       </div>
-      <div class="sb-section" data-group="info">
-        <div class="sb-section-head" onclick="toggleGroup('info')"><span>Info & Settings</span><span class="sb-arrow">▾</span></div>
+      <div class="sb-section" data-group="ops">
+        <div class="sb-section-head" onclick="toggleGroup('ops')"><span>Operations</span><span class="sb-arrow">▾</span></div>
         <div class="sb-section-body">
-          <a class="sb-item <%= page === 'leaderboard' ? 'active' : '' %>" href="/client/leaderboard"><i class="ti ti-trophy" style="font-size:17px;width:20px;text-align:center;"></i> Leaderboard</a>
-          <a class="sb-item <%= page === 'services' ? 'active' : '' %>" href="/client/services"><i class="ti ti-settings-cog" style="font-size:17px;width:20px;text-align:center;"></i> Available Services</a>
-          <a class="sb-item <%= page === 'account' ? 'active' : '' %>" href="/client/account"><i class="ti ti-user-circle" style="font-size:17px;width:20px;text-align:center;"></i> My Account</a>
+          <a class="sb-item <%= page === 'fuel' ? 'active' : '' %>" href="/client/fuel"><i class="ti ti-gas-station" <%= ci %>></i> Fuel Incentive</a>
+          <a class="sb-item <%= page === 'projects' ? 'active' : '' %>" href="/client/projects"><i class="ti ti-folder" <%= ci %>></i> Projects</a>
+          <a class="sb-item <%= tab === 'invoices' ? 'active' : '' %>" href="/client?tab=invoices"><i class="ti ti-file-invoice" <%= ci %>></i> Invoices</a>
+        </div>
+      </div>
+      <div class="sb-section" data-group="knowledge">
+        <div class="sb-section-head" onclick="toggleGroup('knowledge')"><span>Knowledge Base</span><span class="sb-arrow">▾</span></div>
+        <div class="sb-section-body">
+          <a class="sb-item <%= page === 'sops' ? 'active' : '' %>" href="/client/sops"><i class="ti ti-list-check" <%= ci %>></i> SOPs</a>
+          <a class="sb-item <%= page === 'policies' ? 'active' : '' %>" href="/client/policies"><i class="ti ti-shield-check" <%= ci %>></i> Policies</a>
+          <a class="sb-item <%= page === 'passwords' ? 'active' : '' %>" href="/client/passwords"><i class="ti ti-key" <%= ci %>></i> Passwords</a>
+        </div>
+      </div>
+      <div class="sb-section" data-group="me">
+        <div class="sb-section-head" onclick="toggleGroup('me')"><span>Me</span><span class="sb-arrow">▾</span></div>
+        <div class="sb-section-body">
+          <a class="sb-item <%= page === 'leaderboard' ? 'active' : '' %>" href="/client/leaderboard"><i class="ti ti-trophy" <%= ci %>></i> Leaderboard</a>
+          <a class="sb-item <%= page === 'services' ? 'active' : '' %>" href="/client/services"><i class="ti ti-settings-cog" <%= ci %>></i> Services</a>
+          <a class="sb-item <%= page === 'account' ? 'active' : '' %>" href="/client/account"><i class="ti ti-user-circle" <%= ci %>></i> My Account</a>
         </div>
       </div>
     <% } %>
