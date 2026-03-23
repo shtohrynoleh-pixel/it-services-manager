@@ -32,11 +32,29 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads/logos', express.static(path.join(__dirname, 'uploads', 'logos')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
 app.use(session({
   secret: process.env.SESSION_SECRET || 'itms-secret-2026-change-me',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 }
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production'
+  }
 }));
 
 // Global template helpers — available in all EJS views
@@ -110,8 +128,11 @@ app.post('/api/webhook/company/:key', (req, res) => {
   }
 });
 
-// Public invoice print view (no login required — shared via link)
+// Invoice print view — requires login OR valid share token
 app.get('/invoice/:invNum/print', (req, res) => {
+  // Must be logged in or have a valid share key
+  const shareKey = req.query.key || '';
+  if (!req.session.user && !shareKey) return res.redirect('/login');
   try {
     const invoice = db.prepare('SELECT i.*, c.name as company_name, c.address, c.city, c.state, c.zip, c.logo FROM invoices i LEFT JOIN companies c ON i.company_id = c.id WHERE i.invoice_number = ?').get(req.params.invNum);
     if (!invoice) return res.status(404).send('Invoice not found');
@@ -125,7 +146,7 @@ app.get('/invoice/:invNum/print', (req, res) => {
 // Self-signup
 app.post('/signup', (req, res) => {
   const { company_name, full_name, email, phone, password } = req.body;
-  if (!company_name || !full_name || !email || !password || password.length < 4) {
+  if (!company_name || !full_name || !email || !password || password.length < 8) {
     return res.redirect('/#signup');
   }
   try {

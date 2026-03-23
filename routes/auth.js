@@ -11,6 +11,25 @@ module.exports = function(db) {
     return s;
   };
 
+  // Rate limiting: track failed login attempts per IP
+  const loginAttempts = {};
+  const MAX_ATTEMPTS = 10;
+  const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+  function checkRateLimit(ip) {
+    const record = loginAttempts[ip];
+    if (!record) return true;
+    if (Date.now() - record.first > LOCKOUT_MS) { delete loginAttempts[ip]; return true; }
+    return record.count < MAX_ATTEMPTS;
+  }
+  function recordFailedLogin(ip) {
+    if (!loginAttempts[ip]) loginAttempts[ip] = { count: 0, first: Date.now() };
+    loginAttempts[ip].count++;
+  }
+  function clearLoginAttempts(ip) { delete loginAttempts[ip]; }
+  // Clean up stale entries every 30 minutes
+  setInterval(() => { const now = Date.now(); Object.keys(loginAttempts).forEach(ip => { if (now - loginAttempts[ip].first > LOCKOUT_MS) delete loginAttempts[ip]; }); }, 30 * 60 * 1000);
+
   router.get('/login', (req, res) => {
     if (req.session.user) {
       if (req.session.user.role === 'admin' || req.session.user.role === 'company_admin') return res.redirect('/admin');
@@ -22,6 +41,12 @@ module.exports = function(db) {
   router.post('/login', (req, res) => {
     const { username, password } = req.body;
     const settings = getSettings();
+    const clientIp = req.ip || req.connection.remoteAddress;
+
+    // Rate limit check
+    if (!checkRateLimit(clientIp)) {
+      return res.render('login', { error: 'Too many login attempts. Please wait 15 minutes.', settings });
+    }
 
     if (!username || !password) {
       return res.render('login', { error: 'Please enter username and password', settings });
@@ -40,6 +65,7 @@ module.exports = function(db) {
       if (!admin.is_super && admin.role === 'company_admin') {
         assignedCompanies = db.prepare('SELECT company_id FROM admin_companies WHERE user_id = ?').all(admin.id).map(r => r.company_id);
       }
+      clearLoginAttempts(clientIp);
       req.session.user = { id: admin.id, username: admin.username, role: 'admin', full_name: admin.full_name, company_id: null, is_super: admin.is_super || 0, assignedCompanies };
       return res.redirect('/admin');
     }
@@ -50,6 +76,7 @@ module.exports = function(db) {
       if (!client.company_id) {
         return res.render('login', { error: 'Your account is not linked to a company. Contact your IT admin.', settings });
       }
+      clearLoginAttempts(clientIp);
       // Check 2FA
       if (client.totp_enabled && client.totp_secret) {
         req.session.pending2fa = { id: client.id, username: client.username, role: 'client', full_name: client.full_name, company_id: client.company_id };
@@ -59,6 +86,7 @@ module.exports = function(db) {
       return res.redirect('/client');
     }
 
+    recordFailedLogin(clientIp);
     return res.render('login', { error: 'Invalid username or password', settings });
   });
 
@@ -113,8 +141,8 @@ module.exports = function(db) {
 
   router.post('/reset-password', (req, res) => {
     const { token, new_password } = req.body;
-    if (!token || !new_password || new_password.length < 4) {
-      return res.render('reset-password', { error: 'Password must be at least 4 characters.', token });
+    if (!token || !new_password || new_password.length < 8) {
+      return res.render('reset-password', { error: 'Password must be at least 8 characters.', token });
     }
     const reset = db.prepare('SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0').get(token);
     if (!reset || new Date(reset.expires_at) < new Date()) {

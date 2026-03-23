@@ -231,7 +231,7 @@ module.exports = function(db) {
 
   router.post('/account/password', (req, res) => {
     const { current_password, new_password } = req.body;
-    if (!new_password || new_password.length < 4) return res.redirect('/client/account');
+    if (!new_password || new_password.length < 8) return res.redirect('/client/account');
     const currentUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.user.id);
     const bcrypt = require('bcryptjs');
     if (!bcrypt.compareSync(current_password, currentUser.password)) return res.redirect('/client/account');

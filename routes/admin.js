@@ -190,14 +190,14 @@ module.exports = function(db) {
     const filterCompany = req.query.company || '';
     const filterPriority = req.query.priority || '';
     const filterAssigned = req.query.assigned || '';
-    let where = [];
+    let where = []; let params = [];
     if (filter === 'open') where.push("t.status != 'done'");
     else if (filter === 'done') where.push("t.status = 'done'");
-    if (filterCompany) where.push("t.company_id = " + parseInt(filterCompany));
-    if (filterPriority) where.push("t.priority = '" + filterPriority.replace(/'/g,'') + "'");
-    if (filterAssigned) where.push("t.assigned_to = '" + filterAssigned.replace(/'/g,'') + "'");
+    if (filterCompany) { where.push("t.company_id = ?"); params.push(parseInt(filterCompany)); }
+    if (filterPriority) { where.push("t.priority = ?"); params.push(filterPriority); }
+    if (filterAssigned) { where.push("t.assigned_to = ?"); params.push(filterAssigned); }
     const whereStr = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
-    const tasks = safeAll(`SELECT t.*, c.name as company_name FROM tasks t LEFT JOIN companies c ON t.company_id = c.id ${whereStr} ORDER BY CASE t.priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, t.due_date ASC`);
+    const tasks = safeAll("SELECT t.*, c.name as company_name FROM tasks t LEFT JOIN companies c ON t.company_id = c.id " + whereStr + " ORDER BY CASE t.priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, t.due_date ASC", params);
     const companies = safeAll('SELECT id, name FROM companies ORDER BY name');
     const allPeople = [{name:'admin'}].concat(safeAll("SELECT DISTINCT name FROM company_users WHERE name IS NOT NULL AND name != '' ORDER BY name"));
     res.render(V('tasks'), { user: req.session.user, tasks, companies, allPeople, filter, filterCompany, filterPriority, filterAssigned, settings: getSettings(), page: 'tasks' });
@@ -1564,7 +1564,7 @@ module.exports = function(db) {
 
   router.post('/settings/password', (req, res) => {
     const { new_password } = req.body;
-    if (!new_password || new_password.length < 4) return res.redirect('/admin/settings');
+    if (!new_password || new_password.length < 8) return res.redirect('/admin/settings');
     const hash = bcrypt.hashSync(new_password, 10);
     db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hash, req.session.user.id);
     res.redirect('/admin/settings');
@@ -1827,8 +1827,9 @@ module.exports = function(db) {
   // === SERVICE SCHEDULE ===
   router.get('/schedule', (req, res) => {
     const filterCompany = req.query.company || '';
-    let where = filterCompany ? 'WHERE ss.company_id = ' + parseInt(filterCompany) : '';
-    const schedules = safeAll(`SELECT ss.*, c.name as company_name, s.name as service_name FROM service_schedule ss LEFT JOIN companies c ON ss.company_id = c.id LEFT JOIN services s ON ss.service_id = s.id ${where} ORDER BY CASE ss.frequency WHEN 'daily' THEN 1 WHEN 'weekly' THEN 2 WHEN 'biweekly' THEN 3 WHEN 'monthly' THEN 4 WHEN 'quarterly' THEN 5 WHEN 'yearly' THEN 6 ELSE 7 END, ss.next_due ASC`);
+    let schWhere = ''; let schParams = [];
+    if (filterCompany) { schWhere = 'WHERE ss.company_id = ?'; schParams.push(parseInt(filterCompany)); }
+    const schedules = safeAll("SELECT ss.*, c.name as company_name, s.name as service_name FROM service_schedule ss LEFT JOIN companies c ON ss.company_id = c.id LEFT JOIN services s ON ss.service_id = s.id " + schWhere + " ORDER BY CASE ss.frequency WHEN 'daily' THEN 1 WHEN 'weekly' THEN 2 WHEN 'biweekly' THEN 3 WHEN 'monthly' THEN 4 WHEN 'quarterly' THEN 5 WHEN 'yearly' THEN 6 ELSE 7 END, ss.next_due ASC", schParams);
     const companies = safeAll('SELECT id, name FROM companies ORDER BY name');
     const services = safeAll('SELECT id, name FROM services WHERE is_active = 1 ORDER BY name');
     const allPeople = [{name:'admin'}].concat(safeAll("SELECT DISTINCT name FROM company_users WHERE name IS NOT NULL AND name != '' ORDER BY name"));
@@ -1892,13 +1893,13 @@ module.exports = function(db) {
     const filterCat = req.query.category || '';
     const filterDept = req.query.dept || '';
     const filterRole = req.query.role || '';
-    let where = [];
-    if (filterCo) where.push('s.company_id = ' + parseInt(filterCo));
-    if (filterCat) where.push("s.category = '" + filterCat.replace(/'/g,'') + "'");
-    if (filterDept) where.push("s.department = '" + filterDept.replace(/'/g,'') + "'");
-    if (filterRole) where.push("s.target_role = '" + filterRole.replace(/'/g,'') + "'");
+    let where = []; let sopParams = [];
+    if (filterCo) { where.push('s.company_id = ?'); sopParams.push(parseInt(filterCo)); }
+    if (filterCat) { where.push('s.category = ?'); sopParams.push(filterCat); }
+    if (filterDept) { where.push('s.department = ?'); sopParams.push(filterDept); }
+    if (filterRole) { where.push('s.target_role = ?'); sopParams.push(filterRole); }
     const whereStr = where.length ? 'WHERE ' + where.join(' AND ') : '';
-    const sops = safeAll('SELECT s.*, c.name as company_name FROM sops s LEFT JOIN companies c ON s.company_id = c.id ' + whereStr + ' ORDER BY s.is_template DESC, s.title');
+    const sops = safeAll('SELECT s.*, c.name as company_name FROM sops s LEFT JOIN companies c ON s.company_id = c.id ' + whereStr + ' ORDER BY s.is_template DESC, s.title', sopParams);
     const companies = safeAll('SELECT id, name FROM companies ORDER BY name');
     const categories = [...new Set(sops.map(s => s.category).filter(Boolean))].sort();
     const depts = safeAll('SELECT * FROM departments ORDER BY sort_order');
@@ -2018,8 +2019,9 @@ module.exports = function(db) {
   // === PROCESS FLOWS ===
   router.get('/flows', (req, res) => {
     const filterCo = req.query.company || '';
-    let where = filterCo ? 'WHERE f.company_id = ' + parseInt(filterCo) : '';
-    const flows = safeAll('SELECT f.*, c.name as company_name FROM process_flows f LEFT JOIN companies c ON f.company_id = c.id ' + where + ' ORDER BY f.is_template DESC, f.title');
+    let flowWhere = ''; let flowParams = [];
+    if (filterCo) { flowWhere = 'WHERE f.company_id = ?'; flowParams.push(parseInt(filterCo)); }
+    const flows = safeAll('SELECT f.*, c.name as company_name FROM process_flows f LEFT JOIN companies c ON f.company_id = c.id ' + flowWhere + ' ORDER BY f.is_template DESC, f.title', flowParams);
     const companies = safeAll('SELECT id, name FROM companies ORDER BY name');
     res.render(V('flows'), { user: req.session.user, flows, companies, filterCo, settings: getSettings(), page: 'flows' });
   });
@@ -2138,11 +2140,10 @@ module.exports = function(db) {
     const { gmail_user, gmail_app_password, alert_emails } = req.body;
     const set = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
     set.run('gmail_user', gmail_user || '');
-    set.run('gmail_app_password', gmail_app_password || '');
+    // Only update password if a new one was provided (not blank)
+    if (gmail_app_password) { set.run('gmail_app_password', gmail_app_password); process.env.GMAIL_APP_PASSWORD = gmail_app_password; }
     set.run('alert_emails', alert_emails || '');
-    // Also update env for current session
     process.env.GMAIL_USER = gmail_user || '';
-    process.env.GMAIL_APP_PASSWORD = gmail_app_password || '';
     process.env.ALERT_EMAILS = alert_emails || '';
     res.redirect('/admin/integrations');
   });
@@ -2150,12 +2151,11 @@ module.exports = function(db) {
   router.post('/integrations/twilio', (req, res) => {
     const { twilio_sid, twilio_token, twilio_from, alert_phones } = req.body;
     const set = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
-    set.run('twilio_sid', twilio_sid || '');
-    set.run('twilio_token', twilio_token || '');
+    if (twilio_sid) { set.run('twilio_sid', twilio_sid); process.env.TWILIO_ACCOUNT_SID = twilio_sid; }
+    // Only update token if a new one was provided
+    if (twilio_token) { set.run('twilio_token', twilio_token); process.env.TWILIO_AUTH_TOKEN = twilio_token; }
     set.run('twilio_from', twilio_from || '');
     set.run('alert_phones', alert_phones || '');
-    process.env.TWILIO_ACCOUNT_SID = twilio_sid || '';
-    process.env.TWILIO_AUTH_TOKEN = twilio_token || '';
     process.env.TWILIO_FROM_NUMBER = twilio_from || '';
     process.env.ALERT_PHONES = alert_phones || '';
     res.redirect('/admin/integrations');
@@ -2637,8 +2637,9 @@ module.exports = function(db) {
   // === SECURITY POLICIES ===
   router.get('/policies', (req, res) => {
     const filterCo = req.query.company || '';
-    let where = filterCo ? 'WHERE p.company_id = ' + parseInt(filterCo) : '';
-    const policies = safeAll('SELECT p.*, c.name as company_name FROM security_policies p LEFT JOIN companies c ON p.company_id = c.id ' + where + ' ORDER BY p.company_id IS NULL DESC, p.title');
+    let polWhere = ''; let polParams = [];
+    if (filterCo) { polWhere = 'WHERE p.company_id = ?'; polParams.push(parseInt(filterCo)); }
+    const policies = safeAll('SELECT p.*, c.name as company_name FROM security_policies p LEFT JOIN companies c ON p.company_id = c.id ' + polWhere + ' ORDER BY p.company_id IS NULL DESC, p.title', polParams);
     policies.forEach(p => {
       p.ack_count = (safeGet('SELECT COUNT(*) as c FROM policy_acknowledgments WHERE policy_id = ?', [p.id]) || {}).c || 0;
     });
@@ -2713,11 +2714,11 @@ module.exports = function(db) {
   router.get('/vault', (req, res) => {
     const filterCo = req.query.company || '';
     const filterCat = req.query.category || '';
-    let where = [];
-    if (filterCo) where.push('v.company_id = ' + parseInt(filterCo));
-    if (filterCat) where.push("v.category = '" + filterCat.replace(/'/g,'') + "'");
-    const whereStr = where.length ? 'WHERE ' + where.join(' AND ') : '';
-    const entries = safeAll('SELECT v.*, c.name as company_name FROM password_vault v LEFT JOIN companies c ON v.company_id = c.id ' + whereStr + ' ORDER BY v.category, v.title');
+    let vaultWhere = []; let vaultParams = [];
+    if (filterCo) { vaultWhere.push('v.company_id = ?'); vaultParams.push(parseInt(filterCo)); }
+    if (filterCat) { vaultWhere.push('v.category = ?'); vaultParams.push(filterCat); }
+    const whereStr = vaultWhere.length ? 'WHERE ' + vaultWhere.join(' AND ') : '';
+    const entries = safeAll('SELECT v.*, c.name as company_name FROM password_vault v LEFT JOIN companies c ON v.company_id = c.id ' + whereStr + ' ORDER BY v.category, v.title', vaultParams);
     const companies = safeAll('SELECT id, name FROM companies ORDER BY name');
     const categories = safeAll('SELECT DISTINCT category FROM password_vault WHERE category IS NOT NULL ORDER BY category');
     res.render(V('vault'), { user: req.session.user, entries, companies, categories, filterCo, filterCat, settings: getSettings(), page: 'vault' });
