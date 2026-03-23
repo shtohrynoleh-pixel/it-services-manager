@@ -169,7 +169,7 @@
           <% } %>
           <% folders.forEach(f => { %>
             <div class="fl-row" data-search="<%= f.name.toLowerCase() %>" onclick="location.href='/admin/companies/<%= company.id %>/files?folder=<%= f.id %>'">
-              <div class="fl-icon">📁</div><div class="fl-name"><%= f.name %></div><div class="fl-size">—</div><div class="fl-date"><%= f.created_at ? f.created_at.split('T')[0] : '' %></div><div class="fl-by"><%= f.created_by || '' %></div>
+              <div class="fl-icon">📁</div><div class="fl-name"><%= f.name %></div><div class="fl-size">—</div><div class="fl-date"><%= f.created_at ? String(f.created_at).split('T')[0] : '' %></div><div class="fl-by"><%= f.created_by || '' %></div>
               <div class="fl-actions">
                 <form method="POST" action="/admin/companies/<%= company.id %>/folders/<%= f.id %>/delete" onclick="event.stopPropagation()"><input type="hidden" name="parent_id" value="<%= folderId || '' %>"><button type="submit" class="fi-btn" onclick="return confirm('Delete folder?')">🗑️</button></form>
               </div>
@@ -177,7 +177,7 @@
           <% }) %>
           <% files.forEach(f => { %>
             <div class="fl-row" data-search="<%= f.original_name.toLowerCase() %>" onclick="openPreview(<%= f.id %>,'<%= f.original_name.replace(/'/g,"\\'") %>','<%= (f.mime_type||'').replace(/'/g,"\\'") %>',<%= f.size %>)">
-              <div class="fl-icon"><%= fIcon(f.original_name) %></div><div class="fl-name"><%= f.original_name %></div><div class="fl-size"><%= fSize(f.size) %></div><div class="fl-date"><%= f.created_at ? f.created_at.split('T')[0] : '' %></div><div class="fl-by"><%= f.uploaded_by || '' %></div>
+              <div class="fl-icon"><%= fIcon(f.original_name) %></div><div class="fl-name"><%= f.original_name %></div><div class="fl-size"><%= fSize(f.size) %></div><div class="fl-date"><%= f.created_at ? String(f.created_at).split('T')[0] : '' %></div><div class="fl-by"><%= f.uploaded_by || '' %></div>
               <div class="fl-actions">
                 <button class="fi-btn" onclick="event.stopPropagation();openMoveModal(<%= f.id %>,'<%= f.original_name.replace(/'/g,"\\'") %>')" title="Move">📂</button>
                 <a href="/admin/companies/<%= company.id %>/files/<%= f.id %>/download" class="fi-btn" onclick="event.stopPropagation()">📥</a>

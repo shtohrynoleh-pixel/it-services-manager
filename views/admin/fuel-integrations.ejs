@@ -19,7 +19,7 @@
                 <span style="color:<%= statusColor %>;font-weight:700;"><%= intg.status %></span>
                 · <%= intg.assetCount %> assets (<%= intg.mappedCount %> mapped)
                 · <%= intg.measurementCount %> daily records
-                <% if (intg.last_sync_at) { %> · Synced: <%= intg.last_sync_at.replace('T',' ').substring(0,16) %><% } %>
+                <% if (intg.last_sync_at) { %> · Synced: <%= String(intg.last_sync_at).replace('T',' ').substring(0,16) %><% } %>
               </div>
               <% if (intg.last_error) { %><div style="font-size:10px;color:var(--danger);margin-top:4px;"><%= intg.last_error %></div><% } %>
             </div>

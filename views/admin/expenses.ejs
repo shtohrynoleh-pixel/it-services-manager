@@ -1,0 +1,791 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>" style="opacity:0.4;text-decoration:none;"><i class="ti ti-building"></i></a> → <i class="ti ti-receipt-2"></i> Expenses — <%= company.name %></h2></div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+      <!-- Metrics -->
+      <div class="metrics">
+        <div class="metric hi"><div class="m-label">Total Expenses</div><div class="m-val pri"><%= fmt.money(totalAll.total || 0) %></div></div>
+        <div class="metric"><div class="m-label">Transactions</div><div class="m-val"><%= totalAll.cnt || 0 %></div></div>
+        <div class="metric"><div class="m-label">This Month</div><div class="m-val"><%= fmt.money(thisMonth.total || 0) %></div></div>
+        <div class="metric <%= (pending.cnt || 0) > 0 ? 'bad' : 'ok' %>"><div class="m-label">Pending</div><div class="m-val <%= (pending.cnt || 0) > 0 ? 'red' : 'green' %>"><%= pending.cnt || 0 %></div></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <a class="tab <%= tab==='transactions'?'active':'' %>" href="/admin/companies/<%= company.id %>/expenses?tab=transactions"><i class="ti ti-list-details"></i> Transactions</a>
+        <a class="tab <%= tab==='reports'?'active':'' %>" href="/admin/companies/<%= company.id %>/expenses?tab=reports"><i class="ti ti-chart-pie"></i> Reports</a>
+        <a class="tab <%= tab==='import'?'active':'' %>" href="/admin/companies/<%= company.id %>/expenses?tab=import"><i class="ti ti-upload"></i> Import</a>
+        <a class="tab <%= tab==='payroll'?'active':'' %>" href="/admin/companies/<%= company.id %>/expenses?tab=payroll"><i class="ti ti-cash"></i> Payroll</a>
+        <a class="tab <%= tab==='settings'?'active':'' %>" href="/admin/companies/<%= company.id %>/expenses?tab=settings"><i class="ti ti-settings"></i> Settings</a>
+        <a class="tab <%= tab==='audit'?'active':'' %>" href="/admin/companies/<%= company.id %>/expenses?tab=audit"><i class="ti ti-history"></i> Audit</a>
+      </div>
+
+      <!-- ============ TRANSACTIONS TAB ============ -->
+      <% if (tab === 'transactions') { %>
+      <% var _fqs = 'from=' + encodeURIComponent(f.dateFrom) + '&to=' + encodeURIComponent(f.dateTo) + '&category=' + encodeURIComponent(f.category) + '&cc=' + encodeURIComponent(f.costCenter) + '&project=' + encodeURIComponent(f.project) + '&vendor=' + encodeURIComponent(f.vendor) + '&status=' + encodeURIComponent(f.status) + '&source=' + encodeURIComponent(f.source); %>
+      <div>
+        <!-- Validation error -->
+        <% if (txErr) { %>
+          <div style="padding:10px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin-bottom:12px;font-size:12px;color:#991b1b;font-weight:600;"><i class="ti ti-alert-triangle"></i> <%= txErr %></div>
+        <% } %>
+
+        <!-- Filters -->
+        <div class="card" style="margin-bottom:12px;">
+          <form method="GET" action="/admin/companies/<%= company.id %>/expenses" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
+            <input type="hidden" name="tab" value="transactions">
+            <div class="form-group" style="margin-bottom:0;min-width:120px;"><label>From</label><input type="date" name="from" value="<%= f.dateFrom %>"></div>
+            <div class="form-group" style="margin-bottom:0;min-width:120px;"><label>To</label><input type="date" name="to" value="<%= f.dateTo %>"></div>
+            <div class="form-group" style="margin-bottom:0;min-width:120px;"><label>Category</label><select name="category"><option value="">All</option><% activeCategories.forEach(c => { %><option value="<%= c.id %>" <%= String(f.category) === String(c.id) ? 'selected' : '' %>><%= c.name %></option><% }) %></select></div>
+            <div class="form-group" style="margin-bottom:0;min-width:120px;"><label>Cost Center</label><select name="cc"><option value="">All</option><% activeCostCenters.forEach(c => { %><option value="<%= c.id %>" <%= String(f.costCenter) === String(c.id) ? 'selected' : '' %>><%= c.code %> — <%= c.name %></option><% }) %></select></div>
+            <div class="form-group" style="margin-bottom:0;min-width:120px;"><label>Project</label><select name="project"><option value="">All</option><% projects.forEach(p => { %><option value="<%= p.id %>" <%= String(f.project) === String(p.id) ? 'selected' : '' %>><%= p.name %></option><% }) %></select></div>
+            <div class="form-group" style="margin-bottom:0;min-width:120px;"><label>Vendor</label><select name="vendor"><option value="">All</option><% activeVendors.forEach(v => { %><option value="<%= v.id %>" <%= String(f.vendor) === String(v.id) ? 'selected' : '' %>><%= v.name %></option><% }) %></select></div>
+            <div class="form-group" style="margin-bottom:0;min-width:100px;"><label>Status</label><select name="status"><option value="">All</option><option value="pending" <%= f.status==='pending'?'selected':'' %>>Pending</option><option value="approved" <%= f.status==='approved'?'selected':'' %>>Approved</option><option value="rejected" <%= f.status==='rejected'?'selected':'' %>>Rejected</option></select></div>
+            <div class="form-group" style="margin-bottom:0;min-width:100px;"><label>Source</label><select name="source"><option value="">All</option><option value="manual" <%= f.source==='manual'?'selected':'' %>>Manual</option><option value="import" <%= f.source==='import'?'selected':'' %>>Import</option><option value="salary" <%= f.source==='salary'?'selected':'' %>>Salary</option></select></div>
+            <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-filter"></i> Filter</button>
+            <a href="/admin/companies/<%= company.id %>/expenses" class="btn btn-sm">Clear</a>
+            <% if (userCanExport) { %>
+              <a href="/admin/companies/<%= company.id %>/expenses/export?<%= _fqs %>" class="btn btn-sm" style="margin-left:auto;"><i class="ti ti-download"></i> Export CSV</a>
+            <% } %>
+          </form>
+        </div>
+
+        <div class="card" style="overflow-x:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div>
+              <h3 style="margin:0;display:inline;"><i class="ti ti-list-details"></i> Transactions</h3>
+              <span style="font-size:12px;color:var(--muted);margin-left:8px;"><%= filteredTotal.cnt || 0 %> rows · <strong><%= fmt.money(filteredTotal.total || 0) %></strong> total</span>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <% if ((pending.cnt || 0) > 0) { %>
+                <form method="POST" action="/admin/companies/<%= company.id %>/expenses/approve-all" onsubmit="return confirm('Approve all pending transactions?')" style="display:inline;">
+                  <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-checks"></i> Approve All</button>
+                </form>
+              <% } %>
+              <button class="btn btn-sm" onclick="document.getElementById('add-tx-form').style.display=document.getElementById('add-tx-form').style.display==='none'?'':'none'"><i class="ti ti-plus"></i> Add</button>
+            </div>
+          </div>
+
+          <!-- Add form -->
+          <div id="add-tx-form" style="display:none;margin-bottom:16px;padding:16px;background:#f8fafc;border-radius:10px;border:1px solid var(--border);">
+            <form method="POST" action="/admin/companies/<%= company.id %>/expenses/transactions">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <div class="form-group" style="margin-bottom:0;min-width:120px;"><label>Date *</label><input type="date" name="date" required></div>
+                <div class="form-group" style="margin-bottom:0;min-width:100px;"><label>Amount *</label><input type="number" name="amount" step="0.01" required placeholder="0.00"></div>
+                <div class="form-group" style="margin-bottom:0;flex:1;min-width:160px;"><label>Description</label><input type="text" name="description" placeholder="What was this for?"></div>
+                <div class="form-group" style="margin-bottom:0;min-width:120px;"><label>Vendor</label><select name="vendor_id" onchange="this.form.vendor_name.value=this.selectedIndex?this.options[this.selectedIndex].text:''"><option value="">—</option><% activeVendors.forEach(v => { %><option value="<%= v.id %>"><%= v.name %></option><% }) %></select><input type="hidden" name="vendor_name"></div>
+                <div class="form-group" style="margin-bottom:0;min-width:120px;"><label>Category</label><select name="category_id" onchange="this.form.category_name.value=this.selectedIndex?this.options[this.selectedIndex].text:''"><option value="">—</option><% activeCategories.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select><input type="hidden" name="category_name"></div>
+                <div class="form-group" style="margin-bottom:0;min-width:120px;"><label>Cost Center</label><select name="cost_center_id" onchange="this.form.cost_center_code.value=this.selectedIndex?this.options[this.selectedIndex].text:''"><option value="">—</option><% activeCostCenters.forEach(c => { %><option value="<%= c.id %>"><%= c.code %></option><% }) %></select><input type="hidden" name="cost_center_code"></div>
+                <div class="form-group" style="margin-bottom:0;min-width:120px;"><label>Project</label><select name="project_id" onchange="this.form.project_name.value=this.selectedIndex?this.options[this.selectedIndex].text:''"><option value="">—</option><% projects.forEach(p => { %><option value="<%= p.id %>"><%= p.name %></option><% }) %></select><input type="hidden" name="project_name"></div>
+                <div class="form-group" style="margin-bottom:0;min-width:100px;"><label>Reference</label><input type="text" name="reference" placeholder="Check #, PO"></div>
+                <div class="form-group" style="margin-bottom:0;min-width:100px;"><label>Invoice #</label><input type="text" name="invoice_number" placeholder="INV-001"></div>
+                <div class="form-group" style="margin-bottom:0;min-width:100px;"><label>Status</label><select name="status"><option value="pending">Pending</option><option value="approved">Approved</option></select></div>
+              </div>
+              <div class="form-group" style="margin-top:8px;margin-bottom:0;"><label>Notes</label><input type="text" name="notes" placeholder="Additional notes"></div>
+              <div style="margin-top:8px;"><button type="submit" class="btn btn-primary btn-sm"><i class="ti ti-check"></i> Save</button></div>
+            </form>
+          </div>
+
+          <% if (transactions.length === 0) { %>
+            <div style="padding:32px;text-align:center;color:var(--muted);"><i class="ti ti-receipt-off" style="font-size:36px;display:block;margin-bottom:8px;"></i>No transactions found.</div>
+          <% } else { %>
+            <table class="tbl">
+              <thead><tr><th>Date</th><th>Description</th><th style="text-align:right;">Amount</th><th>Category</th><th>Cost Center</th><th>Vendor</th><th>Source</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+              <% transactions.forEach(t => { %>
+                <tr>
+                  <td style="white-space:nowrap;"><%= fmt.date(t.date) %></td>
+                  <td><strong><%= t.description || '—' %></strong><% if (t.reference) { %><br><span style="font-size:10px;color:var(--muted);">Ref: <%= t.reference %></span><% } %><% if (t.project_name) { %><br><span style="font-size:10px;color:var(--primary);">Proj: <%= t.project_name %></span><% } %></td>
+                  <td style="text-align:right;font-weight:700;"><%= fmt.money(t.amount) %></td>
+                  <td><%= t.category_name || '—' %></td>
+                  <td><%= t.cost_center_code || '—' %></td>
+                  <td><%= t.vendor_name || '—' %></td>
+                  <td><span style="font-size:10px;color:var(--muted);"><%= t.source %></span></td>
+                  <td><span class="badge <%= t.status === 'approved' ? 'active' : t.status === 'rejected' ? 'inactive' : 'draft' %>"><%= t.status %></span></td>
+                  <td style="white-space:nowrap;">
+                    <% if (t.status === 'pending') { %><form method="POST" action="/admin/companies/<%= company.id %>/expenses/transactions/<%= t.id %>/approve" style="display:inline;"><button type="submit" class="btn btn-sm" title="Approve" style="padding:2px 6px;"><i class="ti ti-check"></i></button></form><% } %>
+                    <button class="btn btn-sm" style="padding:2px 6px;" onclick="document.getElementById('edit-<%= t.id %>').style.display=document.getElementById('edit-<%= t.id %>').style.display==='none'?'':'none'" title="Edit"><i class="ti ti-pencil"></i></button>
+                    <form method="POST" action="/admin/companies/<%= company.id %>/expenses/transactions/<%= t.id %>/delete" style="display:inline;" onsubmit="return confirm('Delete?')"><button type="submit" class="btn btn-sm" style="padding:2px 6px;color:#ef4444;" title="Delete"><i class="ti ti-trash"></i></button></form>
+                  </td>
+                </tr>
+                <tr id="edit-<%= t.id %>" style="display:none;background:#f8fafc;">
+                  <td colspan="9">
+                    <form method="POST" action="/admin/companies/<%= company.id %>/expenses/transactions/<%= t.id %>/edit" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;padding:8px 0;">
+                      <div class="form-group" style="margin-bottom:0;"><label>Date *</label><input type="date" name="date" value="<%= fmt.date(t.date) %>" required></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Amount *</label><input type="number" name="amount" step="0.01" value="<%= t.amount %>" required></div>
+                      <div class="form-group" style="margin-bottom:0;flex:1;"><label>Description</label><input type="text" name="description" value="<%= t.description || '' %>"></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Category</label><select name="category_id" onchange="this.form.category_name.value=this.selectedIndex?this.options[this.selectedIndex].text:''"><option value="">—</option><% activeCategories.forEach(c => { %><option value="<%= c.id %>" <%= t.category_id == c.id ? 'selected' : '' %>><%= c.name %></option><% }) %></select><input type="hidden" name="category_name" value="<%= t.category_name || '' %>"></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Cost Center</label><select name="cost_center_id" onchange="this.form.cost_center_code.value=this.selectedIndex?this.options[this.selectedIndex].text:''"><option value="">—</option><% activeCostCenters.forEach(c => { %><option value="<%= c.id %>" <%= t.cost_center_id == c.id ? 'selected' : '' %>><%= c.code %></option><% }) %></select><input type="hidden" name="cost_center_code" value="<%= t.cost_center_code || '' %>"></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Vendor</label><select name="vendor_id" onchange="this.form.vendor_name.value=this.selectedIndex?this.options[this.selectedIndex].text:''"><option value="">—</option><% activeVendors.forEach(v => { %><option value="<%= v.id %>" <%= t.vendor_id == v.id ? 'selected' : '' %>><%= v.name %></option><% }) %></select><input type="hidden" name="vendor_name" value="<%= t.vendor_name || '' %>"></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Project</label><select name="project_id" onchange="this.form.project_name.value=this.selectedIndex?this.options[this.selectedIndex].text:''"><option value="">—</option><% projects.forEach(p => { %><option value="<%= p.id %>" <%= t.project_id == p.id ? 'selected' : '' %>><%= p.name %></option><% }) %></select><input type="hidden" name="project_name" value="<%= t.project_name || '' %>"></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Ref</label><input type="text" name="reference" value="<%= t.reference || '' %>"></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Inv #</label><input type="text" name="invoice_number" value="<%= t.invoice_number || '' %>"></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Status</label><select name="status"><option value="pending" <%= t.status==='pending'?'selected':'' %>>Pending</option><option value="approved" <%= t.status==='approved'?'selected':'' %>>Approved</option><option value="rejected" <%= t.status==='rejected'?'selected':'' %>>Rejected</option></select></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Notes</label><input type="text" name="notes" value="<%= t.notes || '' %>"></div>
+                      <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i></button>
+                      <button type="button" class="btn btn-sm" onclick="document.getElementById('edit-<%= t.id %>').style.display='none'"><i class="ti ti-x"></i></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table>
+
+            <!-- Pagination -->
+            <% if (totalPages > 1) { %>
+              <div style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:16px;font-size:12px;">
+                <% if (txPage > 1) { %><a href="/admin/companies/<%= company.id %>/expenses?tab=transactions&p=<%= txPage - 1 %>&<%= _fqs %>" class="btn btn-sm"><i class="ti ti-chevron-left"></i></a><% } %>
+                <% for (var pg = 1; pg <= totalPages; pg++) { %>
+                  <% if (pg === txPage) { %><span style="padding:4px 10px;background:var(--primary);color:#fff;border-radius:6px;font-weight:700;"><%= pg %></span>
+                  <% } else if (pg === 1 || pg === totalPages || (pg >= txPage - 2 && pg <= txPage + 2)) { %><a href="/admin/companies/<%= company.id %>/expenses?tab=transactions&p=<%= pg %>&<%= _fqs %>" class="btn btn-sm"><%= pg %></a>
+                  <% } else if (pg === txPage - 3 || pg === txPage + 3) { %><span style="color:var(--muted);">...</span><% } %>
+                <% } %>
+                <% if (txPage < totalPages) { %><a href="/admin/companies/<%= company.id %>/expenses?tab=transactions&p=<%= txPage + 1 %>&<%= _fqs %>" class="btn btn-sm"><i class="ti ti-chevron-right"></i></a><% } %>
+                <span style="color:var(--muted);margin-left:8px;">Page <%= txPage %> of <%= totalPages %></span>
+              </div>
+            <% } %>
+          <% } %>
+        </div>
+      </div>
+      <% } %>
+
+      <!-- ============ REPORTS TAB ============ -->
+      <% if (tab === 'reports' && rpt) { %>
+      <div>
+        <!-- Date range filter -->
+        <div class="card" style="margin-bottom:14px;">
+          <form method="GET" action="/admin/companies/<%= company.id %>/expenses" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
+            <input type="hidden" name="tab" value="reports">
+            <div class="form-group" style="margin-bottom:0;"><label>From</label><input type="date" name="rfrom" value="<%= rpt.rf.from %>"></div>
+            <div class="form-group" style="margin-bottom:0;"><label>To</label><input type="date" name="rto" value="<%= rpt.rf.to %>"></div>
+            <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-filter"></i> Filter</button>
+            <a href="/admin/companies/<%= company.id %>/expenses?tab=reports" class="btn btn-sm">Clear</a>
+            <% if (rpt.lastImport) { %>
+              <span style="margin-left:auto;font-size:10px;color:var(--muted);"><i class="ti ti-clock"></i> Last import: <%= fmt.datetime(rpt.lastImport.created_at) %> (<%= rpt.lastImport.imported_rows %> rows, <%= rpt.lastImport.filename %>)</span>
+            <% } %>
+          </form>
+        </div>
+
+        <!-- KPI cards -->
+        <div class="metrics" style="margin-bottom:14px;">
+          <div class="metric hi"><div class="m-label"><%= rpt.rf.from || rpt.rf.to ? 'Filtered Total' : 'All Time' %></div><div class="m-val pri"><%= fmt.money(rpt.rTotal.total || 0) %></div></div>
+          <div class="metric"><div class="m-label">MTD</div><div class="m-val"><%= fmt.money(rpt.rMTD.total || 0) %></div></div>
+          <div class="metric"><div class="m-label">YTD</div><div class="m-val"><%= fmt.money(rpt.rYTD.total || 0) %></div></div>
+          <div class="metric"><div class="m-label">Last 30d</div><div class="m-val"><%= fmt.money(rpt.r30d.total || 0) %></div></div>
+          <div class="metric"><div class="m-label">Last 90d</div><div class="m-val"><%= fmt.money(rpt.r90d.total || 0) %></div></div>
+        </div>
+
+        <!-- Payroll split + monthly trend -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+          <div class="card" style="min-width:200px;">
+            <h3 style="font-size:13px;"><i class="ti ti-chart-donut"></i> Payroll vs Non-Payroll</h3>
+            <% var prPay = rpt.payrollSplit.payroll || 0; var prNon = rpt.payrollSplit.non_payroll || 0; var prAll = prPay + prNon || 1; %>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+              <div style="flex:1;height:12px;background:#e2e8f0;border-radius:6px;overflow:hidden;">
+                <div style="height:100%;width:<%= Math.round(prPay/prAll*100) %>%;background:#8b5cf6;border-radius:6px;display:inline-block;"></div>
+              </div>
+            </div>
+            <div style="font-size:12px;display:flex;justify-content:space-between;">
+              <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8b5cf6;margin-right:4px;"></span>Payroll: <strong><%= fmt.money(prPay) %></strong> (<%= Math.round(prPay/prAll*100) %>%)</span>
+            </div>
+            <div style="font-size:12px;display:flex;justify-content:space-between;margin-top:2px;">
+              <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e2e8f0;margin-right:4px;"></span>Other: <strong><%= fmt.money(prNon) %></strong> (<%= Math.round(prNon/prAll*100) %>%)</span>
+            </div>
+          </div>
+
+          <div class="card" style="flex:1;min-width:300px;">
+            <h3 style="font-size:13px;"><i class="ti ti-chart-bar"></i> Monthly Trend (12 months)</h3>
+            <% if (rpt.monthlyTrend.length === 0) { %>
+              <div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;">No data</div>
+            <% } else { var trendMax = Math.max(...rpt.monthlyTrend.map(m => m.total || 0), 1); %>
+              <div style="display:flex;align-items:flex-end;gap:3px;height:80px;">
+                <% rpt.monthlyTrend.forEach(m => { var pct = Math.max(2, Math.round(m.total / trendMax * 100)); %>
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;" title="<%= m.month %>: <%= fmt.money(m.total) %>">
+                    <div style="width:100%;background:var(--primary);border-radius:3px 3px 0 0;height:<%= pct %>%;min-height:2px;"></div>
+                  </div>
+                <% }) %>
+              </div>
+              <div style="display:flex;gap:3px;margin-top:2px;">
+                <% rpt.monthlyTrend.forEach(m => { %>
+                  <div style="flex:1;text-align:center;font-size:8px;color:var(--muted);"><%= m.month.substring(5) %></div>
+                <% }) %>
+              </div>
+            <% } %>
+          </div>
+        </div>
+
+        <!-- Top lists with drill-down links -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <!-- Top Cost Centers -->
+          <div class="card" style="flex:1;min-width:260px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <h3 style="margin:0;font-size:13px;"><i class="ti ti-sitemap"></i> Top Cost Centers</h3>
+              <a href="/admin/companies/<%= company.id %>/expenses/report/cost-center?from=<%= rpt.rf.from %>&to=<%= rpt.rf.to %>" style="font-size:10px;font-weight:700;color:var(--primary);text-decoration:none;">View all →</a>
+            </div>
+            <% if (rpt.topCC.length === 0) { %>
+              <div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;">No data</div>
+            <% } else { var ccMax = Math.max(...rpt.topCC.map(c => c.total || 0), 1); rpt.topCC.forEach(c => { %>
+              <a href="/admin/companies/<%= company.id %>/expenses/report/cost-center?from=<%= rpt.rf.from %>&to=<%= rpt.rf.to %>&id=<%= c.cost_center_id %>&name=<%= encodeURIComponent(c.cost_center_code || '') %>" style="display:block;margin-bottom:8px;text-decoration:none;color:inherit;">
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span style="font-weight:700;"><%= c.cost_center_code || 'Unassigned' %></span><span><%= fmt.money(c.total) %> (<%= c.cnt %>)</span></div>
+                <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;"><div style="height:100%;width:<%= Math.round((c.total/ccMax)*100) %>%;background:#8b5cf6;border-radius:3px;"></div></div>
+              </a>
+            <% }) } %>
+          </div>
+
+          <!-- Top Categories -->
+          <div class="card" style="flex:1;min-width:260px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <h3 style="margin:0;font-size:13px;"><i class="ti ti-tags"></i> Top Categories</h3>
+              <a href="/admin/companies/<%= company.id %>/expenses/report/category?from=<%= rpt.rf.from %>&to=<%= rpt.rf.to %>" style="font-size:10px;font-weight:700;color:var(--primary);text-decoration:none;">View all →</a>
+            </div>
+            <% if (rpt.topCat.length === 0) { %>
+              <div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;">No data</div>
+            <% } else { var catMax = Math.max(...rpt.topCat.map(c => c.total || 0), 1); rpt.topCat.forEach(c => { %>
+              <a href="/admin/companies/<%= company.id %>/expenses/report/category?from=<%= rpt.rf.from %>&to=<%= rpt.rf.to %>&id=<%= c.category_id %>&name=<%= encodeURIComponent(c.category_name || '') %>" style="display:block;margin-bottom:8px;text-decoration:none;color:inherit;">
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span style="font-weight:700;"><%= c.category_name || 'Uncategorized' %></span><span><%= fmt.money(c.total) %> (<%= c.cnt %>)</span></div>
+                <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;"><div style="height:100%;width:<%= Math.round((c.total/catMax)*100) %>%;background:var(--primary);border-radius:3px;"></div></div>
+              </a>
+            <% }) } %>
+          </div>
+
+          <!-- Top Projects -->
+          <div class="card" style="flex:1;min-width:260px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <h3 style="margin:0;font-size:13px;"><i class="ti ti-clipboard-list"></i> Top Projects</h3>
+              <a href="/admin/companies/<%= company.id %>/expenses/report/project?from=<%= rpt.rf.from %>&to=<%= rpt.rf.to %>" style="font-size:10px;font-weight:700;color:var(--primary);text-decoration:none;">View all →</a>
+            </div>
+            <% if (rpt.topProj.length === 0) { %>
+              <div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;">No data</div>
+            <% } else { var projMax = Math.max(...rpt.topProj.map(c => c.total || 0), 1); rpt.topProj.forEach(c => { %>
+              <a href="/admin/companies/<%= company.id %>/expenses/report/project?from=<%= rpt.rf.from %>&to=<%= rpt.rf.to %>&id=<%= c.project_id %>&name=<%= encodeURIComponent(c.project_name || '') %>" style="display:block;margin-bottom:8px;text-decoration:none;color:inherit;">
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span style="font-weight:700;"><%= c.project_name || 'Unassigned' %></span><span><%= fmt.money(c.total) %> (<%= c.cnt %>)</span></div>
+                <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;"><div style="height:100%;width:<%= Math.round((c.total/projMax)*100) %>%;background:#f59e0b;border-radius:3px;"></div></div>
+              </a>
+            <% }) } %>
+          </div>
+        </div>
+      </div>
+      <% } %>
+
+      <!-- ============ IMPORT TAB ============ -->
+      <% if (tab === 'import') { %>
+      <div>
+        <% if (importErr) { %>
+          <div style="padding:10px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin-bottom:12px;font-size:12px;color:#991b1b;font-weight:600;"><i class="ti ti-alert-triangle"></i> <%= importErr %></div>
+        <% } %>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+          <!-- Upload card -->
+          <div class="card" style="flex:1;min-width:300px;">
+            <h3><i class="ti ti-upload"></i> Import CSV</h3>
+            <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Upload a CSV to start the import wizard. You'll map columns, preview results, then confirm.</p>
+            <form method="POST" action="/admin/companies/<%= company.id %>/expenses/import/upload" enctype="multipart/form-data">
+              <div class="form-group"><label>CSV File</label><input type="file" name="file" accept=".csv" required></div>
+              <button type="submit" class="btn btn-primary"><i class="ti ti-upload"></i> Upload & Map Columns</button>
+            </form>
+            <details style="margin-top:16px;"><summary style="cursor:pointer;font-size:11px;font-weight:700;color:var(--primary);">Supported columns</summary>
+              <div style="margin-top:8px;font-size:11px;color:var(--muted);line-height:1.8;">
+                <strong>Required:</strong> date, amount, description<br>
+                <strong>Optional:</strong> vendor, category, cost_center, project, reference, invoice_number, notes<br>
+                <em>Headers auto-detected from common names (e.g., "Posting Date" → date, "Payee" → vendor).</em>
+              </div>
+            </details>
+          </div>
+          <!-- Quick stats -->
+          <div class="card" style="min-width:200px;">
+            <h3><i class="ti ti-chart-bar"></i> Import Stats</h3>
+            <% var bTotal = batches.reduce(function(s,b){ return s + (b.status==='completed' ? (b.imported_rows||0) : 0); }, 0); %>
+            <% var bAmount = batches.reduce(function(s,b){ return s + (b.status==='completed' ? (b.total_amount||0) : 0); }, 0); %>
+            <div style="font-size:13px;line-height:2;">
+              <strong><%= batches.length %></strong> total batches<br>
+              <strong><%= bTotal %></strong> rows imported<br>
+              <strong><%= fmt.money(bAmount) %></strong> total value
+            </div>
+          </div>
+        </div>
+
+        <!-- Import History -->
+        <div class="card">
+          <h3><i class="ti ti-history"></i> Import History</h3>
+          <% if (batches.length === 0) { %>
+            <div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">No imports yet. Upload a CSV above to get started.</div>
+          <% } else { %>
+            <table class="tbl">
+              <thead><tr><th>File</th><th>Date</th><th>By</th><th>Total Rows</th><th>Imported</th><th>Skipped</th><th>Errors</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+              <% batches.forEach(b => { %>
+                <tr>
+                  <td style="font-size:11px;font-weight:600;"><%= b.filename %></td>
+                  <td style="font-size:11px;white-space:nowrap;"><%= fmt.datetime(b.created_at) %></td>
+                  <td style="font-size:11px;"><%= b.uploaded_by || '—' %></td>
+                  <td><%= b.total_rows || 0 %></td>
+                  <td><strong style="color:#16a34a;"><%= b.imported_rows || 0 %></strong></td>
+                  <td><%= b.skipped_rows || 0 %></td>
+                  <td><%= b.error_rows || 0 %></td>
+                  <td style="font-weight:600;"><%= b.total_amount ? fmt.money(b.total_amount) : '—' %></td>
+                  <td><span class="badge <%= b.status === 'completed' ? 'active' : b.status === 'rolled_back' ? 'inactive' : 'draft' %>"><%= b.status %></span></td>
+                  <td style="white-space:nowrap;">
+                    <% if (b.status === 'completed') { %>
+                      <form method="POST" action="/admin/companies/<%= company.id %>/expenses/import/<%= b.id %>/rollback" onsubmit="return confirm('Rollback this import? All <%= b.imported_rows || 0 %> transactions from this batch will be deleted.')" style="display:inline;">
+                        <button type="submit" class="btn btn-sm" style="padding:2px 6px;color:#ef4444;" title="Rollback"><i class="ti ti-arrow-back-up"></i> Undo</button>
+                      </form>
+                    <% } %>
+                  </td>
+                </tr>
+                <% if (b.errors) { try { var errs = JSON.parse(b.errors); if (errs.length > 0) { %>
+                  <tr><td colspan="10" style="padding:4px 12px;background:#fef2f2;font-size:10px;color:#991b1b;">
+                    <% errs.slice(0,5).forEach(function(e) { %>
+                      <% if (typeof e === 'object') { %>Line <%= e.line %>: <%= (e.errors||[]).join(', ') %><br><% } else { %><%= e %><br><% } %>
+                    <% }) %>
+                    <% if (errs.length > 5) { %><em>...and <%= errs.length - 5 %> more</em><% } %>
+                  </td></tr>
+                <% } } catch(ex) {} } %>
+              <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+      </div>
+      <% } %>
+
+      <!-- ============ PAYROLL TAB ============ -->
+      <% if (tab === 'payroll') { %>
+      <div>
+        <% if (payrollErr) { %>
+          <div style="padding:10px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin-bottom:12px;font-size:12px;color:#991b1b;font-weight:600;"><i class="ti ti-alert-triangle"></i> <%= payrollErr %></div>
+        <% } %>
+
+        <!-- Payroll summary -->
+        <div class="metrics" style="margin-bottom:16px;">
+          <div class="metric hi"><div class="m-label">Payroll Posted</div><div class="m-val pri"><%= fmt.money(payrollTotal.total || 0) %></div></div>
+          <div class="metric"><div class="m-label">Salary Txns</div><div class="m-val"><%= payrollTotal.cnt || 0 %></div></div>
+          <div class="metric"><div class="m-label">Active Profiles</div><div class="m-val"><%= salaryProfiles.filter(function(p){return p.is_active;}).length %></div></div>
+          <div class="metric"><div class="m-label">Runs</div><div class="m-val"><%= salaryRuns.length %></div></div>
+        </div>
+
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+          <!-- ===== Salary Profiles ===== -->
+          <div class="card" style="flex:1;min-width:380px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <h3 style="margin:0;"><i class="ti ti-user-dollar"></i> Salary Profiles</h3>
+              <button class="btn btn-sm" onclick="document.getElementById('add-profile').style.display=document.getElementById('add-profile').style.display==='none'?'':'none'"><i class="ti ti-plus"></i> Add</button>
+            </div>
+
+            <div id="add-profile" style="display:none;margin-bottom:14px;padding:14px;background:#f8fafc;border-radius:10px;border:1px solid var(--border);">
+              <form method="POST" action="/admin/companies/<%= company.id %>/expenses/salary/profiles">
+                <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;">
+                  <div class="form-group" style="margin-bottom:0;min-width:150px;"><label>Employee *</label><select name="employee_id" required><option value="">— Select —</option><% companyUsers.forEach(u => { %><option value="<%= u.id %>"><%= u.name %></option><% }) %></select></div>
+                  <div class="form-group" style="margin-bottom:0;min-width:100px;"><label>Amount *</label><input type="number" name="amount" step="0.01" required placeholder="0.00"></div>
+                  <div class="form-group" style="margin-bottom:0;"><label>Frequency</label><select name="pay_frequency"><option value="weekly">Weekly</option><option value="biweekly">Bi-weekly</option><option value="semi_monthly">Semi-monthly</option><option value="monthly" selected>Monthly</option></select></div>
+                  <div class="form-group" style="margin-bottom:0;"><label>Cost Center</label><select name="cost_center_id"><option value="">—</option><% activeCostCenters.forEach(c => { %><option value="<%= c.id %>"><%= c.code %> — <%= c.name %></option><% }) %></select></div>
+                  <div class="form-group" style="margin-bottom:0;"><label>Project</label><select name="project_id"><option value="">—</option><% projects.forEach(p => { %><option value="<%= p.id %>"><%= p.name %></option><% }) %></select></div>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;margin-top:6px;">
+                  <div class="form-group" style="margin-bottom:0;"><label>Effective From</label><input type="date" name="effective_from"></div>
+                  <div class="form-group" style="margin-bottom:0;"><label>Effective To</label><input type="date" name="effective_to"></div>
+                  <div class="form-group" style="flex:1;margin-bottom:0;"><label>Notes</label><input type="text" name="notes" placeholder="Optional"></div>
+                  <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i> Add Profile</button>
+                </div>
+              </form>
+            </div>
+
+            <% if (salaryProfiles.length === 0) { %>
+              <div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;">No salary profiles yet. Add employees above.</div>
+            <% } else { %>
+              <table class="tbl">
+                <thead><tr><th>Employee</th><th>Amount</th><th>Freq</th><th>Cost Center</th><th>Project</th><th>Dates</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                <% salaryProfiles.forEach(sp => { %>
+                  <tr style="<%= !sp.is_active ? 'opacity:0.5;' : '' %>">
+                    <td><strong><%= sp.employee_name %></strong></td>
+                    <td style="font-weight:700;"><%= fmt.money(sp.amount) %></td>
+                    <td style="font-size:11px;"><%= sp.pay_frequency %></td>
+                    <td style="font-size:11px;"><%= sp.cc_code || '—' %></td>
+                    <td style="font-size:11px;"><%= sp.proj_name || '—' %></td>
+                    <td style="font-size:10px;color:var(--muted);"><%= sp.effective_from ? fmt.date(sp.effective_from) : '—' %> → <%= sp.effective_to ? fmt.date(sp.effective_to) : 'ongoing' %></td>
+                    <td><span class="badge <%= sp.is_active ? 'active' : 'inactive' %>"><%= sp.is_active ? 'Active' : 'Inactive' %></span></td>
+                    <td style="white-space:nowrap;">
+                      <button class="btn btn-sm" style="padding:2px 6px;" onclick="document.getElementById('sp-edit-<%= sp.id %>').style.display=document.getElementById('sp-edit-<%= sp.id %>').style.display==='none'?'':'none'" title="Edit"><i class="ti ti-pencil"></i></button>
+                      <form method="POST" action="/admin/companies/<%= company.id %>/expenses/salary/profiles/<%= sp.id %>/deactivate" style="display:inline;" onsubmit="return confirm('<%= sp.is_active ? 'Deactivate' : 'Reactivate' %>?')">
+                        <button type="submit" class="btn btn-sm" style="padding:2px 6px;"><i class="ti ti-<%= sp.is_active ? 'eye-off' : 'eye' %>"></i></button>
+                      </form>
+                    </td>
+                  </tr>
+                  <tr id="sp-edit-<%= sp.id %>" style="display:none;background:#f8fafc;">
+                    <td colspan="8">
+                      <form method="POST" action="/admin/companies/<%= company.id %>/expenses/salary/profiles/<%= sp.id %>/edit" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;padding:6px 0;">
+                        <div class="form-group" style="margin-bottom:0;"><label>Amount</label><input type="number" name="amount" step="0.01" value="<%= sp.amount %>" required style="width:100px;"></div>
+                        <div class="form-group" style="margin-bottom:0;"><label>Freq</label><select name="pay_frequency"><option value="weekly" <%= sp.pay_frequency==='weekly'?'selected':'' %>>Weekly</option><option value="biweekly" <%= sp.pay_frequency==='biweekly'?'selected':'' %>>Bi-weekly</option><option value="semi_monthly" <%= sp.pay_frequency==='semi_monthly'?'selected':'' %>>Semi-monthly</option><option value="monthly" <%= sp.pay_frequency==='monthly'?'selected':'' %>>Monthly</option></select></div>
+                        <div class="form-group" style="margin-bottom:0;"><label>Cost Center</label><select name="cost_center_id"><option value="">—</option><% activeCostCenters.forEach(c => { %><option value="<%= c.id %>" <%= sp.cost_center_id == c.id ? 'selected' : '' %>><%= c.code %></option><% }) %></select></div>
+                        <div class="form-group" style="margin-bottom:0;"><label>Project</label><select name="project_id"><option value="">—</option><% projects.forEach(p => { %><option value="<%= p.id %>" <%= sp.project_id == p.id ? 'selected' : '' %>><%= p.name %></option><% }) %></select></div>
+                        <div class="form-group" style="margin-bottom:0;"><label>From</label><input type="date" name="effective_from" value="<%= sp.effective_from || '' %>"></div>
+                        <div class="form-group" style="margin-bottom:0;"><label>To</label><input type="date" name="effective_to" value="<%= sp.effective_to || '' %>"></div>
+                        <div class="form-group" style="flex:1;margin-bottom:0;"><label>Notes</label><input type="text" name="notes" value="<%= sp.notes || '' %>"></div>
+                        <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i></button>
+                        <button type="button" class="btn btn-sm" onclick="document.getElementById('sp-edit-<%= sp.id %>').style.display='none'"><i class="ti ti-x"></i></button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }) %>
+                </tbody>
+              </table>
+            <% } %>
+          </div>
+
+          <!-- ===== Salary Runs ===== -->
+          <div class="card" style="flex:1;min-width:380px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <h3 style="margin:0;"><i class="ti ti-calendar-dollar"></i> Pay Runs</h3>
+              <button class="btn btn-sm" onclick="document.getElementById('new-run').style.display=document.getElementById('new-run').style.display==='none'?'':'none'"><i class="ti ti-plus"></i> New Run</button>
+            </div>
+
+            <div id="new-run" style="display:none;margin-bottom:14px;padding:14px;background:#f8fafc;border-radius:10px;border:1px solid var(--border);">
+              <form method="POST" action="/admin/companies/<%= company.id %>/expenses/salary/runs">
+                <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;">
+                  <div class="form-group" style="margin-bottom:0;"><label>Period Start *</label><input type="date" name="period_start" required></div>
+                  <div class="form-group" style="margin-bottom:0;"><label>Period End *</label><input type="date" name="period_end" required></div>
+                  <div class="form-group" style="margin-bottom:0;"><label>Pay Date *</label><input type="date" name="pay_date" required></div>
+                  <div class="form-group" style="flex:1;margin-bottom:0;"><label>Notes</label><input type="text" name="notes" placeholder="Optional"></div>
+                  <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-player-play"></i> Generate Run</button>
+                </div>
+              </form>
+            </div>
+
+            <% if (salaryRuns.length === 0) { %>
+              <div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;">No pay runs yet. Create one above to generate payroll transactions.</div>
+            <% } else { %>
+              <table class="tbl">
+                <thead><tr><th>Period</th><th>Pay Date</th><th>Lines</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                <% salaryRuns.forEach(sr => { %>
+                  <tr>
+                    <td style="font-size:11px;white-space:nowrap;"><%= fmt.date(sr.period_start) %> → <%= fmt.date(sr.period_end) %></td>
+                    <td style="font-size:11px;"><%= fmt.date(sr.pay_date) %></td>
+                    <td><%= sr.line_count %></td>
+                    <td style="font-weight:700;"><%= fmt.money(sr.total_amount) %></td>
+                    <td>
+                      <span class="badge <%= sr.status === 'posted' ? 'active' : sr.status === 'approved' ? 'draft' : sr.status === 'draft' ? '' : 'inactive' %>"><%= sr.status %></span>
+                    </td>
+                    <td style="white-space:nowrap;">
+                      <% if (sr.status === 'draft') { %>
+                        <form method="POST" action="/admin/companies/<%= company.id %>/expenses/salary/runs/<%= sr.id %>/approve" style="display:inline;"><button type="submit" class="btn btn-sm" style="padding:2px 6px;" title="Approve"><i class="ti ti-check"></i></button></form>
+                        <form method="POST" action="/admin/companies/<%= company.id %>/expenses/salary/runs/<%= sr.id %>/delete" style="display:inline;" onsubmit="return confirm('Delete this draft run?')"><button type="submit" class="btn btn-sm" style="padding:2px 6px;color:#ef4444;" title="Delete"><i class="ti ti-trash"></i></button></form>
+                      <% } else if (sr.status === 'approved') { %>
+                        <form method="POST" action="/admin/companies/<%= company.id %>/expenses/salary/runs/<%= sr.id %>/post" style="display:inline;" onsubmit="return confirm('Post this run? This will create salary expense transactions.')"><button type="submit" class="btn btn-sm btn-primary" style="padding:2px 8px;font-size:11px;"><i class="ti ti-send"></i> Post</button></form>
+                      <% } else if (sr.status === 'posted') { %>
+                        <span style="font-size:10px;color:var(--muted);"><%= sr.posted_by %> · <%= fmt.date(sr.posted_at) %></span>
+                      <% } %>
+                      <a href="/admin/companies/<%= company.id %>/expenses?tab=payroll&run=<%= sr.id %>" class="btn btn-sm" style="padding:2px 6px;" title="View lines"><i class="ti ti-eye"></i></a>
+                    </td>
+                  </tr>
+                <% }) %>
+                </tbody>
+              </table>
+            <% } %>
+
+            <!-- Run lines (expandable) -->
+            <% if (runLines.length > 0) { %>
+              <div style="margin-top:16px;padding:14px;background:#f8fafc;border-radius:10px;border:1px solid var(--border);">
+                <h4 style="font-size:12px;font-weight:700;margin-bottom:8px;"><i class="ti ti-list"></i> Run #<%= expandRunId %> — <%= runLines.length %> lines</h4>
+                <table class="tbl" style="font-size:11px;">
+                  <thead><tr><th>Employee</th><th>Amount</th><th>Cost Center</th><th>Project</th><th>Description</th><th>Txn</th></tr></thead>
+                  <tbody>
+                  <% runLines.forEach(rl => { %>
+                    <tr>
+                      <td><strong><%= rl.employee_name %></strong></td>
+                      <td style="font-weight:700;"><%= fmt.money(rl.amount) %></td>
+                      <td><%= rl.cost_center_code || '—' %></td>
+                      <td><%= rl.project_name || '—' %></td>
+                      <td style="font-size:10px;color:var(--muted);"><%= rl.description || '—' %></td>
+                      <td><%= rl.transaction_id ? '#' + rl.transaction_id : '—' %></td>
+                    </tr>
+                  <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            <% } %>
+          </div>
+        </div>
+
+        <!-- Import payroll tip -->
+        <div style="margin-top:16px;padding:14px;background:linear-gradient(135deg,#f0fdfa,#ecfeff);border:1px solid #a7f3d0;border-radius:10px;font-size:12px;color:#065f46;">
+          <strong><i class="ti ti-bulb"></i> Tip:</strong> You can also import payroll via the <a href="/admin/companies/<%= company.id %>/expenses?tab=import">Import tab</a>. Map your CSV columns, and set the category column to "Payroll" — the system will auto-create the Payroll category if needed. Imported payroll transactions appear in cost center and project reports just like any other expense.
+        </div>
+      </div>
+      <% } %>
+
+      <!-- ============ SETTINGS TAB ============ -->
+      <% if (tab === 'settings') { %>
+      <div>
+        <!-- ===== COST CENTERS ===== -->
+        <div class="card" style="margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="margin:0;"><i class="ti ti-sitemap"></i> Cost Centers (<%= costCenters.length %>)</h3>
+            <button class="btn btn-sm" onclick="document.getElementById('add-cc-form').style.display=document.getElementById('add-cc-form').style.display==='none'?'':'none'"><i class="ti ti-plus"></i> Add</button>
+          </div>
+
+          <!-- Search / filter -->
+          <form method="GET" action="/admin/companies/<%= company.id %>/expenses" style="display:flex;gap:6px;align-items:flex-end;margin-bottom:12px;">
+            <input type="hidden" name="tab" value="settings">
+            <div class="form-group" style="margin-bottom:0;flex:1;"><input type="text" name="ccq" value="<%= sf.ccSearch %>" placeholder="Search code or name..."></div>
+            <select name="cca" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+              <option value="active" <%= sf.ccActive==='active'?'selected':'' %>>Active</option>
+              <option value="inactive" <%= sf.ccActive==='inactive'?'selected':'' %>>Inactive</option>
+              <option value="all" <%= sf.ccActive==='all'?'selected':'' %>>All</option>
+            </select>
+            <!-- preserve other filters -->
+            <input type="hidden" name="catq" value="<%= sf.catSearch %>"><input type="hidden" name="cata" value="<%= sf.catActive %>">
+            <input type="hidden" name="vq" value="<%= sf.vendorSearch %>"><input type="hidden" name="va" value="<%= sf.vendorActive %>">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-search"></i></button>
+          </form>
+
+          <!-- Add form -->
+          <div id="add-cc-form" style="display:none;margin-bottom:12px;padding:14px;background:#f8fafc;border-radius:10px;border:1px solid var(--border);">
+            <form method="POST" action="/admin/companies/<%= company.id %>/expenses/cost-centers" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;">
+              <div class="form-group" style="margin-bottom:0;"><label>Code *</label><input type="text" name="code" required placeholder="CC-100" style="width:90px;"></div>
+              <div class="form-group" style="flex:1;margin-bottom:0;"><label>Name *</label><input type="text" name="name" required placeholder="e.g., Operations"></div>
+              <div class="form-group" style="margin-bottom:0;"><label>Manager</label><select name="manager_id" style="min-width:120px;"><option value="">—</option><% companyUsers.forEach(u => { %><option value="<%= u.id %>"><%= u.name %></option><% }) %></select></div>
+              <div class="form-group" style="margin-bottom:0;flex:1;"><label>Notes</label><input type="text" name="notes" placeholder="Optional"></div>
+              <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i> Add</button>
+            </form>
+          </div>
+
+          <% if (costCenters.length === 0) { %>
+            <div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">No cost centers found.</div>
+          <% } else { %>
+            <table class="tbl">
+              <thead><tr><th>Code</th><th>Name</th><th>Manager</th><th>Notes</th><th>Status</th><th style="width:100px;">Actions</th></tr></thead>
+              <tbody>
+              <% costCenters.forEach(c => { %>
+                <tr style="<%= !c.is_active ? 'opacity:0.5;' : '' %>">
+                  <td><strong><%= c.code %></strong></td>
+                  <td><%= c.name %></td>
+                  <td style="font-size:11px;"><%= c.manager_id ? (companyUsers.find(u => u.id === c.manager_id) || {}).name || '—' : '—' %></td>
+                  <td style="font-size:11px;color:var(--muted);"><%= c.notes || '' %></td>
+                  <td><span class="badge <%= c.is_active ? 'active' : 'inactive' %>"><%= c.is_active ? 'Active' : 'Inactive' %></span></td>
+                  <td style="white-space:nowrap;">
+                    <button class="btn btn-sm" style="padding:2px 6px;" onclick="document.getElementById('cc-edit-<%= c.id %>').style.display=document.getElementById('cc-edit-<%= c.id %>').style.display==='none'?'':'none'" title="Edit"><i class="ti ti-pencil"></i></button>
+                    <form method="POST" action="/admin/companies/<%= company.id %>/expenses/cost-centers/<%= c.id %>/deactivate" style="display:inline;" onsubmit="return confirm('<%= c.is_active ? 'Deactivate' : 'Reactivate' %> this cost center?')">
+                      <button type="submit" class="btn btn-sm" style="padding:2px 6px;" title="<%= c.is_active ? 'Deactivate' : 'Reactivate' %>"><i class="ti ti-<%= c.is_active ? 'eye-off' : 'eye' %>"></i></button>
+                    </form>
+                  </td>
+                </tr>
+                <tr id="cc-edit-<%= c.id %>" style="display:none;background:#f8fafc;">
+                  <td colspan="6">
+                    <form method="POST" action="/admin/companies/<%= company.id %>/expenses/cost-centers/<%= c.id %>/edit" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;padding:6px 0;">
+                      <div class="form-group" style="margin-bottom:0;"><label>Code</label><input type="text" name="code" value="<%= c.code %>" required style="width:90px;"></div>
+                      <div class="form-group" style="flex:1;margin-bottom:0;"><label>Name</label><input type="text" name="name" value="<%= c.name %>" required></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Manager</label><select name="manager_id" style="min-width:120px;"><option value="">—</option><% companyUsers.forEach(u => { %><option value="<%= u.id %>" <%= c.manager_id == u.id ? 'selected' : '' %>><%= u.name %></option><% }) %></select></div>
+                      <div class="form-group" style="flex:1;margin-bottom:0;"><label>Notes</label><input type="text" name="notes" value="<%= c.notes || '' %>"></div>
+                      <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i></button>
+                      <button type="button" class="btn btn-sm" onclick="document.getElementById('cc-edit-<%= c.id %>').style.display='none'"><i class="ti ti-x"></i></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+
+        <!-- ===== CATEGORIES ===== -->
+        <div class="card" style="margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="margin:0;"><i class="ti ti-tags"></i> Categories (<%= categories.length %>)</h3>
+            <button class="btn btn-sm" onclick="document.getElementById('add-cat-form').style.display=document.getElementById('add-cat-form').style.display==='none'?'':'none'"><i class="ti ti-plus"></i> Add</button>
+          </div>
+
+          <form method="GET" action="/admin/companies/<%= company.id %>/expenses" style="display:flex;gap:6px;align-items:flex-end;margin-bottom:12px;">
+            <input type="hidden" name="tab" value="settings">
+            <div class="form-group" style="margin-bottom:0;flex:1;"><input type="text" name="catq" value="<%= sf.catSearch %>" placeholder="Search name..."></div>
+            <select name="cata" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+              <option value="active" <%= sf.catActive==='active'?'selected':'' %>>Active</option>
+              <option value="inactive" <%= sf.catActive==='inactive'?'selected':'' %>>Inactive</option>
+              <option value="all" <%= sf.catActive==='all'?'selected':'' %>>All</option>
+            </select>
+            <input type="hidden" name="ccq" value="<%= sf.ccSearch %>"><input type="hidden" name="cca" value="<%= sf.ccActive %>">
+            <input type="hidden" name="vq" value="<%= sf.vendorSearch %>"><input type="hidden" name="va" value="<%= sf.vendorActive %>">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-search"></i></button>
+          </form>
+
+          <div id="add-cat-form" style="display:none;margin-bottom:12px;padding:14px;background:#f8fafc;border-radius:10px;border:1px solid var(--border);">
+            <form method="POST" action="/admin/companies/<%= company.id %>/expenses/categories" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;">
+              <div class="form-group" style="flex:1;margin-bottom:0;"><label>Name *</label><input type="text" name="name" required placeholder="e.g., Fuel"></div>
+              <div class="form-group" style="margin-bottom:0;"><label>Parent</label><select name="parent_id" style="min-width:120px;"><option value="">— None (top-level) —</option><% activeCategories.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+              <div class="form-group" style="margin-bottom:0;"><label>Icon</label><input type="text" name="icon" placeholder="ti-gas-station" style="width:120px;"></div>
+              <div class="form-group" style="margin-bottom:0;"><label>Sort</label><input type="number" name="sort_order" value="0" style="width:60px;"></div>
+              <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i> Add</button>
+            </form>
+          </div>
+
+          <% if (categories.length === 0) { %>
+            <div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">No categories found.</div>
+          <% } else { %>
+            <table class="tbl">
+              <thead><tr><th>Name</th><th>Parent</th><th>Icon</th><th>Sort</th><th>Status</th><th style="width:100px;">Actions</th></tr></thead>
+              <tbody>
+              <% categories.forEach(c => { var parentName = c.parent_id ? (activeCategories.find(p => p.id === c.parent_id) || {}).name || '—' : '—'; %>
+                <tr style="<%= !c.is_active ? 'opacity:0.5;' : '' %>">
+                  <td><strong><%= c.name %></strong></td>
+                  <td style="font-size:11px;"><%= parentName %></td>
+                  <td style="font-size:11px;"><% if (c.icon && /^ti-[a-z0-9-]+$/.test(c.icon)) { %><i class="ti <%= c.icon %>"></i> <%= c.icon %><% } else { %><%= c.icon || '—' %><% } %></td>
+                  <td><%= c.sort_order || 0 %></td>
+                  <td><span class="badge <%= c.is_active ? 'active' : 'inactive' %>"><%= c.is_active ? 'Active' : 'Inactive' %></span></td>
+                  <td style="white-space:nowrap;">
+                    <button class="btn btn-sm" style="padding:2px 6px;" onclick="document.getElementById('cat-edit-<%= c.id %>').style.display=document.getElementById('cat-edit-<%= c.id %>').style.display==='none'?'':'none'" title="Edit"><i class="ti ti-pencil"></i></button>
+                    <form method="POST" action="/admin/companies/<%= company.id %>/expenses/categories/<%= c.id %>/deactivate" style="display:inline;" onsubmit="return confirm('<%= c.is_active ? 'Deactivate' : 'Reactivate' %>?')">
+                      <button type="submit" class="btn btn-sm" style="padding:2px 6px;" title="<%= c.is_active ? 'Deactivate' : 'Reactivate' %>"><i class="ti ti-<%= c.is_active ? 'eye-off' : 'eye' %>"></i></button>
+                    </form>
+                  </td>
+                </tr>
+                <tr id="cat-edit-<%= c.id %>" style="display:none;background:#f8fafc;">
+                  <td colspan="6">
+                    <form method="POST" action="/admin/companies/<%= company.id %>/expenses/categories/<%= c.id %>/edit" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;padding:6px 0;">
+                      <div class="form-group" style="flex:1;margin-bottom:0;"><label>Name</label><input type="text" name="name" value="<%= c.name %>" required></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Parent</label><select name="parent_id" style="min-width:120px;"><option value="">— None —</option><% activeCategories.forEach(p => { if (p.id !== c.id) { %><option value="<%= p.id %>" <%= c.parent_id == p.id ? 'selected' : '' %>><%= p.name %></option><% } }) %></select></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Icon</label><input type="text" name="icon" value="<%= c.icon || '' %>" style="width:120px;"></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Sort</label><input type="number" name="sort_order" value="<%= c.sort_order || 0 %>" style="width:60px;"></div>
+                      <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i></button>
+                      <button type="button" class="btn btn-sm" onclick="document.getElementById('cat-edit-<%= c.id %>').style.display='none'"><i class="ti ti-x"></i></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+
+        <!-- ===== VENDORS ===== -->
+        <div class="card" style="margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="margin:0;"><i class="ti ti-users-group"></i> Vendors (<%= vendors.length %>)</h3>
+            <button class="btn btn-sm" onclick="document.getElementById('add-vendor-form').style.display=document.getElementById('add-vendor-form').style.display==='none'?'':'none'"><i class="ti ti-plus"></i> Add</button>
+          </div>
+
+          <form method="GET" action="/admin/companies/<%= company.id %>/expenses" style="display:flex;gap:6px;align-items:flex-end;margin-bottom:12px;">
+            <input type="hidden" name="tab" value="settings">
+            <div class="form-group" style="margin-bottom:0;flex:1;"><input type="text" name="vq" value="<%= sf.vendorSearch %>" placeholder="Search name, contact, email..."></div>
+            <select name="va" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+              <option value="active" <%= sf.vendorActive==='active'?'selected':'' %>>Active</option>
+              <option value="inactive" <%= sf.vendorActive==='inactive'?'selected':'' %>>Inactive</option>
+              <option value="all" <%= sf.vendorActive==='all'?'selected':'' %>>All</option>
+            </select>
+            <input type="hidden" name="ccq" value="<%= sf.ccSearch %>"><input type="hidden" name="cca" value="<%= sf.ccActive %>">
+            <input type="hidden" name="catq" value="<%= sf.catSearch %>"><input type="hidden" name="cata" value="<%= sf.catActive %>">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-search"></i></button>
+          </form>
+
+          <div id="add-vendor-form" style="display:none;margin-bottom:12px;padding:14px;background:#f8fafc;border-radius:10px;border:1px solid var(--border);">
+            <form method="POST" action="/admin/companies/<%= company.id %>/expenses/vendors">
+              <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;">
+                <div class="form-group" style="flex:1;margin-bottom:0;"><label>Name *</label><input type="text" name="name" required placeholder="Vendor name"></div>
+                <div class="form-group" style="margin-bottom:0;"><label>Contact</label><input type="text" name="contact" placeholder="Person" style="width:120px;"></div>
+                <div class="form-group" style="margin-bottom:0;"><label>Email</label><input type="email" name="email" placeholder="email" style="width:150px;"></div>
+                <div class="form-group" style="margin-bottom:0;"><label>Phone</label><input type="text" name="phone" placeholder="phone" style="width:120px;"></div>
+                <div class="form-group" style="margin-bottom:0;"><label>Address</label><input type="text" name="address" placeholder="address" style="width:160px;"></div>
+                <div class="form-group" style="margin-bottom:0;"><label>Tax ID</label><input type="text" name="tax_id" placeholder="EIN" style="width:100px;"></div>
+              </div>
+              <div class="form-group" style="margin-top:6px;margin-bottom:0;"><label>Notes</label><input type="text" name="notes" placeholder="Optional notes"></div>
+              <div style="margin-top:6px;"><button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i> Add</button></div>
+            </form>
+          </div>
+
+          <% if (vendors.length === 0) { %>
+            <div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">No vendors found.</div>
+          <% } else { %>
+            <table class="tbl">
+              <thead><tr><th>Name</th><th>Contact</th><th>Email</th><th>Phone</th><th>Tax ID</th><th>Status</th><th style="width:100px;">Actions</th></tr></thead>
+              <tbody>
+              <% vendors.forEach(v => { %>
+                <tr style="<%= !v.is_active ? 'opacity:0.5;' : '' %>">
+                  <td><strong><%= v.name %></strong></td>
+                  <td style="font-size:11px;"><%= v.contact || '—' %></td>
+                  <td style="font-size:11px;"><%= v.email || '—' %></td>
+                  <td style="font-size:11px;"><%= v.phone || '—' %></td>
+                  <td style="font-size:11px;"><%= v.tax_id || '—' %></td>
+                  <td><span class="badge <%= v.is_active ? 'active' : 'inactive' %>"><%= v.is_active ? 'Active' : 'Inactive' %></span></td>
+                  <td style="white-space:nowrap;">
+                    <button class="btn btn-sm" style="padding:2px 6px;" onclick="document.getElementById('v-edit-<%= v.id %>').style.display=document.getElementById('v-edit-<%= v.id %>').style.display==='none'?'':'none'" title="Edit"><i class="ti ti-pencil"></i></button>
+                    <form method="POST" action="/admin/companies/<%= company.id %>/expenses/vendors/<%= v.id %>/deactivate" style="display:inline;" onsubmit="return confirm('<%= v.is_active ? 'Deactivate' : 'Reactivate' %>?')">
+                      <button type="submit" class="btn btn-sm" style="padding:2px 6px;" title="<%= v.is_active ? 'Deactivate' : 'Reactivate' %>"><i class="ti ti-<%= v.is_active ? 'eye-off' : 'eye' %>"></i></button>
+                    </form>
+                  </td>
+                </tr>
+                <tr id="v-edit-<%= v.id %>" style="display:none;background:#f8fafc;">
+                  <td colspan="7">
+                    <form method="POST" action="/admin/companies/<%= company.id %>/expenses/vendors/<%= v.id %>/edit" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;padding:6px 0;">
+                      <div class="form-group" style="flex:1;margin-bottom:0;"><label>Name</label><input type="text" name="name" value="<%= v.name %>" required></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Contact</label><input type="text" name="contact" value="<%= v.contact || '' %>" style="width:120px;"></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Email</label><input type="email" name="email" value="<%= v.email || '' %>" style="width:150px;"></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Phone</label><input type="text" name="phone" value="<%= v.phone || '' %>" style="width:120px;"></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Address</label><input type="text" name="address" value="<%= v.address || '' %>" style="width:160px;"></div>
+                      <div class="form-group" style="margin-bottom:0;"><label>Tax ID</label><input type="text" name="tax_id" value="<%= v.tax_id || '' %>" style="width:100px;"></div>
+                      <div class="form-group" style="flex:1;margin-bottom:0;"><label>Notes</label><input type="text" name="notes" value="<%= v.notes || '' %>"></div>
+                      <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i></button>
+                      <button type="button" class="btn btn-sm" onclick="document.getElementById('v-edit-<%= v.id %>').style.display='none'"><i class="ti ti-x"></i></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+
+        <!-- ===== PROJECTS (linked from existing projects table) ===== -->
+        <div class="card">
+          <h3 style="margin-bottom:12px;"><i class="ti ti-clipboard-list"></i> Projects (<%= projects.length %>)</h3>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">Projects are managed in the company's Projects tab. They appear here for reference and can be assigned to transactions.</p>
+          <% if (projects.length === 0) { %>
+            <div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;">No projects for this company. <a href="/admin/companies/<%= company.id %>?tab=tasks">Create one in Tasks</a>.</div>
+          <% } else { %>
+            <table class="tbl">
+              <thead><tr><th>Name</th><th>Status</th><th>Budget</th><th>Start</th><th>Due</th></tr></thead>
+              <tbody>
+              <% projects.forEach(p => { %>
+                <tr><td><strong><%= p.name %></strong></td><td><span class="badge"><%= p.status %></span></td><td><%= p.budget ? fmt.money(p.budget) : '—' %></td><td><%= fmt.date(p.start_date) %></td><td><%= fmt.date(p.due_date) %></td></tr>
+              <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+      </div>
+      <% } %>
+
+      <!-- ============ AUDIT LOG TAB ============ -->
+      <% if (tab === 'audit') { %>
+      <div class="card">
+        <h3><i class="ti ti-history"></i> Audit Log</h3>
+        <% if (auditLogs.length === 0) { %>
+          <div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;">No audit entries yet. Actions will appear here as you create, edit, or deactivate records.</div>
+        <% } else { %>
+          <table class="tbl">
+            <thead><tr><th>Date</th><th>User</th><th>Entity</th><th>Action</th><th>Changes</th></tr></thead>
+            <tbody>
+            <% auditLogs.forEach(a => { %>
+              <tr>
+                <td style="white-space:nowrap;font-size:11px;"><%= fmt.datetime(a.created_at) %></td>
+                <td style="font-weight:600;font-size:12px;"><%= a.performed_by %></td>
+                <td style="font-size:12px;"><span style="background:#e2e8f0;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;"><%= a.entity_type %></span> #<%= a.entity_id || '—' %></td>
+                <td><span class="badge <%= a.action === 'create' ? 'active' : a.action === 'deactivate' ? 'inactive' : a.action === 'delete' ? 'inactive' : 'draft' %>"><%= a.action %></span></td>
+                <td style="font-size:10px;max-width:300px;overflow:hidden;text-overflow:ellipsis;">
+                  <% if (a.field_changes) { try { var ch = JSON.parse(a.field_changes); Object.keys(ch).forEach(k => { var v = ch[k]; %>
+                    <% if (v && v.from !== undefined) { %><strong><%= k %></strong>: <span style="color:#ef4444;text-decoration:line-through;"><%= v.from || '—' %></span> → <span style="color:#16a34a;"><%= v.to || '—' %></span><br><% } else { %><strong><%= k %></strong>: <%= v %><br><% } %>
+                  <% }); } catch(e) { %><%= a.field_changes %><% } } else { %>—<% } %>
+                </td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+      <% } %>
+
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

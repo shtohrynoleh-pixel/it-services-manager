@@ -79,7 +79,7 @@
               <div class="my-xp-item">
                 <div class="my-xp-amount">+<%= x.xp %></div>
                 <div class="my-xp-action"><%= x.description %></div>
-                <div class="my-xp-time"><%= x.created_at ? x.created_at.split('T')[0] : '' %></div>
+                <div class="my-xp-time"><%= x.created_at ? String(x.created_at).split('T')[0] : '' %></div>
               </div>
             <% }) %>
           <% } %>

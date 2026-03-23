@@ -58,7 +58,7 @@
         <div class="card" style="width:300px;flex-shrink:0;">
           <h3><i class="ti ti-sparkles"></i> My Recent XP</h3>
           <% myXP.forEach(x => { %>
-            <div class="my-xp-item"><div class="my-xp-amount">+<%= x.xp %></div><div class="my-xp-action"><%= x.description %></div><div class="my-xp-time"><%= x.created_at ? x.created_at.split('T')[0] : '' %></div></div>
+            <div class="my-xp-item"><div class="my-xp-amount">+<%= x.xp %></div><div class="my-xp-action"><%= x.description %></div><div class="my-xp-time"><%= x.created_at ? String(x.created_at).split('T')[0] : '' %></div></div>
           <% }) %>
           <% if (myXP.length === 0) { %><div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">Start using the portal to earn XP!</div><% } %>
         </div>

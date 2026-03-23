@@ -762,6 +762,7 @@ function initDB() {
       eld INTEGER DEFAULT 0,
       domains INTEGER DEFAULT 1,
       rdp INTEGER DEFAULT 1,
+      expenses INTEGER DEFAULT 0,
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
     );
 
@@ -1437,6 +1438,11 @@ function initDB() {
         'published', 1]
     ];
     policies.forEach(p => pi.run(...p));
+  }
+
+  // Add expenses column to company_modules if missing
+  try { db.prepare('SELECT expenses FROM company_modules LIMIT 1').get(); } catch(e) {
+    try { db.exec('ALTER TABLE company_modules ADD COLUMN expenses INTEGER DEFAULT 0'); } catch(e2) {}
   }
 
   return db;

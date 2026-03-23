@@ -433,7 +433,7 @@ module.exports = function(db) {
 
   router.post('/companies/:cid/modules', (req, res) => {
     const b = req.body;
-    const fields = ['tms','fleet','monitoring','files','chat','sops','policies','passwords','eld','domains','rdp'];
+    const fields = ['tms','fleet','monitoring','files','chat','sops','policies','passwords','eld','domains','rdp','expenses'];
     const existing = safeGet('SELECT id FROM company_modules WHERE company_id = ?', [req.params.cid]);
     if (existing) {
       const sets = fields.map(f => f + '=?').join(',');

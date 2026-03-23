@@ -1,0 +1,225 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <h2>
+          <a href="/admin/companies/<%= company.id %>" style="opacity:0.4;text-decoration:none;"><i class="ti ti-building"></i></a> →
+          <a href="/admin/companies/<%= company.id %>/expenses?tab=import" style="opacity:0.4;text-decoration:none;"><i class="ti ti-receipt-2"></i></a> →
+          <i class="ti ti-upload"></i> Import — <%= staging.filename %>
+        </h2>
+      </div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+
+      <!-- Step indicator -->
+      <div style="display:flex;gap:4px;margin-bottom:20px;">
+        <% ['Upload','Map Columns','Preview','Import'].forEach(function(s, i) {
+          var current = (step==='map' && i===1) || (step==='preview' && i===2) || (step==='done' && i===3);
+          var done = (step==='preview' && i<2) || (step==='done' && i<3);
+        %>
+          <div style="flex:1;text-align:center;padding:8px 4px;border-radius:8px;font-size:11px;font-weight:700;<%= current ? 'background:var(--primary);color:#fff;' : done ? 'background:#d1fae5;color:#065f46;' : 'background:#f1f5f9;color:var(--muted);' %>">
+            <% if (done) { %><i class="ti ti-check"></i> <% } %><%= s %>
+          </div>
+        <% }) %>
+      </div>
+
+      <% if (importErr) { %>
+        <div style="padding:10px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin-bottom:12px;font-size:12px;color:#991b1b;font-weight:600;"><i class="ti ti-alert-triangle"></i> <%= importErr %></div>
+      <% } %>
+
+      <!-- ===== STEP: MAP COLUMNS ===== -->
+      <% if (step === 'map') { %>
+      <div class="card">
+        <h3><i class="ti ti-columns"></i> Map CSV Columns</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">
+          File: <strong><%= staging.filename %></strong> · <%= staging.dataRows.length %> data rows · <%= staging.rawHeaders.length %> columns<br>
+          Map each CSV column to the correct transaction field. Columns are auto-suggested where possible.
+        </p>
+
+        <form method="POST" action="/admin/companies/<%= company.id %>/expenses/import/preview">
+          <input type="hidden" name="token" value="<%= staging.token %>">
+
+          <%
+            var targetFields = [
+              { key: 'date', label: 'Date *', required: true },
+              { key: 'amount', label: 'Amount *', required: true },
+              { key: 'description', label: 'Description', required: false },
+              { key: 'vendor_name', label: 'Vendor', required: false },
+              { key: 'category_name', label: 'Category', required: false },
+              { key: 'cost_center_code', label: 'Cost Center', required: false },
+              { key: 'project_name', label: 'Project', required: false },
+              { key: 'reference', label: 'Reference', required: false },
+              { key: 'invoice_number', label: 'Invoice #', required: false },
+              { key: 'notes', label: 'Notes', required: false }
+            ];
+            // Invert mapping: field → colIndex
+            var fieldToCol = {};
+            if (staging.mapping) { Object.entries(staging.mapping).forEach(function(e) { fieldToCol[e[1]] = parseInt(e[0]); }); }
+          %>
+
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+            <% targetFields.forEach(function(tf) { %>
+              <div class="form-group" style="margin-bottom:0;min-width:160px;">
+                <label><%= tf.label %></label>
+                <select name="map_<%= tf.key %>" style="font-size:12px;">
+                  <option value="-1">— Skip —</option>
+                  <% staging.rawHeaders.forEach(function(h, i) { %>
+                    <option value="<%= i %>" <%= fieldToCol[tf.key] === i ? 'selected' : '' %>><%= h || ('Column ' + (i+1)) %></option>
+                  <% }) %>
+                </select>
+              </div>
+            <% }) %>
+          </div>
+
+          <div class="form-check" style="margin-bottom:16px;">
+            <input type="checkbox" name="auto_vendors" value="1" checked> Auto-create vendors not found in the system
+          </div>
+
+          <!-- Sample rows -->
+          <h4 style="font-size:12px;font-weight:700;margin-bottom:8px;">Sample Rows (first 5)</h4>
+          <div style="overflow-x:auto;margin-bottom:16px;">
+            <table class="tbl" style="font-size:11px;">
+              <thead><tr><th>#</th><% staging.rawHeaders.forEach(function(h) { %><th><%= h %></th><% }) %></tr></thead>
+              <tbody>
+              <% sampleRows.forEach(function(row, i) { %>
+                <tr><td style="color:var(--muted);"><%= i+2 %></td><% row.forEach(function(v) { %><td><%= v %></td><% }) %></tr>
+              <% }) %>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="display:flex;gap:8px;">
+            <a href="/admin/companies/<%= company.id %>/expenses?tab=import" class="btn btn-sm">Cancel</a>
+            <button type="submit" class="btn btn-primary"><i class="ti ti-eye"></i> Preview Import</button>
+          </div>
+        </form>
+      </div>
+      <% } %>
+
+      <!-- ===== STEP: PREVIEW ===== -->
+      <% if (step === 'preview' && preview) { %>
+      <div>
+        <!-- Summary counts -->
+        <div class="metrics" style="margin-bottom:16px;">
+          <div class="metric ok"><div class="m-label">Will Import</div><div class="m-val green"><%= preview.valid.length %></div></div>
+          <div class="metric"><div class="m-label">Duplicates (skip)</div><div class="m-val"><%= preview.duplicates.length %></div></div>
+          <div class="metric <%= preview.invalid.length > 0 ? 'bad' : '' %>"><div class="m-label">Invalid (reject)</div><div class="m-val <%= preview.invalid.length > 0 ? 'red' : '' %>"><%= preview.invalid.length %></div></div>
+          <div class="metric"><div class="m-label">Warnings</div><div class="m-val"><%= preview.warnings %></div></div>
+          <div class="metric hi"><div class="m-label">Total Amount</div><div class="m-val pri"><%= fmt.money(preview.totalAmount) %></div></div>
+        </div>
+
+        <!-- Valid rows sample -->
+        <div class="card" style="margin-bottom:12px;">
+          <h3 style="color:#16a34a;"><i class="ti ti-check"></i> Valid Rows (<%= preview.valid.length %>)</h3>
+          <% if (preview.valid.length > 0) { %>
+            <div style="overflow-x:auto;">
+              <table class="tbl" style="font-size:11px;">
+                <thead><tr><th>Line</th><th>Date</th><th>Amount</th><th>Description</th><th>Vendor</th><th>Category</th><th>Cost Center</th><th>Project</th><th>Ref</th><th>Warnings</th></tr></thead>
+                <tbody>
+                <% preview.valid.slice(0, 20).forEach(function(v) { var r = v.resolved; %>
+                  <tr>
+                    <td><%= v.line %></td>
+                    <td><%= r.date %></td>
+                    <td style="font-weight:700;"><%= fmt.money(r.amount) %></td>
+                    <td><%= r.description || '—' %></td>
+                    <td><%= r.vendor_name || '—' %><% if (r.vendor_id) { %> <span style="color:#16a34a;font-size:9px;">linked</span><% } %></td>
+                    <td><%= r.category_name || '—' %><% if (r.category_id) { %> <span style="color:#16a34a;font-size:9px;">linked</span><% } %></td>
+                    <td><%= r.cost_center_code || '—' %><% if (r.cost_center_id) { %> <span style="color:#16a34a;font-size:9px;">linked</span><% } %></td>
+                    <td><%= r.project_name || '—' %><% if (r.project_id) { %> <span style="color:#16a34a;font-size:9px;">linked</span><% } %></td>
+                    <td><%= r.reference || '—' %></td>
+                    <td><% if (r.warnings && r.warnings.length > 0) { %><span style="color:#d97706;font-size:10px;"><%= r.warnings.join('; ') %></span><% } else { %>—<% } %></td>
+                  </tr>
+                <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <% if (preview.valid.length > 20) { %><div style="font-size:11px;color:var(--muted);margin-top:8px;">...and <%= preview.valid.length - 20 %> more rows</div><% } %>
+          <% } else { %>
+            <div style="padding:12px;text-align:center;color:var(--muted);font-size:12px;">No valid rows to import.</div>
+          <% } %>
+        </div>
+
+        <!-- Duplicates -->
+        <% if (preview.duplicates.length > 0) { %>
+        <div class="card" style="margin-bottom:12px;">
+          <h3 style="color:var(--muted);"><i class="ti ti-copy"></i> Duplicates — Will Skip (<%= preview.duplicates.length %>)</h3>
+          <div style="overflow-x:auto;">
+            <table class="tbl" style="font-size:11px;">
+              <thead><tr><th>Line</th><th>Date</th><th>Amount</th><th>Description</th><th>Vendor</th></tr></thead>
+              <tbody>
+              <% preview.duplicates.slice(0, 10).forEach(function(d) { var r = d.resolved; %>
+                <tr style="opacity:0.6;"><td><%= d.line %></td><td><%= r.date %></td><td><%= fmt.money(r.amount) %></td><td><%= r.description || '—' %></td><td><%= r.vendor_name || '—' %></td></tr>
+              <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <% if (preview.duplicates.length > 10) { %><div style="font-size:11px;color:var(--muted);margin-top:8px;">...and <%= preview.duplicates.length - 10 %> more</div><% } %>
+        </div>
+        <% } %>
+
+        <!-- Invalid rows -->
+        <% if (preview.invalid.length > 0) { %>
+        <div class="card" style="margin-bottom:12px;">
+          <h3 style="color:#ef4444;"><i class="ti ti-alert-triangle"></i> Invalid — Will Reject (<%= preview.invalid.length %>)</h3>
+          <div style="overflow-x:auto;">
+            <table class="tbl" style="font-size:11px;">
+              <thead><tr><th>Line</th><th>Raw Data</th><th>Errors</th></tr></thead>
+              <tbody>
+              <% preview.invalid.slice(0, 10).forEach(function(inv) { %>
+                <tr style="background:#fef2f2;">
+                  <td><%= inv.line %></td>
+                  <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;"><%= inv.raw.join(', ') %></td>
+                  <td style="color:#991b1b;font-weight:600;"><%= inv.errors.join(', ') %></td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <% } %>
+
+        <!-- Commit or cancel -->
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <a href="/admin/companies/<%= company.id %>/expenses?tab=import" class="btn btn-sm">Cancel</a>
+          <% if (preview.valid.length > 0) { %>
+            <form method="POST" action="/admin/companies/<%= company.id %>/expenses/import/commit">
+              <input type="hidden" name="token" value="<%= staging.token %>">
+              <input type="hidden" name="auto_vendors" value="<%= staging.autoVendors ? '1' : '0' %>">
+              <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerText='Importing...';this.form.submit();">
+                <i class="ti ti-check"></i> Confirm Import (<%= preview.valid.length %> rows · <%= fmt.money(preview.totalAmount) %>)
+              </button>
+            </form>
+          <% } %>
+        </div>
+      </div>
+      <% } %>
+
+      <!-- ===== STEP: DONE ===== -->
+      <% if (step === 'done' && commitResult) { %>
+      <div class="card" style="text-align:center;padding:40px;">
+        <div style="font-size:48px;margin-bottom:12px;"><i class="ti ti-circle-check" style="color:#16a34a;"></i></div>
+        <h2 style="margin-bottom:8px;">Import Complete</h2>
+        <p style="font-size:14px;color:var(--muted);margin-bottom:20px;">
+          <strong><%= staging.filename %></strong> processed successfully.
+        </p>
+        <div class="metrics" style="justify-content:center;margin-bottom:24px;">
+          <div class="metric ok"><div class="m-label">Imported</div><div class="m-val green"><%= commitResult.imported %></div></div>
+          <div class="metric"><div class="m-label">Skipped (dupes)</div><div class="m-val"><%= commitResult.skipped %></div></div>
+          <div class="metric <%= commitResult.errors > 0 ? 'bad' : '' %>"><div class="m-label">Errors</div><div class="m-val <%= commitResult.errors > 0 ? 'red' : '' %>"><%= commitResult.errors %></div></div>
+          <div class="metric hi"><div class="m-label">Total Amount</div><div class="m-val pri"><%= fmt.money(commitResult.totalAmount) %></div></div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:center;">
+          <a href="/admin/companies/<%= company.id %>/expenses?tab=transactions" class="btn btn-primary"><i class="ti ti-list-details"></i> View Transactions</a>
+          <a href="/admin/companies/<%= company.id %>/expenses?tab=import" class="btn btn-sm"><i class="ti ti-history"></i> Import History</a>
+        </div>
+      </div>
+      <% } %>
+
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

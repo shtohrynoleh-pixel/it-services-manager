@@ -63,7 +63,7 @@
               <thead><tr><th>Name</th><th>Company</th><th>Date</th></tr></thead>
               <tbody>
               <% acks.forEach(a => { %>
-                <tr><td><strong><%= a.user_name %></strong></td><td><%= a.company_name || '—' %></td><td><%= a.acknowledged_at ? a.acknowledged_at.split('T')[0] : '—' %></td></tr>
+                <tr><td><strong><%= a.user_name %></strong></td><td><%= a.company_name || '—' %></td><td><%= a.acknowledged_at ? String(a.acknowledged_at).split('T')[0] : '—' %></td></tr>
               <% }) %>
               </tbody>
             </table>

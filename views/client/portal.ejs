@@ -96,7 +96,7 @@
                 <div class="ic-sub">
                   <span class="badge <%= t.status === 'done' ? 'paid' : t.status === 'in-progress' ? 'sent' : 'prospect' %>"><%= t.status %></span>
                   · <span class="badge <%= t.priority === 'urgent' ? 'overdue' : t.priority === 'high' ? 'sent' : 'active' %>"><%= t.priority %></span>
-                  · <%= t.created_at ? t.created_at.split('T')[0] : '' %>
+                  · <%= t.created_at ? String(t.created_at).split('T')[0] : '' %>
                 </div>
                 <% if (t.description) { %><div style="font-size:11px;color:#475569;margin-top:4px;"><%= t.description %></div><% } %>
               </div>

@@ -27,7 +27,7 @@ td{padding:10px 12px;border-bottom:1px solid #f1f5f9;}
 <div class="rc">
   <div class="rc-head">
     <div><% if (settings.business_logo) { %><img src="<%= settings.business_logo %>" style="height:32px;margin-bottom:4px;"><br><% } %><h1><%= settings.business_name || 'IT Forge' %></h1><div style="font-size:11px;color:#64748b;"><%= settings.business_address || '' %><br><%= settings.business_email || '' %> · <%= settings.business_phone || '' %></div></div>
-    <div style="text-align:right;"><div style="font-size:10px;color:#64748b;">RATE CONFIRMATION</div><div class="rc-num"><%= load.load_number %></div><div style="font-size:11px;color:#64748b;">Date: <%= load.created_at ? load.created_at.split('T')[0] : '' %></div></div>
+    <div style="text-align:right;"><div style="font-size:10px;color:#64748b;">RATE CONFIRMATION</div><div class="rc-num"><%= load.load_number %></div><div style="font-size:11px;color:#64748b;">Date: <%= load.created_at ? String(load.created_at).split('T')[0] : '' %></div></div>
   </div>
   <div class="rc-parties">
     <div class="rc-party"><h3>Carrier</h3><strong><%= company.name %></strong><br><%= company.address ? company.address + ', ' : '' %><%= [company.city, company.state, company.zip].filter(Boolean).join(', ') %></div>

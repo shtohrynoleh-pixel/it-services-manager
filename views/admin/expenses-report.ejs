@@ -1,0 +1,173 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <h2>
+          <a href="/admin/companies/<%= company.id %>" style="opacity:0.4;text-decoration:none;"><i class="ti ti-building"></i></a> →
+          <a href="/admin/companies/<%= company.id %>/expenses?tab=reports" style="opacity:0.4;text-decoration:none;"><i class="ti ti-receipt-2"></i></a> →
+          <i class="ti <%= icon %>"></i> <%= title %>
+        </h2>
+      </div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+
+      <!-- Date filter -->
+      <div class="card" style="margin-bottom:14px;">
+        <form method="GET" action="/admin/companies/<%= company.id %>/expenses/report/<%= type %>" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
+          <div class="form-group" style="margin-bottom:0;"><label>From</label><input type="date" name="from" value="<%= from %>"></div>
+          <div class="form-group" style="margin-bottom:0;"><label>To</label><input type="date" name="to" value="<%= to %>"></div>
+          <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-filter"></i> Filter</button>
+          <a href="/admin/companies/<%= company.id %>/expenses/report/<%= type %>" class="btn btn-sm">Clear</a>
+          <% if (userCanExport) { %>
+            <a href="/admin/companies/<%= company.id %>/expenses/report/<%= type %>/export?from=<%= from %>&to=<%= to %><%= drillId ? '&id='+drillId : '' %><%= drillName ? '&name='+encodeURIComponent(drillName) : '' %>" class="btn btn-sm" style="margin-left:auto;"><i class="ti ti-download"></i> Export CSV</a>
+          <% } %>
+        </form>
+      </div>
+
+      <% if (drillId || drillName) { %>
+        <!-- ===== DRILL-DOWN VIEW ===== -->
+        <div style="margin-bottom:14px;">
+          <a href="/admin/companies/<%= company.id %>/expenses/report/<%= type %>?from=<%= from %>&to=<%= to %>" class="btn btn-sm"><i class="ti ti-arrow-left"></i> Back to all</a>
+        </div>
+
+        <div class="card" style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h3 style="margin:0;"><i class="ti <%= icon %>"></i> <%= drillName || ('ID ' + drillId) %></h3>
+            <% if (drillTotal) { %>
+              <div style="font-size:14px;font-weight:900;color:var(--primary);"><%= fmt.money(drillTotal.total || 0) %> <span style="font-size:11px;color:var(--muted);font-weight:400;">(<%= drillTotal.cnt || 0 %> transactions)</span></div>
+            <% } %>
+          </div>
+        </div>
+
+        <!-- Sub-breakdown (category breakdown within a cost center or project) -->
+        <% if (drillTotal && drillTotal.subBreakdown && drillTotal.subBreakdown.length > 0) { %>
+        <div class="card" style="margin-bottom:14px;">
+          <h4 style="font-size:12px;font-weight:700;margin-bottom:8px;"><i class="ti ti-chart-pie"></i> Breakdown by Category</h4>
+          <% var subMax = Math.max(...drillTotal.subBreakdown.map(s => s.total || 0), 1); %>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;">
+            <% drillTotal.subBreakdown.forEach(s => { %>
+              <div style="min-width:200px;flex:1;">
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">
+                  <span style="font-weight:700;"><%= s.category_name || 'Uncategorized' %></span>
+                  <span><%= fmt.money(s.total) %> (<%= s.cnt %>)</span>
+                </div>
+                <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+                  <div style="height:100%;width:<%= Math.round((s.total/subMax)*100) %>%;background:var(--primary);border-radius:3px;"></div>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+        <% } %>
+
+        <!-- Transaction list -->
+        <div class="card" style="overflow-x:auto;">
+          <h4 style="font-size:12px;font-weight:700;margin-bottom:8px;">Transactions (<%= drillTxns.length %><%= drillTxns.length >= 200 ? '+' : '' %>)</h4>
+          <% if (drillTxns.length === 0) { %>
+            <div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">No transactions found.</div>
+          <% } else { %>
+            <table class="tbl" style="font-size:12px;">
+              <thead><tr><th>Date</th><th>Description</th><th style="text-align:right;">Amount</th><th>Category</th><th>Cost Center</th><th>Project</th><th>Vendor</th><th>Source</th><th>Status</th></tr></thead>
+              <tbody>
+              <% drillTxns.forEach(t => { %>
+                <tr>
+                  <td style="white-space:nowrap;"><%= fmt.date(t.date) %></td>
+                  <td><%= t.description || '—' %><% if (t.reference) { %><br><span style="font-size:9px;color:var(--muted);">Ref: <%= t.reference %></span><% } %></td>
+                  <td style="text-align:right;font-weight:700;"><%= fmt.money(t.amount) %></td>
+                  <td style="font-size:11px;"><%= t.category_name || '—' %></td>
+                  <td style="font-size:11px;"><%= t.cost_center_code || '—' %></td>
+                  <td style="font-size:11px;"><%= t.project_name || '—' %></td>
+                  <td style="font-size:11px;"><%= t.vendor_name || '—' %></td>
+                  <td style="font-size:10px;color:var(--muted);"><%= t.source %></td>
+                  <td><span class="badge <%= t.status === 'approved' ? 'active' : t.status === 'rejected' ? 'inactive' : 'draft' %>"><%= t.status %></span></td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+
+      <% } else { %>
+        <!-- ===== SUMMARY VIEW ===== -->
+
+        <!-- Grand total -->
+        <div class="metrics" style="margin-bottom:14px;">
+          <div class="metric hi"><div class="m-label">Total</div><div class="m-val pri"><%= fmt.money(grandTotal) %></div></div>
+          <div class="metric"><div class="m-label">Groups</div><div class="m-val"><%= summary.length %></div></div>
+        </div>
+
+        <!-- Summary table with bars -->
+        <div class="card" style="margin-bottom:14px;">
+          <h3><i class="ti <%= icon %>"></i> Summary</h3>
+          <% if (summary.length === 0) { %>
+            <div style="padding:16px;text-align:center;color:var(--muted);font-size:12px;">No data for this date range.</div>
+          <% } else { %>
+            <table class="tbl">
+              <thead><tr><th>Name</th><th>Transactions</th><th style="text-align:right;">Total</th><th style="width:30%;">Share</th><th></th></tr></thead>
+              <tbody>
+              <% summary.forEach(s => { %>
+                <tr>
+                  <td><strong><%= s.entity_name || 'Unassigned' %></strong></td>
+                  <td><%= s.cnt %></td>
+                  <td style="text-align:right;font-weight:700;"><%= fmt.money(s.total) %></td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+                        <div style="height:100%;width:<%= grandTotal > 0 ? Math.round(s.total/grandTotal*100) : 0 %>%;background:var(--primary);border-radius:3px;"></div>
+                      </div>
+                      <span style="font-size:10px;color:var(--muted);min-width:32px;text-align:right;"><%= grandTotal > 0 ? Math.round(s.total/grandTotal*100) : 0 %>%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <a href="/admin/companies/<%= company.id %>/expenses/report/<%= type %>?from=<%= from %>&to=<%= to %>&id=<%= s.entity_id %>&name=<%= encodeURIComponent(s.entity_name || '') %>" class="btn btn-sm" style="padding:2px 8px;font-size:10px;"><i class="ti ti-eye"></i> Drill</a>
+                  </td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table>
+          <% } %>
+        </div>
+
+        <!-- Monthly breakdown grid -->
+        <% if (months.length > 0 && summary.length > 0) { %>
+        <div class="card" style="overflow-x:auto;">
+          <h3><i class="ti ti-calendar-stats"></i> Monthly Breakdown</h3>
+          <table class="tbl" style="font-size:11px;">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <% months.forEach(m => { %><th style="text-align:right;"><%= m.substring(5) %>/<%= m.substring(2,4) %></th><% }) %>
+                <th style="text-align:right;font-weight:900;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+            <% summary.forEach(s => { var rowTotal = 0; %>
+              <tr>
+                <td><strong><%= s.entity_name || 'Unassigned' %></strong></td>
+                <% months.forEach(m => { var val = (monthlyMap[s.entity_name] || {})[m] || 0; rowTotal += val; %>
+                  <td style="text-align:right;<%= val > 0 ? '' : 'color:var(--muted);' %>"><%= val > 0 ? fmt.money(val) : '—' %></td>
+                <% }) %>
+                <td style="text-align:right;font-weight:700;"><%= fmt.money(rowTotal) %></td>
+              </tr>
+            <% }) %>
+            <tr style="border-top:2px solid var(--border);font-weight:900;">
+              <td>Total</td>
+              <% months.forEach(m => { var colTotal = 0; summary.forEach(s => { colTotal += ((monthlyMap[s.entity_name] || {})[m] || 0); }); %>
+                <td style="text-align:right;"><%= fmt.money(colTotal) %></td>
+              <% }) %>
+              <td style="text-align:right;"><%= fmt.money(grandTotal) %></td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
+
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

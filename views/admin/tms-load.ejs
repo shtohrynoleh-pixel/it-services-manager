@@ -111,7 +111,7 @@
                   <div class="tl-status" style="color:<%= t.status==='delivered'?'var(--success)':t.status==='in-transit'?'var(--primary)':'var(--muted)' %>;"><%= t.status %></div>
                   <% if (t.note) { %><div><%= t.note %></div><% } %>
                   <% if (t.location) { %><div style="color:var(--primary);"><i class="ti ti-map-pin" style="font-size:10px;"></i> <%= t.location %></div><% } %>
-                  <div class="tl-time"><%= t.created_at ? t.created_at.replace('T',' ').substring(0,16) : '' %> · <%= t.changed_by||'' %></div>
+                  <div class="tl-time"><%= t.created_at ? String(t.created_at).replace('T',' ').substring(0,16) : '' %> · <%= t.changed_by||'' %></div>
                 </div>
               <% }) %>
               <% if (timeline.length === 0) { %><div style="font-size:11px;color:var(--muted);padding:8px 0;">No updates yet</div><% } %>
@@ -128,7 +128,7 @@
           <div class="card">
             <h3 style="font-size:12px;"><i class="ti ti-calendar"></i> Timestamps</h3>
             <div style="font-size:11px;line-height:2;">
-              Created: <strong><%= load.created_at ? load.created_at.replace('T',' ').substring(0,16) : '—' %></strong><br>
+              Created: <strong><%= load.created_at ? String(load.created_at).replace('T',' ').substring(0,16) : '—' %></strong><br>
               Dispatched: <strong><%= load.dispatched_at || '—' %></strong><br>
               Picked Up: <strong><%= load.picked_up_at || '—' %></strong><br>
               Delivered: <strong><%= load.delivered_at || '—' %></strong>

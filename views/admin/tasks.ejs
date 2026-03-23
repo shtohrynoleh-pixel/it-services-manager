@@ -83,7 +83,7 @@
               <% if (t.description) { %><div style="font-size:11px;color:#475569;margin-top:4px;white-space:pre-wrap;max-height:60px;overflow:hidden;"><%= t.description %></div><% } %>
               <!-- SLA timing -->
               <div style="display:flex;gap:12px;margin-top:6px;font-size:10px;color:var(--muted);">
-                <span><i class="ti ti-clock" style="font-size:10px;"></i> Created: <%= t.created_at ? t.created_at.replace('T',' ').substring(0,16) : '—' %></span>
+                <span><i class="ti ti-clock" style="font-size:10px;"></i> Created: <%= t.created_at ? String(t.created_at).replace('T',' ').substring(0,16) : '—' %></span>
                 <% if (t.status === 'done') { %>
                   <% if (t.sla_response_min != null) { %><span style="color:<%= t.sla_response_min <= 60 ? 'var(--success)' : t.sla_response_min <= 240 ? 'var(--accent)' : 'var(--danger)' %>;font-weight:700;"><i class="ti ti-message-dots" style="font-size:10px;"></i> Response: <%= fmtMin(t.sla_response_min) %></span><% } %>
                   <% if (t.sla_resolve_min != null) { %><span style="color:<%= t.sla_resolve_min <= 1440 ? 'var(--success)' : t.sla_resolve_min <= 4320 ? 'var(--accent)' : 'var(--danger)' %>;font-weight:700;"><i class="ti ti-circle-check" style="font-size:10px;"></i> Resolved: <%= fmtMin(t.sla_resolve_min) %></span><% } %>

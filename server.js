@@ -204,6 +204,7 @@ app.use('/admin', require('./routes/admin')(db));
 app.use('/client', require('./routes/client')(db));
 app.use('/chat', require('./routes/chat')(db));
 app.use('/admin', require('./routes/fuel')(db));
+app.use('/admin', require('./routes/expenses')(db));
 
 app.get('/', (req, res) => {
   if (req.session.user) {
