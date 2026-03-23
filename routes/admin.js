@@ -362,17 +362,27 @@ module.exports = function(db) {
   });
 
   router.post('/companies', (req, res) => {
-    const { name, status, address, city, state, zip, notes, contact_name, contact_email, contact_phone, client_username, client_password } = req.body;
-    const result = db.prepare('INSERT INTO companies (name, status, address, city, state, zip, notes) VALUES (?,?,?,?,?,?,?)').run(name, status || 'active', address, city, state, zip, notes);
-    const companyId = result.lastInsertRowid;
-    if (contact_name) {
-      db.prepare('INSERT INTO contacts (company_id, name, email, phone, is_primary) VALUES (?,?,?,?,1)').run(companyId, contact_name, contact_email, contact_phone);
+    try {
+      const { name, status, address, city, state, zip, notes, contact_name, contact_email, contact_phone, client_username, client_password } = req.body;
+      if (!name) return res.redirect('/admin/companies');
+      const result = db.prepare('INSERT INTO companies (name, status, address, city, state, zip, notes) VALUES (?,?,?,?,?,?,?)').run(name, status || 'active', address || null, city || null, state || null, zip || null, notes || null);
+      const companyId = result.lastInsertRowid;
+      // Create default modules
+      try { db.prepare('INSERT INTO company_modules (company_id) VALUES (?)').run(companyId); } catch(e2) {}
+      if (contact_name) {
+        try { db.prepare('INSERT INTO contacts (company_id, name, email, phone, is_primary) VALUES (?,?,?,?,1)').run(companyId, contact_name, contact_email || null, contact_phone || null); } catch(e2) {}
+      }
+      if (client_username && client_password) {
+        try {
+          const hash = bcrypt.hashSync(client_password, 10);
+          db.prepare('INSERT INTO users (username, password, role, company_id, full_name, email) VALUES (?,?,?,?,?,?)').run(client_username, hash, 'client', companyId, contact_name || client_username, contact_email || null);
+        } catch(e2) {}
+      }
+      res.redirect('/admin/companies/' + companyId);
+    } catch(e) {
+      console.error('Company create error:', e.message);
+      res.redirect('/admin/companies');
     }
-    if (client_username && client_password) {
-      const hash = bcrypt.hashSync(client_password, 10);
-      db.prepare('INSERT INTO users (username, password, role, company_id, full_name, email) VALUES (?,?,?,?,?,?)').run(client_username, hash, 'client', companyId, contact_name || client_username, contact_email);
-    }
-    res.redirect('/admin/companies/' + companyId);
   });
 
   router.get('/companies/:id', (req, res) => {
