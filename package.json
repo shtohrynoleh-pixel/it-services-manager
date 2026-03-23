@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "node tests/fuel-baseline.test.js && node tests/fuel-calc.test.js",
+    "test": "node tests/crud-all-tables.test.js && node tests/fuel-baseline.test.js && node tests/fuel-calc.test.js",
     "pg:setup": "psql -d itforge -f db/postgres-schema.sql",
     "pg:migrate": "echo 'PostgreSQL uses postgres-schema.sql — run pg:setup'"
   },
