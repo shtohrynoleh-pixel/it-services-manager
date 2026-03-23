@@ -275,6 +275,17 @@ module.exports = function(db) {
     res.render(V('record-edit'), { user: req.session.user, company, table, dbTable, item, companyUsers, inventoryItems, roles, depts, locations, settings: getSettings(), page: 'companies' });
   });
 
+  // Specific edit routes MUST come before the generic /:table/:itemId/edit
+  router.post('/companies/:cid/email-providers/:eid/edit', (req, res) => {
+    const { provider, domain, admin_url, mfa_enabled, spf_configured, dkim_configured, dmarc_configured, backup_codes_stored, password_policy, retention_days, notes, last_audit_date } = req.body;
+    try {
+      db.prepare('UPDATE email_providers SET provider=?, domain=?, admin_url=?, mfa_enabled=?, spf_configured=?, dkim_configured=?, dmarc_configured=?, backup_codes_stored=?, password_policy=?, retention_days=?, notes=?, last_audit_date=? WHERE id=? AND company_id=?').run(
+        provider || null, domain || null, admin_url || null, mfa_enabled ? 1 : 0, spf_configured ? 1 : 0, dkim_configured ? 1 : 0, dmarc_configured ? 1 : 0, backup_codes_stored ? 1 : 0, password_policy || null, parseInt(retention_days) || 0, notes || null, last_audit_date || null, req.params.eid, req.params.cid
+      );
+    } catch(e) { console.error('Email provider update error:', e.message); }
+    res.redirect('/admin/companies/' + req.params.cid + '/email-security');
+  });
+
   router.post('/companies/:cid/:table/:itemId/edit', (req, res) => {
     const { cid, table, itemId } = req.params;
     const dbTable = table === 'users' ? 'company_users' : table;
@@ -471,16 +482,6 @@ module.exports = function(db) {
         req.params.cid, provider, domain, admin_url, mfa_enabled ? 1 : 0, spf_configured ? 1 : 0, dkim_configured ? 1 : 0, dmarc_configured ? 1 : 0, backup_codes_stored ? 1 : 0, password_policy, parseInt(retention_days) || 0, notes
       );
     } catch(e) {}
-    res.redirect('/admin/companies/' + req.params.cid + '/email-security');
-  });
-
-  router.post('/companies/:cid/email-providers/:eid/edit', (req, res) => {
-    const { provider, domain, admin_url, mfa_enabled, spf_configured, dkim_configured, dmarc_configured, backup_codes_stored, password_policy, retention_days, notes, last_audit_date } = req.body;
-    try {
-      db.prepare('UPDATE email_providers SET provider=?, domain=?, admin_url=?, mfa_enabled=?, spf_configured=?, dkim_configured=?, dmarc_configured=?, backup_codes_stored=?, password_policy=?, retention_days=?, notes=?, last_audit_date=? WHERE id=? AND company_id=?').run(
-        provider || null, domain || null, admin_url || null, mfa_enabled ? 1 : 0, spf_configured ? 1 : 0, dkim_configured ? 1 : 0, dmarc_configured ? 1 : 0, backup_codes_stored ? 1 : 0, password_policy || null, parseInt(retention_days) || 0, notes || null, last_audit_date || null, req.params.eid, req.params.cid
-      );
-    } catch(e) { console.error('Email provider update error:', e.message); }
     res.redirect('/admin/companies/' + req.params.cid + '/email-security');
   });
 
