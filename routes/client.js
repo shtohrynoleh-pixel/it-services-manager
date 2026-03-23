@@ -293,7 +293,7 @@ module.exports = function(db) {
     res.render('client/org-chart', { user: req.session.user, company, users, depts, settings: getSettings(), page: 'client' });
   });
 
-  // User profile (client view)
+  // User profile (client view — full)
   router.get('/users/:uid', (req, res) => {
     const cid = req.session.user.company_id;
     const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(cid);
@@ -305,7 +305,116 @@ module.exports = function(db) {
     const userEmails = safeAll('SELECT * FROM user_emails WHERE user_id = ? AND company_id = ? ORDER BY is_primary DESC', [usr.id, cid]);
     const userPhones = safeAll('SELECT * FROM user_phones WHERE user_id = ? AND company_id = ? ORDER BY is_primary DESC', [usr.id, cid]);
     const userDivisions = safeAll('SELECT uda.*, d.name as division_name, d.code as division_code FROM user_division_assignments uda JOIN divisions d ON uda.division_id = d.id WHERE uda.user_id = ? AND uda.company_id = ?', [usr.id, cid]);
-    res.render('client/user-profile', { user: req.session.user, company, usr, manager, directReports, userEmails, userPhones, userDivisions, settings: getSettings(), page: 'client' });
+    const allDivisions = safeAll('SELECT * FROM divisions WHERE company_id = ? AND is_active = 1 ORDER BY name', [cid]);
+    const allUsers = safeAll('SELECT id, name, title FROM company_users WHERE company_id = ? AND id != ? ORDER BY name', [cid, usr.id]);
+    const assignedEquip = safeAll('SELECT * FROM inventory WHERE company_id = ? AND assigned_to = ?', [cid, usr.name]);
+    const availableEquip = safeAll("SELECT * FROM inventory WHERE company_id = ? AND (assigned_to IS NULL OR assigned_to = '') ORDER BY name", [cid]);
+    const assignedSoftware = safeAll('SELECT * FROM user_software WHERE company_id = ? AND user_id = ?', [cid, usr.id]);
+    const tasks = safeAll("SELECT * FROM tasks WHERE company_id = ? AND assigned_to = ? ORDER BY status ASC, due_date ASC", [cid, usr.name]);
+    const roles = safeAll('SELECT * FROM roles ORDER BY sort_order');
+    const depts = safeAll('SELECT * FROM departments ORDER BY sort_order');
+    res.render('client/user-profile', {
+      user: req.session.user, company, usr, manager, directReports,
+      userEmails, userPhones, userDivisions, allDivisions, allUsers,
+      assignedEquip, availableEquip, assignedSoftware, tasks, roles, depts,
+      settings: getSettings(), page: 'client'
+    });
+  });
+
+  // === CLIENT USER EDIT ===
+  router.post('/users/:uid/edit', (req, res) => {
+    const cid = req.session.user.company_id;
+    const b = req.body;
+    try {
+      db.prepare('UPDATE company_users SET name=?, title=?, email=?, phone=?, department=?, role=?, email_account=?, manager_id=?, hire_date=?, is_active=? WHERE id=? AND company_id=?').run(
+        b.name, b.title||null, b.email||null, b.phone||null, b.department||null, b.role||null, b.email_account||null, b.manager_id||null, b.hire_date||null, b.is_active ? 1 : 0, req.params.uid, cid
+      );
+    } catch(e) { console.error('Client user edit:', e.message); }
+    res.redirect('/client/users/' + req.params.uid);
+  });
+
+  // Manager
+  router.post('/users/:uid/set-manager', (req, res) => {
+    const cid = req.session.user.company_id;
+    try { db.prepare('UPDATE company_users SET manager_id = ? WHERE id = ? AND company_id = ?').run(req.body.manager_id || null, req.params.uid, cid); } catch(e) {}
+    res.redirect('/client/users/' + req.params.uid);
+  });
+
+  // Assign equipment
+  router.post('/users/:uid/assign-equipment', (req, res) => {
+    const cid = req.session.user.company_id;
+    const usr = safeGet('SELECT name FROM company_users WHERE id = ? AND company_id = ?', [req.params.uid, cid]);
+    if (usr && req.body.inventory_id) {
+      try { db.prepare('UPDATE inventory SET assigned_to = ? WHERE id = ? AND company_id = ?').run(usr.name, req.body.inventory_id, cid); } catch(e) {}
+    }
+    res.redirect('/client/users/' + req.params.uid);
+  });
+
+  router.post('/users/:uid/unassign-equipment/:eid', (req, res) => {
+    const cid = req.session.user.company_id;
+    try { db.prepare("UPDATE inventory SET assigned_to = NULL WHERE id = ? AND company_id = ?").run(req.params.eid, cid); } catch(e) {}
+    res.redirect('/client/users/' + req.params.uid);
+  });
+
+  // Software
+  router.post('/users/:uid/assign-software', (req, res) => {
+    const cid = req.session.user.company_id;
+    const { name, vendor, license_key, cost } = req.body;
+    if (name) {
+      try { db.prepare('INSERT INTO user_software (company_id, user_id, name, vendor, license_key, cost) VALUES (?,?,?,?,?,?)').run(cid, req.params.uid, name, vendor||null, license_key||null, parseFloat(cost)||0); } catch(e) {}
+    }
+    res.redirect('/client/users/' + req.params.uid);
+  });
+
+  router.post('/users/:uid/software/:sid/delete', (req, res) => {
+    const cid = req.session.user.company_id;
+    try { db.prepare('DELETE FROM user_software WHERE id = ? AND company_id = ?').run(req.params.sid, cid); } catch(e) {}
+    res.redirect('/client/users/' + req.params.uid);
+  });
+
+  // Emails
+  router.post('/users/:uid/emails', (req, res) => {
+    const cid = req.session.user.company_id;
+    if (!req.body.email) return res.redirect('/client/users/' + req.params.uid);
+    if (req.body.is_primary) { try { db.prepare('UPDATE user_emails SET is_primary = 0 WHERE user_id = ? AND company_id = ?').run(req.params.uid, cid); } catch(e) {} }
+    try { db.prepare('INSERT INTO user_emails (company_id, user_id, email, type, is_primary, notes) VALUES (?,?,?,?,?,?)').run(cid, req.params.uid, req.body.email, req.body.type||'work', req.body.is_primary?1:0, req.body.notes||null); } catch(e) {}
+    res.redirect('/client/users/' + req.params.uid);
+  });
+
+  router.post('/users/:uid/emails/:eid/delete', (req, res) => {
+    const cid = req.session.user.company_id;
+    try { db.prepare('DELETE FROM user_emails WHERE id = ? AND user_id = ? AND company_id = ?').run(req.params.eid, req.params.uid, cid); } catch(e) {}
+    res.redirect('/client/users/' + req.params.uid);
+  });
+
+  // Phones
+  router.post('/users/:uid/phones', (req, res) => {
+    const cid = req.session.user.company_id;
+    if (!req.body.phone) return res.redirect('/client/users/' + req.params.uid);
+    if (req.body.is_primary) { try { db.prepare('UPDATE user_phones SET is_primary = 0 WHERE user_id = ? AND company_id = ?').run(req.params.uid, cid); } catch(e) {} }
+    try { db.prepare('INSERT INTO user_phones (company_id, user_id, phone, ext, type, is_primary, notes) VALUES (?,?,?,?,?,?,?)').run(cid, req.params.uid, req.body.phone, req.body.ext||null, req.body.type||'work', req.body.is_primary?1:0, req.body.notes||null); } catch(e) {}
+    res.redirect('/client/users/' + req.params.uid);
+  });
+
+  router.post('/users/:uid/phones/:pid/delete', (req, res) => {
+    const cid = req.session.user.company_id;
+    try { db.prepare('DELETE FROM user_phones WHERE id = ? AND user_id = ? AND company_id = ?').run(req.params.pid, req.params.uid, cid); } catch(e) {}
+    res.redirect('/client/users/' + req.params.uid);
+  });
+
+  // Division assignments
+  router.post('/users/:uid/divisions', (req, res) => {
+    const cid = req.session.user.company_id;
+    if (!req.body.division_id) return res.redirect('/client/users/' + req.params.uid);
+    if (req.body.is_primary) { try { db.prepare('UPDATE user_division_assignments SET is_primary = 0 WHERE user_id = ? AND company_id = ?').run(req.params.uid, cid); } catch(e) {} }
+    try { db.prepare('INSERT INTO user_division_assignments (company_id, user_id, division_id, role_in_division, is_primary) VALUES (?,?,?,?,?)').run(cid, req.params.uid, req.body.division_id, req.body.role_in_division||null, req.body.is_primary?1:0); } catch(e) {}
+    res.redirect('/client/users/' + req.params.uid);
+  });
+
+  router.post('/users/:uid/divisions/:aid/delete', (req, res) => {
+    const cid = req.session.user.company_id;
+    try { db.prepare('DELETE FROM user_division_assignments WHERE id = ? AND user_id = ? AND company_id = ?').run(req.params.aid, req.params.uid, cid); } catch(e) {}
+    res.redirect('/client/users/' + req.params.uid);
   });
 
   // === CSV EXPORT (client can export their own data) ===
