@@ -2414,80 +2414,157 @@ module.exports = function(db) {
     res.send(csv);
   });
 
-  // Import CSV
+  // ================================================================
+  //  CSV IMPORT WIZARD (multi-step: upload → map → preview/commit)
+  // ================================================================
+  const importDir = path.join(uploadDir, 'csv-staging');
+  if (!fs.existsSync(importDir)) fs.mkdirSync(importDir, { recursive: true });
+  const crypto = require('crypto');
+
+  // Step 1: Upload → parse → show mapping page
   router.post('/companies/:cid/:table/csv-import', upload.single('csvfile'), (req, res) => {
     const { cid, table } = req.params;
     const cfg = csvTableConfig[table];
     if (!cfg || !req.file) return res.redirect('/admin/companies/' + cid + '?tab=' + table);
-    const dbTable = cfg.dbTable || table;
 
     try {
       const text = fs.readFileSync(req.file.path, 'utf-8');
-      const { headers, rows } = parseCSV(text);
+      const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim());
+      if (lines.length < 2) { fs.unlinkSync(req.file.path); return res.redirect('/admin/companies/' + cid + '?tab=' + table + '&importError=CSV+is+empty'); }
 
-      // Separate core DB fields from extra contact fields
-      const extraContactFields = cfg.extraContactFields || [];
-      const coreFields = cfg.fields.filter(f => !extraContactFields.includes(f));
-      const validFields = coreFields.filter(f => headers.includes(f));
-      if (validFields.length === 0 || !validFields.includes('name')) {
-        fs.unlinkSync(req.file.path);
-        return res.redirect('/admin/companies/' + cid + '?tab=' + table + '&importError=Missing+required+columns.+Must+include+name.');
+      // Parse header + raw rows
+      const parseLine = (line) => { const fields=[]; let cur='',inQ=false; for(let i=0;i<line.length;i++){const ch=line[i]; if(ch==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else{inQ=!inQ;}} else if(ch===','&&!inQ){fields.push(cur.trim());cur='';}else{cur+=ch;}} fields.push(cur.trim()); return fields; };
+      const rawHeaders = parseLine(lines[0]);
+      const dataRows = [];
+      for (let i = 1; i < lines.length; i++) { const v = parseLine(lines[i]); if (v.some(x => x)) dataRows.push(v); }
+
+      // Auto-suggest mapping
+      const allFields = cfg.fields;
+      const normHeaders = rawHeaders.map(h => h.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, ''));
+      const autoMap = {};
+      normHeaders.forEach((nh, i) => { if (allFields.includes(nh)) autoMap[i] = nh; });
+
+      // Save staging file
+      const token = crypto.randomBytes(16).toString('hex');
+      const staging = { token, cid: parseInt(cid), table, filename: req.file.originalname, rawHeaders, dataRows, mapping: autoMap };
+      fs.writeFileSync(path.join(importDir, 'csv-' + token + '.json'), JSON.stringify(staging));
+      fs.unlinkSync(req.file.path);
+
+      const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(cid);
+      res.render(V('csv-import-wizard'), {
+        user: req.session.user, company, step: 'map', staging, cfg,
+        sampleRows: dataRows.slice(0, 5), importErr: null, commitResult: null,
+        settings: getSettings(), page: 'companies'
+      });
+    } catch(e) {
+      console.error('CSV import upload error:', e.message);
+      try { fs.unlinkSync(req.file.path); } catch(x) {}
+      res.redirect('/admin/companies/' + cid + '?tab=' + table + '&importError=' + encodeURIComponent(e.message));
+    }
+  });
+
+  // Step 2: Apply mapping → preview + commit
+  router.post('/companies/:cid/:table/csv-commit', (req, res) => {
+    const { cid, table } = req.params;
+    const cfg = csvTableConfig[table];
+    if (!cfg) return res.redirect('/admin/companies/' + cid + '?tab=' + table);
+    const dbTable = cfg.dbTable || table;
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(cid);
+    if (!company) return res.redirect('/admin/companies');
+
+    const token = req.body.token;
+    let staging;
+    try { staging = JSON.parse(fs.readFileSync(path.join(importDir, 'csv-' + token + '.json'), 'utf-8')); }
+    catch(e) { return res.redirect('/admin/companies/' + cid + '?tab=' + table + '&importError=Import+session+expired'); }
+    if (staging.cid !== parseInt(cid)) return res.status(403).send('Access denied');
+
+    // Read user's column mapping
+    const mapping = {};
+    cfg.fields.forEach(field => {
+      const colIdx = req.body['map_' + field];
+      if (colIdx !== undefined && colIdx !== '' && colIdx !== '-1') mapping[parseInt(colIdx)] = field;
+    });
+
+    // Validate required: name column
+    const mappedFields = Object.values(mapping);
+    if (!mappedFields.includes('name')) {
+      return res.render(V('csv-import-wizard'), {
+        user: req.session.user, company, step: 'map', staging: { ...staging, mapping }, cfg,
+        sampleRows: staging.dataRows.slice(0, 5), importErr: 'You must map at least the "name" column.',
+        commitResult: null, settings: getSettings(), page: 'companies'
+      });
+    }
+
+    // Build mapped rows
+    const extraContactFields = cfg.extraContactFields || [];
+    const coreFields = Object.values(mapping).filter(f => !extraContactFields.includes(f));
+
+    try {
+      let imported = 0, skipped = 0;
+      const errors = [];
+
+      const insertStmt = db.prepare('INSERT INTO ' + dbTable + ' (company_id, ' + coreFields.join(',') + ') VALUES (?, ' + coreFields.map(() => '?').join(',') + ')');
+
+      let insPhone, insEmail;
+      if (table === 'users') {
+        insPhone = db.prepare('INSERT INTO user_phones (company_id, user_id, phone, ext, type, is_primary) VALUES (?,?,?,?,?,?)');
+        insEmail = db.prepare('INSERT INTO user_emails (company_id, user_id, email, type, is_primary) VALUES (?,?,?,?,?)');
       }
 
-      // Check which extra columns are present in the CSV
-      const hasExtras = extraContactFields.filter(f => headers.includes(f));
+      const invertMap = {};
+      Object.entries(mapping).forEach(([col, field]) => { invertMap[field] = parseInt(col); });
 
-      let imported = 0;
-      const insert = db.prepare('INSERT INTO ' + dbTable + ' (company_id, ' + validFields.join(',') + ') VALUES (?, ' + validFields.map(() => '?').join(',') + ')');
-      const insPhone = db.prepare('INSERT INTO user_phones (company_id, user_id, phone, ext, type, is_primary) VALUES (?,?,?,?,?,?)');
-      const insEmail = db.prepare('INSERT INTO user_emails (company_id, user_id, email, type, is_primary) VALUES (?,?,?,?,?,?)');
+      const importTx = db.transaction(() => {
+        for (let i = 0; i < staging.dataRows.length; i++) {
+          const vals = staging.dataRows[i];
+          const row = {};
+          Object.entries(mapping).forEach(([col, field]) => { row[field] = vals[parseInt(col)] || ''; });
 
-      const insertMany = db.transaction((items) => {
-        for (const row of items) {
-          const vals = validFields.map(f => {
+          if (!row.name || !row.name.trim()) { skipped++; continue; }
+
+          // Build insert values for core fields only
+          const insertVals = coreFields.map(f => {
             let v = row[f] || '';
             if (['is_active','is_primary','auto_renew'].includes(f)) return (v === '1' || v.toLowerCase() === 'true' || v.toLowerCase() === 'yes') ? 1 : 0;
             if (['seats','cost_per_unit','cost'].includes(f)) return parseFloat(v) || 0;
             if (f === 'quantity') return parseInt(v) || 1;
             return v || null;
           });
-          if (!row.name) return;
-          const result = insert.run(cid, ...vals);
-          const userId = result.lastInsertRowid;
-          imported++;
 
-          // Create extra phone/email records for users table
-          if (table === 'users' && userId) {
-            // Main phone with extension
-            if (row.phone && row.phone_ext) {
-              try { insPhone.run(cid, userId, row.phone, row.phone_ext, 'work', 1); } catch(e) {}
+          try {
+            const result = insertStmt.run(cid, ...insertVals);
+            const newId = result.lastInsertRowid;
+            imported++;
+
+            // For users: create phone/email records from extra fields
+            if (table === 'users' && newId) {
+              if (row.phone && row.phone_ext) { try { insPhone.run(cid, newId, row.phone, row.phone_ext, 'work', 1); } catch(e) {} }
+              if (row.direct_phone) { try { insPhone.run(cid, newId, row.direct_phone, row.direct_ext || null, 'work', 0); } catch(e) {} }
+              if (row.mobile_phone) { try { insPhone.run(cid, newId, row.mobile_phone, null, 'mobile', 0); } catch(e) {} }
+              if (row.personal_email) { try { insEmail.run(cid, newId, row.personal_email, 'personal', 0); } catch(e) {} }
+              if (row.email_account) { try { insEmail.run(cid, newId, row.email_account, 'work', 1); } catch(e) {} }
             }
-            // Direct phone
-            if (row.direct_phone) {
-              try { insPhone.run(cid, userId, row.direct_phone, row.direct_ext || null, 'work', 0); } catch(e) {}
-            }
-            // Mobile
-            if (row.mobile_phone) {
-              try { insPhone.run(cid, userId, row.mobile_phone, null, 'mobile', 0); } catch(e) {}
-            }
-            // Personal email
-            if (row.personal_email) {
-              try { insEmail.run(cid, userId, row.personal_email, 'personal', 0); } catch(e) {}
-            }
-            // Work email (email_account) as additional email record
-            if (row.email_account) {
-              try { insEmail.run(cid, userId, row.email_account, 'work', 1); } catch(e) {}
-            }
+          } catch(e) {
+            errors.push({ line: i + 2, error: e.message });
           }
         }
       });
-      insertMany(rows);
-      fs.unlinkSync(req.file.path);
-      if (imported > 0) awardXP(db, xpUser(req), 'csv_import', 'Imported ' + imported + ' records', req);
-      res.redirect('/admin/companies/' + cid + '?tab=' + table + '&imported=' + imported);
+      importTx();
+
+      // Cleanup staging
+      try { fs.unlinkSync(path.join(importDir, 'csv-' + token + '.json')); } catch(e) {}
+
+      if (imported > 0) awardXP(db, xpUser(req), 'csv_import', 'Imported ' + imported + ' ' + table, req);
+
+      res.render(V('csv-import-wizard'), {
+        user: req.session.user, company, step: 'done', staging, cfg,
+        sampleRows: null, importErr: null,
+        commitResult: { imported, skipped, errors: errors.length, errorDetails: errors.slice(0, 10) },
+        settings: getSettings(), page: 'companies'
+      });
     } catch(e) {
-      console.error('CSV import error:', e.message);
-      try { fs.unlinkSync(req.file.path); } catch(x) {}
+      console.error('CSV import commit error:', e.message);
+      try { fs.unlinkSync(path.join(importDir, 'csv-' + token + '.json')); } catch(x) {}
       res.redirect('/admin/companies/' + cid + '?tab=' + table + '&importError=' + encodeURIComponent(e.message));
     }
   });

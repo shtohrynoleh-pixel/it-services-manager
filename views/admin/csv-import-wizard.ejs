@@ -1,0 +1,125 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="mob-toggle" onclick="openSidebar()">☰</button>
+        <h2>
+          <a href="/admin/companies/<%= company.id %>?tab=<%= staging.table %>" style="opacity:0.4;text-decoration:none;"><i class="ti ti-building"></i></a> →
+          <i class="ti ti-upload"></i> Import <%= cfg.label %> — <%= staging.filename %>
+        </h2>
+      </div>
+      <%- include('../partials/notif-bell') %>
+    </div>
+    <div class="content">
+
+      <!-- Step indicator -->
+      <div style="display:flex;gap:4px;margin-bottom:20px;">
+        <% ['Upload','Map Columns','Import'].forEach(function(s, i) {
+          var current = (step==='map' && i===1) || (step==='done' && i===2);
+          var done = (step==='done' && i<2) || (step==='map' && i<1);
+        %>
+          <div style="flex:1;text-align:center;padding:8px 4px;border-radius:8px;font-size:11px;font-weight:700;<%= current ? 'background:var(--primary);color:#fff;' : done ? 'background:#d1fae5;color:#065f46;' : 'background:#f1f5f9;color:var(--muted);' %>">
+            <% if (done) { %><i class="ti ti-check"></i> <% } %><%= s %>
+          </div>
+        <% }) %>
+      </div>
+
+      <% if (importErr) { %>
+        <div style="padding:10px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin-bottom:12px;font-size:12px;color:#991b1b;font-weight:600;"><i class="ti ti-alert-triangle"></i> <%= importErr %></div>
+      <% } %>
+
+      <!-- ===== STEP: MAP COLUMNS ===== -->
+      <% if (step === 'map') { %>
+      <div class="card">
+        <h3><i class="ti ti-columns"></i> Map CSV Columns to <%= cfg.label %> Fields</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px;">
+          File: <strong><%= staging.filename %></strong> · <%= staging.dataRows.length %> rows · <%= staging.rawHeaders.length %> columns<br>
+          Map each column from your CSV to the correct field. Auto-matched columns are pre-selected.
+        </p>
+
+        <form method="POST" action="/admin/companies/<%= company.id %>/<%= staging.table %>/csv-commit">
+          <input type="hidden" name="token" value="<%= staging.token %>">
+
+          <%
+            var fieldToCol = {};
+            if (staging.mapping) { Object.entries(staging.mapping).forEach(function(e) { fieldToCol[e[1]] = parseInt(e[0]); }); }
+            var required = ['name'];
+          %>
+
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+            <% cfg.fields.forEach(function(field) { %>
+              <div class="form-group" style="margin-bottom:0;min-width:155px;">
+                <label><%= field %><%= required.includes(field) ? ' *' : '' %></label>
+                <select name="map_<%= field %>" style="font-size:12px;">
+                  <option value="-1">— Skip —</option>
+                  <% staging.rawHeaders.forEach(function(h, i) { %>
+                    <option value="<%= i %>" <%= fieldToCol[field] === i ? 'selected' : '' %>><%= h || ('Column ' + (i+1)) %></option>
+                  <% }) %>
+                </select>
+              </div>
+            <% }) %>
+          </div>
+
+          <!-- Sample data -->
+          <h4 style="font-size:12px;font-weight:700;margin-bottom:8px;">Preview (first 5 rows)</h4>
+          <div style="overflow-x:auto;margin-bottom:16px;">
+            <table class="tbl" style="font-size:11px;">
+              <thead><tr><th>#</th><% staging.rawHeaders.forEach(function(h) { %><th><%= h %></th><% }) %></tr></thead>
+              <tbody>
+              <% sampleRows.forEach(function(row, i) { %>
+                <tr><td style="color:var(--muted);"><%= i+2 %></td><% row.forEach(function(v) { %><td><%= v %></td><% }) %></tr>
+              <% }) %>
+              </tbody>
+            </table>
+          </div>
+
+          <% if (staging.table === 'users') { %>
+            <div style="padding:12px;background:linear-gradient(135deg,#f0fdfa,#ecfeff);border:1px solid #a7f3d0;border-radius:10px;margin-bottom:16px;font-size:12px;color:#065f46;">
+              <strong><i class="ti ti-bulb"></i> Phone extensions:</strong> Map <code>phone_ext</code> for the main line extension, <code>direct_phone</code> + <code>direct_ext</code> for a direct line, and <code>mobile_phone</code> for mobile. These create separate phone records on the user profile.
+            </div>
+          <% } %>
+
+          <div style="display:flex;gap:8px;">
+            <a href="/admin/companies/<%= company.id %>?tab=<%= staging.table %>" class="btn btn-sm">Cancel</a>
+            <button type="submit" class="btn btn-primary"><i class="ti ti-check"></i> Import <%= staging.dataRows.length %> Rows</button>
+          </div>
+        </form>
+      </div>
+      <% } %>
+
+      <!-- ===== STEP: DONE ===== -->
+      <% if (step === 'done' && commitResult) { %>
+      <div class="card" style="text-align:center;padding:40px;">
+        <div style="font-size:48px;margin-bottom:12px;"><i class="ti ti-circle-check" style="color:#16a34a;"></i></div>
+        <h2 style="margin-bottom:8px;">Import Complete</h2>
+        <p style="font-size:14px;color:var(--muted);margin-bottom:20px;">
+          <strong><%= staging.filename %></strong> — <%= cfg.label %>
+        </p>
+        <div class="metrics" style="justify-content:center;margin-bottom:24px;">
+          <div class="metric ok"><div class="m-label">Imported</div><div class="m-val green"><%= commitResult.imported %></div></div>
+          <div class="metric"><div class="m-label">Skipped</div><div class="m-val"><%= commitResult.skipped %></div></div>
+          <div class="metric <%= commitResult.errors > 0 ? 'bad' : '' %>"><div class="m-label">Errors</div><div class="m-val <%= commitResult.errors > 0 ? 'red' : '' %>"><%= commitResult.errors %></div></div>
+        </div>
+
+        <% if (commitResult.errorDetails && commitResult.errorDetails.length > 0) { %>
+          <div style="text-align:left;margin-bottom:20px;padding:12px;background:#fef2f2;border-radius:8px;font-size:11px;color:#991b1b;">
+            <strong>Errors:</strong><br>
+            <% commitResult.errorDetails.forEach(function(e) { %>
+              Line <%= e.line %>: <%= e.error %><br>
+            <% }) %>
+          </div>
+        <% } %>
+
+        <div style="display:flex;gap:8px;justify-content:center;">
+          <a href="/admin/companies/<%= company.id %>?tab=<%= staging.table %>" class="btn btn-primary"><i class="ti ti-list"></i> View <%= cfg.label %></a>
+          <a href="/admin/companies/<%= company.id %>?tab=<%= staging.table %>" class="btn btn-sm"><i class="ti ti-upload"></i> Import More</a>
+        </div>
+      </div>
+      <% } %>
+
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>
