@@ -2357,7 +2357,7 @@ module.exports = function(db) {
   // === CSV IMPORT / EXPORT ===
   const csvTableConfig = {
     contacts:      { fields: ['name','role','email','phone','is_primary'], label: 'Contacts' },
-    users:         { fields: ['name','title','email','phone','department','role','email_account','hire_date','photo_url','is_active'], label: 'Users', dbTable: 'company_users' },
+    users:         { fields: ['name','title','email','phone','phone_ext','direct_phone','direct_ext','mobile_phone','department','role','email_account','personal_email','hire_date','photo_url','is_active'], label: 'Users', dbTable: 'company_users', extraContactFields: ['phone_ext','direct_phone','direct_ext','mobile_phone','personal_email'] },
     servers:       { fields: ['name','type','ip','os','purpose','location','is_active','notes'], label: 'Servers' },
     subscriptions: { fields: ['name','vendor','type','seats','cost_per_unit','billing_cycle','renewal_date','auto_renew','notes'], label: 'Subscriptions' },
     assets:        { fields: ['name','type','provider','expires_at','login_url','notes'], label: 'Assets' },
@@ -2368,7 +2368,12 @@ module.exports = function(db) {
   router.get('/companies/:cid/:table/csv-template', (req, res) => {
     const cfg = csvTableConfig[req.params.table];
     if (!cfg) return res.status(404).send('Unknown table');
-    const csv = cfg.fields.join(',') + '\n';
+    let fields = cfg.fields;
+    let csv = fields.join(',') + '\n';
+    // Add example row for users
+    if (req.params.table === 'users') {
+      csv += 'John Smith,Sr Dispatcher,john@gmail.com,555-0100,1234,555-0150,5678,555-9999,Operations,Dispatcher,john@company.com,john.personal@gmail.com,2025-01-15,,1\n';
+    }
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename=' + req.params.table + '-template.csv');
     res.send(csv);
@@ -2420,15 +2425,23 @@ module.exports = function(db) {
       const text = fs.readFileSync(req.file.path, 'utf-8');
       const { headers, rows } = parseCSV(text);
 
-      // Map CSV headers to known fields
-      const validFields = cfg.fields.filter(f => headers.includes(f));
+      // Separate core DB fields from extra contact fields
+      const extraContactFields = cfg.extraContactFields || [];
+      const coreFields = cfg.fields.filter(f => !extraContactFields.includes(f));
+      const validFields = coreFields.filter(f => headers.includes(f));
       if (validFields.length === 0 || !validFields.includes('name')) {
         fs.unlinkSync(req.file.path);
         return res.redirect('/admin/companies/' + cid + '?tab=' + table + '&importError=Missing+required+columns.+Must+include+name.');
       }
 
+      // Check which extra columns are present in the CSV
+      const hasExtras = extraContactFields.filter(f => headers.includes(f));
+
       let imported = 0;
       const insert = db.prepare('INSERT INTO ' + dbTable + ' (company_id, ' + validFields.join(',') + ') VALUES (?, ' + validFields.map(() => '?').join(',') + ')');
+      const insPhone = db.prepare('INSERT INTO user_phones (company_id, user_id, phone, ext, type, is_primary) VALUES (?,?,?,?,?,?)');
+      const insEmail = db.prepare('INSERT INTO user_emails (company_id, user_id, email, type, is_primary) VALUES (?,?,?,?,?,?)');
+
       const insertMany = db.transaction((items) => {
         for (const row of items) {
           const vals = validFields.map(f => {
@@ -2438,9 +2451,34 @@ module.exports = function(db) {
             if (f === 'quantity') return parseInt(v) || 1;
             return v || null;
           });
-          if (!row.name) return; // skip rows without name
-          insert.run(cid, ...vals);
+          if (!row.name) return;
+          const result = insert.run(cid, ...vals);
+          const userId = result.lastInsertRowid;
           imported++;
+
+          // Create extra phone/email records for users table
+          if (table === 'users' && userId) {
+            // Main phone with extension
+            if (row.phone && row.phone_ext) {
+              try { insPhone.run(cid, userId, row.phone, row.phone_ext, 'work', 1); } catch(e) {}
+            }
+            // Direct phone
+            if (row.direct_phone) {
+              try { insPhone.run(cid, userId, row.direct_phone, row.direct_ext || null, 'work', 0); } catch(e) {}
+            }
+            // Mobile
+            if (row.mobile_phone) {
+              try { insPhone.run(cid, userId, row.mobile_phone, null, 'mobile', 0); } catch(e) {}
+            }
+            // Personal email
+            if (row.personal_email) {
+              try { insEmail.run(cid, userId, row.personal_email, 'personal', 0); } catch(e) {}
+            }
+            // Work email (email_account) as additional email record
+            if (row.email_account) {
+              try { insEmail.run(cid, userId, row.email_account, 'work', 1); } catch(e) {}
+            }
+          }
         }
       });
       insertMany(rows);
