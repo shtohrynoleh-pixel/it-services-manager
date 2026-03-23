@@ -103,8 +103,8 @@ module.exports = function(db) {
       const clientTasks = allOpen.filter(t => t.created_by === 'client');
       const myTasks = allOpen.filter(t => t.created_by !== 'client');
 
-      // Schedules
-      const schedules = safeAll("SELECT s.*, c.name as company_name, sv.name as service_name, 'schedule' as item_type FROM service_schedule s LEFT JOIN companies c ON s.company_id = c.id LEFT JOIN services sv ON s.service_id = sv.id WHERE s.is_active = 1 ORDER BY s.next_due ASC");
+      // Schedules — show ALL active (not just overdue/today/this week)
+      const schedules = safeAll("SELECT s.*, c.name as company_name, sv.name as service_name, 'schedule' as item_type FROM service_schedule s LEFT JOIN companies c ON s.company_id = c.id LEFT JOIN services sv ON s.service_id = sv.id WHERE s.is_active = 1 AND (s.last_completed IS NULL OR s.last_completed < s.next_due) ORDER BY s.next_due ASC");
 
       // Categorize by time
       const overdueTasks = allOpen.filter(t => t.due_date && t.due_date < today);
@@ -114,17 +114,19 @@ module.exports = function(db) {
       const overdueSchedules = schedules.filter(s => s.next_due && s.next_due < today);
       const todaySchedules = schedules.filter(s => s.next_due === today);
       const upcomingSchedules = schedules.filter(s => s.next_due && s.next_due > today && s.next_due <= weekEnd);
+      // Future schedules — beyond this week, still not done
+      const futureSchedules = schedules.filter(s => !s.next_due || s.next_due > weekEnd);
 
-      const totalCount = allOpen.length + overdueSchedules.length + todaySchedules.length;
+      const totalCount = allOpen.length + overdueSchedules.length + todaySchedules.length + upcomingSchedules.length + futureSchedules.length;
 
       return {
         allOpen, clientTasks, myTasks,
         overdueTasks, todayTasks, upcomingTasks,
-        overdueSchedules, todaySchedules, upcomingSchedules,
+        overdueSchedules, todaySchedules, upcomingSchedules, futureSchedules,
         schedules,
         count: totalCount
       };
-    } catch(e) { return { allOpen: [], clientTasks: [], myTasks: [], overdueTasks: [], todayTasks: [], upcomingTasks: [], overdueSchedules: [], todaySchedules: [], upcomingSchedules: [], schedules: [], count: 0 }; }
+    } catch(e) { return { allOpen: [], clientTasks: [], myTasks: [], overdueTasks: [], todayTasks: [], upcomingTasks: [], overdueSchedules: [], todaySchedules: [], upcomingSchedules: [], futureSchedules: [], schedules: [], count: 0 }; }
   };
 
   // Inject notifications + XP into every admin render

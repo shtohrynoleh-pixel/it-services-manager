@@ -44,7 +44,7 @@ updateThemeIcon();
       <div class="notif-tabs">
         <div class="notif-tab active" onclick="switchNotifTab('all')">All <span class="nt-count"><%= notifications.count %></span></div>
         <div class="notif-tab" onclick="switchNotifTab('tasks')">Tasks <span class="nt-count"><%= notifications.allOpen.length %></span></div>
-        <div class="notif-tab" onclick="switchNotifTab('schedule')">Schedule <span class="nt-count"><%= notifications.overdueSchedules.length + notifications.todaySchedules.length + notifications.upcomingSchedules.length %></span></div>
+        <div class="notif-tab" onclick="switchNotifTab('schedule')">Schedule <span class="nt-count"><%= notifications.overdueSchedules.length + notifications.todaySchedules.length + notifications.upcomingSchedules.length + (notifications.futureSchedules||[]).length %></span></div>
         <% if (notifications.clientTasks.length > 0) { %><div class="notif-tab" onclick="switchNotifTab('client')">Requests <span class="nt-count"><%= notifications.clientTasks.length %></span></div><% } %>
       </div>
 
@@ -77,6 +77,13 @@ updateThemeIcon();
           <% }) %>
           <% notifications.upcomingSchedules.slice(0,3).forEach(s => { %>
             <a href="/admin/schedule" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon">📅</span><div class="ni-text"><div class="ni-title"><%= s.title %></div><div class="ni-sub"><%= s.company_name || '' %> · Due: <%= s.next_due %><%= s.day_of_week ? ' · ' + s.day_of_week : '' %></div></div></a>
+          <% }) %>
+        <% } %>
+
+        <% if (notifications.futureSchedules && notifications.futureSchedules.length > 0) { %>
+          <div class="notif-group">🗓️ Upcoming Schedules (<%= notifications.futureSchedules.length %>)</div>
+          <% notifications.futureSchedules.slice(0,5).forEach(s => { %>
+            <a href="/admin/schedule" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon">🗓️</span><div class="ni-text"><div class="ni-title"><%= s.title %></div><div class="ni-sub"><%= s.company_name || '' %> · Due: <%= s.next_due || 'No date' %> · <%= s.frequency %><%= s.assigned_to ? ' · 👤 ' + s.assigned_to : '' %></div></div></a>
           <% }) %>
         <% } %>
 
@@ -117,9 +124,9 @@ updateThemeIcon();
 
       <!-- SCHEDULE tab -->
       <div class="notif-section" id="notif-schedule">
-        <% var allSch = [...notifications.overdueSchedules, ...notifications.todaySchedules, ...notifications.upcomingSchedules]; %>
+        <% var allSch = [...notifications.overdueSchedules, ...notifications.todaySchedules, ...notifications.upcomingSchedules, ...(notifications.futureSchedules||[])]; %>
         <% if (allSch.length === 0) { %>
-          <div class="notif-empty">No upcoming schedules this week</div>
+          <div class="notif-empty">No pending schedules</div>
         <% } else { %>
           <% if (notifications.overdueSchedules.length > 0) { %><div class="notif-group danger">Overdue (<%= notifications.overdueSchedules.length %>)</div><% } %>
           <% notifications.overdueSchedules.forEach(s => { %>
@@ -131,7 +138,11 @@ updateThemeIcon();
           <% }) %>
           <% if (notifications.upcomingSchedules.length > 0) { %><div class="notif-group">This Week (<%= notifications.upcomingSchedules.length %>)</div><% } %>
           <% notifications.upcomingSchedules.forEach(s => { %>
-            <a href="/admin/schedule" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon">📆</span><div class="ni-text"><div class="ni-title"><%= s.title %></div><div class="ni-sub"><%= s.company_name || '' %> · Due: <%= s.next_due %> · <%= s.frequency %></div></div></a>
+            <a href="/admin/schedule" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon">📆</span><div class="ni-text"><div class="ni-title"><%= s.title %></div><div class="ni-sub"><%= s.company_name || '' %> · Due: <%= s.next_due %> · <%= s.frequency %><%= s.assigned_to ? ' · 👤 ' + s.assigned_to : '' %></div></div></a>
+          <% }) %>
+          <% if (notifications.futureSchedules && notifications.futureSchedules.length > 0) { %><div class="notif-group">Upcoming (<%= notifications.futureSchedules.length %>)</div><% } %>
+          <% (notifications.futureSchedules||[]).forEach(s => { %>
+            <a href="/admin/schedule" class="notif-item" style="text-decoration:none;color:inherit;"><span class="ni-icon">🗓️</span><div class="ni-text"><div class="ni-title"><%= s.title %></div><div class="ni-sub"><%= s.company_name || '' %> · Due: <%= s.next_due || 'No date' %> · <%= s.frequency %><%= s.assigned_to ? ' · 👤 ' + s.assigned_to : '' %></div></div></a>
           <% }) %>
           <div style="padding:8px 16px;border-top:1px solid var(--border);"><a href="/admin/schedule" style="font-size:11px;font-weight:700;">View all schedules →</a></div>
         <% } %>
