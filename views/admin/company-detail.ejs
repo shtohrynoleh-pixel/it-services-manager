@@ -327,7 +327,7 @@
             <div class="metric hi"><div class="m-label">Total Users</div><div class="m-val pri"><%= allItems.length %></div></div>
             <div class="metric ok"><div class="m-label">Active</div><div class="m-val green"><%= allItems.filter(x => x.is_active).length %></div></div>
             <div class="metric"><div class="m-label">Portal Access</div><div class="m-val"><%= clientUsers.length %></div></div>
-            <div class="metric"><div class="m-label">With Email</div><div class="m-val"><%= allItems.filter(x => x.email_account).length %></div></div>
+            <div class="metric"><div class="m-label">With Email</div><div class="m-val"><%= allItems.filter(x => x.email || x.email_account).length %></div></div>
           </div>
         <% } %>
 
