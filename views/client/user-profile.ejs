@@ -4,6 +4,7 @@
   <div class="main">
     <div class="topbar">
       <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/client?tab=users" style="opacity:0.4;text-decoration:none;"><i class="ti ti-users"></i></a> → <%= usr.name %></h2></div>
+      <span class="badge <%= usr.is_active ? 'active' : 'inactive' %>"><%= usr.is_active ? 'Active' : 'Inactive' %></span>
     </div>
     <div class="content">
       <div style="margin-bottom:12px;"><a href="/client?tab=users" class="btn btn-sm"><i class="ti ti-arrow-left"></i> Back to Team</a></div>
@@ -17,8 +18,23 @@
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <% if (usr.role) { %><span class="badge active"><%= usr.role %></span><% } %>
             <% if (usr.department) { %><span class="badge prospect"><%= usr.department %></span><% } %>
-            <span class="badge <%= usr.is_active ? 'active' : 'inactive' %>"><%= usr.is_active ? 'Active' : 'Inactive' %></span>
           </div>
+        </div>
+        <button class="btn btn-sm" onclick="document.getElementById('editUser').style.display=document.getElementById('editUser').style.display==='none'?'':'none'"><i class="ti ti-pencil"></i> Edit</button>
+      </div>
+
+      <!-- Edit form (hidden) -->
+      <div id="editUser" style="display:none;">
+        <div class="card">
+          <h3><i class="ti ti-pencil"></i> Edit User</h3>
+          <form method="POST" action="/client/users/<%= usr.id %>/edit">
+            <div class="form-row"><div class="form-group"><label>Full Name *</label><input type="text" name="name" value="<%= usr.name %>" required></div><div class="form-group"><label>Job Title</label><input type="text" name="title" value="<%= usr.title || '' %>"></div></div>
+            <div class="form-row"><div class="form-group"><label>Personal Email</label><input type="email" name="email" value="<%= usr.email || '' %>"></div><div class="form-group"><label>Phone</label><input type="text" name="phone" value="<%= usr.phone || '' %>"></div></div>
+            <div class="form-row"><div class="form-group"><label>Department</label><select name="department"><option value="">—</option><% (depts||[]).forEach(d => { %><option <%= usr.department===d.name?'selected':'' %>><%= d.name %></option><% }) %></select></div><div class="form-group"><label>Role</label><select name="role"><option value="">—</option><% (roles||[]).forEach(r => { %><option <%= usr.role===r.name?'selected':'' %>><%= r.name %></option><% }) %></select></div></div>
+            <div class="form-row"><div class="form-group"><label>Company Email</label><input type="email" name="email_account" value="<%= usr.email_account || '' %>"></div><div class="form-group"><label>Reports To</label><select name="manager_id"><option value="">— None —</option><% allUsers.forEach(u => { %><option value="<%= u.id %>" <%= usr.manager_id===u.id?'selected':'' %>><%= u.name %></option><% }) %></select></div></div>
+            <div class="form-row"><div class="form-group"><label>Hire Date</label><input type="date" name="hire_date" value="<%= usr.hire_date || '' %>"></div><div class="form-group"><label>Status</label><div class="form-check" style="margin-top:8px;"><input type="checkbox" name="is_active" value="1" <%= usr.is_active ? 'checked' : '' %>> Active employee</div></div></div>
+            <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button><button type="button" class="btn" onclick="document.getElementById('editUser').style.display='none'">Cancel</button></div>
+          </form>
         </div>
       </div>
 
@@ -32,55 +48,167 @@
         <% if (manager) { %><div class="card-row"><span class="label">Reports To</span><span class="value"><a href="/client/users/<%= manager.id %>"><%= manager.name %></a><% if (manager.title) { %> (<%= manager.title %>)<% } %></span></div><% } %>
       </div>
 
-      <!-- Additional Emails -->
-      <% if (userEmails.length > 0) { %>
+      <!-- Emails -->
       <div class="card">
-        <h3><i class="ti ti-mail"></i> Emails</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3 style="margin:0;"><i class="ti ti-mail"></i> Emails (<%= userEmails.length %>)</h3>
+          <button class="btn btn-sm" onclick="document.getElementById('add-email').style.display=document.getElementById('add-email').style.display==='none'?'':'none'"><i class="ti ti-plus"></i></button>
+        </div>
+        <div id="add-email" style="display:none;margin-bottom:10px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">
+          <form method="POST" action="/client/users/<%= usr.id %>/emails" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;">
+            <div class="form-group" style="flex:1;margin-bottom:0;min-width:180px;"><label>Email *</label><input type="email" name="email" required placeholder="user@company.com"></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Type</label><select name="type"><option value="work">Work</option><option value="personal">Personal</option><option value="other">Other</option></select></div>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="is_primary" value="1" style="width:auto;"> Primary</label>
+            <div class="form-group" style="margin-bottom:0;"><label>Notes</label><input type="text" name="notes" placeholder="Optional" style="width:100px;"></div>
+            <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i></button>
+          </form>
+        </div>
         <% userEmails.forEach(em => { %>
           <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
             <span style="flex:1;font-weight:<%= em.is_primary ? '700' : '400' %>;"><%= em.email %></span>
             <span class="badge" style="font-size:9px;"><%= em.type %></span>
             <% if (em.is_primary) { %><span style="font-size:9px;color:#16a34a;font-weight:700;">PRIMARY</span><% } %>
+            <form method="POST" action="/client/users/<%= usr.id %>/emails/<%= em.id %>/delete" style="display:inline;" onsubmit="return confirm('Remove?')"><button type="submit" class="btn btn-sm" style="padding:1px 4px;color:#ef4444;"><i class="ti ti-x"></i></button></form>
           </div>
         <% }) %>
+        <% if (userEmails.length === 0) { %><div style="font-size:12px;color:var(--muted);">No additional emails.</div><% } %>
       </div>
-      <% } %>
 
-      <!-- Additional Phones -->
-      <% if (userPhones.length > 0) { %>
+      <!-- Phones -->
       <div class="card">
-        <h3><i class="ti ti-phone"></i> Phones</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3 style="margin:0;"><i class="ti ti-phone"></i> Phones (<%= userPhones.length %>)</h3>
+          <button class="btn btn-sm" onclick="document.getElementById('add-phone').style.display=document.getElementById('add-phone').style.display==='none'?'':'none'"><i class="ti ti-plus"></i></button>
+        </div>
+        <div id="add-phone" style="display:none;margin-bottom:10px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">
+          <form method="POST" action="/client/users/<%= usr.id %>/phones" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;">
+            <div class="form-group" style="flex:1;margin-bottom:0;min-width:140px;"><label>Phone *</label><input type="text" name="phone" required placeholder="555-0100"></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Ext</label><input type="text" name="ext" placeholder="1234" style="width:70px;"></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Type</label><select name="type"><option value="work">Work</option><option value="mobile">Mobile</option><option value="home">Home</option><option value="fax">Fax</option></select></div>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="is_primary" value="1" style="width:auto;"> Primary</label>
+            <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i></button>
+          </form>
+        </div>
         <% userPhones.forEach(ph => { %>
           <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
             <span style="flex:1;font-weight:<%= ph.is_primary ? '700' : '400' %>;"><%= ph.phone %><% if (ph.ext) { %> <span style="font-size:11px;color:var(--muted);">x<%= ph.ext %></span><% } %></span>
             <span class="badge" style="font-size:9px;"><%= ph.type %></span>
             <% if (ph.is_primary) { %><span style="font-size:9px;color:#16a34a;font-weight:700;">PRIMARY</span><% } %>
+            <form method="POST" action="/client/users/<%= usr.id %>/phones/<%= ph.id %>/delete" style="display:inline;" onsubmit="return confirm('Remove?')"><button type="submit" class="btn btn-sm" style="padding:1px 4px;color:#ef4444;"><i class="ti ti-x"></i></button></form>
           </div>
         <% }) %>
+        <% if (userPhones.length === 0) { %><div style="font-size:12px;color:var(--muted);">No additional phones.</div><% } %>
       </div>
-      <% } %>
 
       <!-- Divisions -->
-      <% if (userDivisions.length > 0) { %>
       <div class="card">
-        <h3><i class="ti ti-hierarchy-2"></i> Divisions</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3 style="margin:0;"><i class="ti ti-hierarchy-2"></i> Divisions (<%= userDivisions.length %>)</h3>
+          <button class="btn btn-sm" onclick="document.getElementById('add-div').style.display=document.getElementById('add-div').style.display==='none'?'':'none'"><i class="ti ti-plus"></i></button>
+        </div>
+        <div id="add-div" style="display:none;margin-bottom:10px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">
+          <form method="POST" action="/client/users/<%= usr.id %>/divisions" style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;">
+            <div class="form-group" style="flex:1;margin-bottom:0;"><label>Division *</label><select name="division_id" required><option value="">— Select —</option><% allDivisions.forEach(d => { %><option value="<%= d.id %>"><%= d.name %></option><% }) %></select></div>
+            <div class="form-group" style="margin-bottom:0;"><label>Role</label><input type="text" name="role_in_division" placeholder="e.g. Lead" style="width:120px;"></div>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;"><input type="checkbox" name="is_primary" value="1" style="width:auto;"> Primary</label>
+            <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-check"></i></button>
+          </form>
+        </div>
         <% userDivisions.forEach(ud => { %>
           <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
             <span style="flex:1;font-weight:700;"><%= ud.division_name %><% if (ud.division_code) { %> <span style="font-size:11px;color:var(--muted);">(<%= ud.division_code %>)</span><% } %></span>
             <% if (ud.role_in_division) { %><span class="badge" style="font-size:9px;"><%= ud.role_in_division %></span><% } %>
+            <form method="POST" action="/client/users/<%= usr.id %>/divisions/<%= ud.id %>/delete" style="display:inline;" onsubmit="return confirm('Remove?')"><button type="submit" class="btn btn-sm" style="padding:1px 4px;color:#ef4444;"><i class="ti ti-x"></i></button></form>
           </div>
         <% }) %>
+        <% if (userDivisions.length === 0) { %><div style="font-size:12px;color:var(--muted);">Not assigned to any divisions.</div><% } %>
       </div>
-      <% } %>
 
-      <!-- Direct Reports -->
-      <% if (directReports.length > 0) { %>
+      <!-- Reporting Structure -->
       <div class="card">
-        <h3><i class="ti ti-users"></i> Direct Reports (<%= directReports.length %>)</h3>
-        <% directReports.forEach(dr => { %>
-          <a href="/client/users/<%= dr.id %>" style="display:block;padding:6px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;font-size:13px;">
-            <strong><%= dr.name %></strong><% if (dr.title) { %> — <span style="color:var(--muted);"><%= dr.title %></span><% } %>
-          </a>
+        <h3><i class="ti ti-hierarchy-3"></i> Reporting Structure</h3>
+        <form method="POST" action="/client/users/<%= usr.id %>/set-manager" style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;">
+          <div class="form-group" style="flex:1;margin:0;"><label>Reports To</label><select name="manager_id"><option value="">— No manager —</option><% allUsers.forEach(u => { %><option value="<%= u.id %>" <%= usr.manager_id === u.id ? 'selected' : '' %>><%= u.name %><% if (u.title) { %> (<%= u.title %>)<% } %></option><% }) %></select></div>
+          <button type="submit" class="btn btn-sm btn-primary">Save</button>
+        </form>
+        <% if (directReports.length > 0) { %>
+          <div style="font-size:12px;font-weight:700;color:var(--muted);margin:12px 0 8px;">DIRECT REPORTS (<%= directReports.length %>)</div>
+          <% directReports.forEach(dr => { %>
+            <a href="/client/users/<%= dr.id %>" style="display:block;padding:6px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;font-size:13px;">
+              <strong><%= dr.name %></strong><% if (dr.title) { %> — <span style="color:var(--muted);"><%= dr.title %></span><% } %>
+            </a>
+          <% }) %>
+        <% } %>
+      </div>
+
+      <!-- Assigned Equipment -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3 style="margin:0;"><i class="ti ti-device-desktop"></i> Equipment (<%= assignedEquip.length %>)</h3>
+          <button class="btn btn-sm" onclick="document.getElementById('assign-equip').style.display=document.getElementById('assign-equip').style.display==='none'?'':'none'"><i class="ti ti-plus"></i> Assign</button>
+        </div>
+        <div id="assign-equip" style="display:none;margin-bottom:10px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">
+          <form method="POST" action="/client/users/<%= usr.id %>/assign-equipment" style="display:flex;gap:8px;align-items:flex-end;">
+            <div class="form-group" style="flex:1;margin:0;"><label>Equipment</label><select name="inventory_id" required><option value="">— Select —</option><% availableEquip.forEach(eq => { %><option value="<%= eq.id %>"><%= eq.name %> <% if (eq.serial_number) { %>(SN: <%= eq.serial_number %>)<% } %></option><% }) %></select></div>
+            <button type="submit" class="btn btn-sm btn-primary">Assign</button>
+          </form>
+        </div>
+        <% if (assignedEquip.length > 0) { %>
+          <% assignedEquip.forEach(eq => { %>
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+              <span style="flex:1;"><strong><%= eq.name %></strong><% if (eq.serial_number) { %> <span style="font-size:11px;color:var(--muted);">SN: <%= eq.serial_number %></span><% } %></span>
+              <% if (eq.condition) { %><span class="badge <%= eq.condition==='New'||eq.condition==='Good'?'active':eq.condition==='Needs Repair'?'overdue':'inactive' %>"><%= eq.condition %></span><% } %>
+              <form method="POST" action="/client/users/<%= usr.id %>/unassign-equipment/<%= eq.id %>" style="display:inline;" onsubmit="return confirm('Unassign?')"><button type="submit" class="btn btn-sm" style="padding:1px 4px;color:#ef4444;" title="Unassign"><i class="ti ti-x"></i></button></form>
+            </div>
+          <% }) %>
+        <% } else { %>
+          <div style="font-size:12px;color:var(--muted);">No equipment assigned.</div>
+        <% } %>
+      </div>
+
+      <!-- Software -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3 style="margin:0;"><i class="ti ti-app-window"></i> Software (<%= assignedSoftware.length %>)</h3>
+          <button class="btn btn-sm" onclick="document.getElementById('add-sw').style.display=document.getElementById('add-sw').style.display==='none'?'':'none'"><i class="ti ti-plus"></i> Add</button>
+        </div>
+        <div id="add-sw" style="display:none;margin-bottom:10px;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">
+          <form method="POST" action="/client/users/<%= usr.id %>/assign-software">
+            <div class="form-row"><div class="form-group"><label>Software *</label><input type="text" name="name" required placeholder="Microsoft Office"></div><div class="form-group"><label>Vendor</label><input type="text" name="vendor" placeholder="Microsoft"></div></div>
+            <div class="form-row"><div class="form-group"><label>License Key</label><input type="text" name="license_key" placeholder="XXXX-XXXX"></div><div class="form-group"><label>Monthly Cost</label><input type="number" name="cost" step="0.01" placeholder="0.00"></div></div>
+            <button type="submit" class="btn btn-sm btn-primary">Add</button>
+          </form>
+        </div>
+        <% if (assignedSoftware.length > 0) { %>
+          <table class="tbl" style="font-size:12px;">
+            <thead><tr><th>Software</th><th>Vendor</th><th>License</th><th>Cost</th><th></th></tr></thead>
+            <tbody>
+            <% assignedSoftware.forEach(sw => { %>
+              <tr>
+                <td><strong><%= sw.name %></strong></td>
+                <td><%= sw.vendor || '—' %></td>
+                <td style="font-family:monospace;font-size:10px;"><%= sw.license_key || '—' %></td>
+                <td><%= (sw.cost||0) > 0 ? '$' + (sw.cost).toFixed(2) : '—' %></td>
+                <td><form method="POST" action="/client/users/<%= usr.id %>/software/<%= sw.id %>/delete" style="display:inline;" onsubmit="return confirm('Remove?')"><button type="submit" class="btn btn-sm" style="padding:1px 4px;color:#ef4444;"><i class="ti ti-x"></i></button></form></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        <% } else { %>
+          <div style="font-size:12px;color:var(--muted);">No software assigned.</div>
+        <% } %>
+      </div>
+
+      <!-- Tasks -->
+      <% if (tasks.length > 0) { %>
+      <div class="card">
+        <h3><i class="ti ti-checkbox"></i> Tasks (<%= tasks.length %>)</h3>
+        <% tasks.forEach(t => { %>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+            <span style="flex:1;<%= t.status === 'done' ? 'text-decoration:line-through;opacity:0.5;' : '' %>"><%= t.title %></span>
+            <span class="badge <%= t.status === 'done' ? 'paid' : t.status === 'in-progress' ? 'sent' : 'prospect' %>"><%= t.status %></span>
+            <span class="badge <%= t.priority === 'urgent' ? 'overdue' : t.priority === 'high' ? 'sent' : 'active' %>"><%= t.priority %></span>
+          </div>
         <% }) %>
       </div>
       <% } %>
