@@ -53,7 +53,7 @@
 
         <div class="metrics">
           <%
-            var emailCount = users.filter(u => u.email_account).length;
+            var emailCount = users.filter(u => u.email || u.email_account).length;
             var phoneCount = users.filter(u => u.phone).length;
             var monthlySubCost = subs.reduce((s,x) => s + ((x.billing_cycle === 'Monthly' ? (x.cost_per_unit||0) * (x.seats||1) : 0)), 0);
             var yearlySubCost = subs.reduce((s,x) => s + ((x.billing_cycle === 'Yearly' ? (x.cost_per_unit||0) * (x.seats||1) : 0)), 0);
