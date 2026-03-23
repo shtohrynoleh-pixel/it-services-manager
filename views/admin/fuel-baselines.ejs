@@ -39,7 +39,7 @@
                 <td><%= s.total_gallons ? s.total_gallons.toFixed(1) : '—' %></td>
                 <td><%= s.vehicle_count %></td>
                 <td><%= s.measurement_count %></td>
-                <td style="font-size:10px;color:var(--muted);"><%= s.computed_at ? s.computed_at.replace('T',' ').substring(0,16) : '' %><br>by <%= s.computed_by || '—' %></td>
+                <td style="font-size:10px;color:var(--muted);"><%= s.computed_at ? String(s.computed_at).replace('T',' ').substring(0,16) : '' %><br>by <%= s.computed_by || '—' %></td>
                 <td><form method="POST" action="/admin/companies/<%= company.id %>/fuel/baselines/compute"><input type="hidden" name="group_id" value="<%= s.group_id %>"><button type="submit" class="btn btn-sm"><i class="ti ti-refresh"></i></button></form></td>
               </tr>
             <% }) %>
@@ -65,7 +65,7 @@
                 <td style="font-size:10px;"><%= s.period_start %> → <%= s.period_end %></td>
                 <td><%= Math.round(s.total_miles).toLocaleString() %></td>
                 <td><%= s.is_current ? '✅' : '' %></td>
-                <td style="font-size:10px;"><%= s.computed_at ? s.computed_at.replace('T',' ').substring(0,16) : '' %></td>
+                <td style="font-size:10px;"><%= s.computed_at ? String(s.computed_at).replace('T',' ').substring(0,16) : '' %></td>
               </tr>
             <% }) %>
             </tbody>

@@ -41,7 +41,7 @@
           </div>
           <div class="card"><h3><i class="ti ti-list"></i> Recent Activity</h3>
             <% auditLog.slice(0,8).forEach(a => { %>
-              <div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #f8fafc;font-size:11px;"><span class="badge draft" style="font-size:8px;"><%= a.action %></span><div style="flex:1;"><%= a.details || '' %></div><div style="color:var(--muted);font-size:9px;"><%= a.created_at ? a.created_at.split('T')[0] : '' %></div></div>
+              <div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #f8fafc;font-size:11px;"><span class="badge draft" style="font-size:8px;"><%= a.action %></span><div style="flex:1;"><%= a.details || '' %></div><div style="color:var(--muted);font-size:9px;"><%= a.created_at ? String(a.created_at).split('T')[0] : '' %></div></div>
             <% }) %>
             <% if (auditLog.length === 0) { %><div style="font-size:11px;color:var(--muted);padding:8px;">No activity yet.</div><% } %>
           </div>
@@ -167,7 +167,7 @@
           <h3><i class="ti ti-list"></i> Audit Log</h3>
           <% if (auditLog.length === 0) { %><div style="font-size:12px;color:var(--muted);padding:12px;">No entries.</div><% } else { %>
             <table class="tbl"><thead><tr><th>Date</th><th>Action</th><th>Driver</th><th>Vehicle</th><th>Details</th><th>By</th></tr></thead><tbody>
-            <% auditLog.forEach(a => { %><tr><td style="font-size:10px;"><%= a.created_at ? a.created_at.replace('T',' ').substring(0,16) : '' %></td><td><span class="badge draft" style="font-size:8px;"><%= a.action %></span></td><td><%= a.driver_name||'—' %></td><td><%= a.vehicle_unit ? '#'+a.vehicle_unit : '—' %></td><td style="font-size:10px;"><%= a.details||'' %></td><td style="font-size:10px;color:var(--muted);"><%= a.created_by||'' %></td></tr><% }) %>
+            <% auditLog.forEach(a => { %><tr><td style="font-size:10px;"><%= a.created_at ? String(a.created_at).replace('T',' ').substring(0,16) : '' %></td><td><span class="badge draft" style="font-size:8px;"><%= a.action %></span></td><td><%= a.driver_name||'—' %></td><td><%= a.vehicle_unit ? '#'+a.vehicle_unit : '—' %></td><td style="font-size:10px;"><%= a.details||'' %></td><td style="font-size:10px;color:var(--muted);"><%= a.created_by||'' %></td></tr><% }) %>
             </tbody></table>
           <% } %>
         </div>

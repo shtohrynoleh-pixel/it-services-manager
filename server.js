@@ -38,6 +38,15 @@ app.use(session({
   cookie: { maxAge: 24 * 60 * 60 * 1000 }
 }));
 
+// Global template helpers — available in all EJS views
+app.locals.fmt = {
+  date: function(v) { if (!v) return '—'; var s = String(v); return s.includes('T') ? s.split('T')[0] : s.substring(0,10); },
+  datetime: function(v) { if (!v) return '—'; var s = String(v); return s.includes('T') ? s.replace('T',' ').substring(0,16) : s.substring(0,16); },
+  money: function(v) { return '$' + (Number(v) || 0).toFixed(2); },
+  num: function(v) { return (Number(v) || 0).toLocaleString(); },
+  pct: function(v, d) { return (Number(v) || 0).toFixed(d || 1) + '%'; }
+};
+
 app.use((req, res, next) => {
   res.locals.user = req.session.user || null;
   next();
