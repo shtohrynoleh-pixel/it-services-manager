@@ -1,0 +1,90 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/client?tab=users" style="opacity:0.4;text-decoration:none;"><i class="ti ti-users"></i></a> → <%= usr.name %></h2></div>
+    </div>
+    <div class="content">
+      <div style="margin-bottom:12px;"><a href="/client?tab=users" class="btn btn-sm"><i class="ti ti-arrow-left"></i> Back to Team</a></div>
+
+      <!-- Profile header -->
+      <div class="card" style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+        <div style="width:64px;height:64px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;color:var(--primary);flex-shrink:0;"><%= usr.name.charAt(0).toUpperCase() %></div>
+        <div style="flex:1;min-width:200px;">
+          <h3 style="margin-bottom:2px;"><%= usr.name %></h3>
+          <% if (usr.title) { %><div style="font-size:13px;color:var(--muted);margin-bottom:6px;"><%= usr.title %></div><% } %>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <% if (usr.role) { %><span class="badge active"><%= usr.role %></span><% } %>
+            <% if (usr.department) { %><span class="badge prospect"><%= usr.department %></span><% } %>
+            <span class="badge <%= usr.is_active ? 'active' : 'inactive' %>"><%= usr.is_active ? 'Active' : 'Inactive' %></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contact info -->
+      <div class="card">
+        <h3><i class="ti ti-address-book"></i> Contact Info</h3>
+        <div class="card-row"><span class="label">Personal Email</span><span class="value"><%= usr.email || '—' %></span></div>
+        <div class="card-row"><span class="label">Company Email</span><span class="value" style="color:var(--primary);font-weight:700;"><%= usr.email_account || '—' %></span></div>
+        <div class="card-row"><span class="label">Phone</span><span class="value"><%= usr.phone || '—' %></span></div>
+        <div class="card-row"><span class="label">Hire Date</span><span class="value"><%= usr.hire_date || '—' %></span></div>
+        <% if (manager) { %><div class="card-row"><span class="label">Reports To</span><span class="value"><a href="/client/users/<%= manager.id %>"><%= manager.name %></a><% if (manager.title) { %> (<%= manager.title %>)<% } %></span></div><% } %>
+      </div>
+
+      <!-- Additional Emails -->
+      <% if (userEmails.length > 0) { %>
+      <div class="card">
+        <h3><i class="ti ti-mail"></i> Emails</h3>
+        <% userEmails.forEach(em => { %>
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+            <span style="flex:1;font-weight:<%= em.is_primary ? '700' : '400' %>;"><%= em.email %></span>
+            <span class="badge" style="font-size:9px;"><%= em.type %></span>
+            <% if (em.is_primary) { %><span style="font-size:9px;color:#16a34a;font-weight:700;">PRIMARY</span><% } %>
+          </div>
+        <% }) %>
+      </div>
+      <% } %>
+
+      <!-- Additional Phones -->
+      <% if (userPhones.length > 0) { %>
+      <div class="card">
+        <h3><i class="ti ti-phone"></i> Phones</h3>
+        <% userPhones.forEach(ph => { %>
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+            <span style="flex:1;font-weight:<%= ph.is_primary ? '700' : '400' %>;"><%= ph.phone %><% if (ph.ext) { %> <span style="font-size:11px;color:var(--muted);">x<%= ph.ext %></span><% } %></span>
+            <span class="badge" style="font-size:9px;"><%= ph.type %></span>
+            <% if (ph.is_primary) { %><span style="font-size:9px;color:#16a34a;font-weight:700;">PRIMARY</span><% } %>
+          </div>
+        <% }) %>
+      </div>
+      <% } %>
+
+      <!-- Divisions -->
+      <% if (userDivisions.length > 0) { %>
+      <div class="card">
+        <h3><i class="ti ti-hierarchy-2"></i> Divisions</h3>
+        <% userDivisions.forEach(ud => { %>
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+            <span style="flex:1;font-weight:700;"><%= ud.division_name %><% if (ud.division_code) { %> <span style="font-size:11px;color:var(--muted);">(<%= ud.division_code %>)</span><% } %></span>
+            <% if (ud.role_in_division) { %><span class="badge" style="font-size:9px;"><%= ud.role_in_division %></span><% } %>
+          </div>
+        <% }) %>
+      </div>
+      <% } %>
+
+      <!-- Direct Reports -->
+      <% if (directReports.length > 0) { %>
+      <div class="card">
+        <h3><i class="ti ti-users"></i> Direct Reports (<%= directReports.length %>)</h3>
+        <% directReports.forEach(dr => { %>
+          <a href="/client/users/<%= dr.id %>" style="display:block;padding:6px 0;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit;font-size:13px;">
+            <strong><%= dr.name %></strong><% if (dr.title) { %> — <span style="color:var(--muted);"><%= dr.title %></span><% } %>
+          </a>
+        <% }) %>
+      </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

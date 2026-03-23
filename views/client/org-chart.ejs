@@ -1,0 +1,45 @@
+<%- include('../partials/head') %>
+<div class="app-wrap">
+  <%- include('../partials/sidebar', { settings, user, page, tab: '' }) %>
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/client?tab=users" style="opacity:0.4;text-decoration:none;"><i class="ti ti-users"></i></a> → <i class="ti ti-hierarchy-3"></i> Org Chart</h2></div>
+    </div>
+    <div class="content">
+      <div style="margin-bottom:12px;"><a href="/client?tab=users" class="btn btn-sm"><i class="ti ti-arrow-left"></i> Back to Team</a></div>
+
+      <%
+        var topLevel = users.filter(u => !u.manager_id);
+        var byManager = {};
+        users.forEach(u => { if (u.manager_id) { if (!byManager[u.manager_id]) byManager[u.manager_id] = []; byManager[u.manager_id].push(u); } });
+      %>
+
+      <% function renderNode(u, depth) { %>
+        <div style="margin-left:<%= depth * 28 %>px;padding:8px 14px;border-left:<%= depth > 0 ? '2px solid var(--border)' : 'none' %>;margin-bottom:4px;">
+          <a href="/client/users/<%= u.id %>" style="font-weight:700;font-size:13px;text-decoration:none;"><%= u.name %></a>
+          <% if (u.title) { %><span style="font-size:11px;color:var(--muted);"> — <%= u.title %></span><% } %>
+          <% if (u.department) { %><span class="badge prospect" style="font-size:8px;margin-left:4px;"><%= u.department %></span><% } %>
+          <% if (u.role) { %><span class="badge active" style="font-size:8px;margin-left:2px;"><%= u.role %></span><% } %>
+          <% if (byManager[u.id]) { byManager[u.id].forEach(child => { renderNode(child, depth + 1); }); } %>
+        </div>
+      <% } %>
+
+      <div class="card">
+        <h3><i class="ti ti-hierarchy-3"></i> <%= company.name %> — Organization</h3>
+        <% if (users.length === 0) { %>
+          <div style="padding:20px;text-align:center;color:var(--muted);font-size:12px;">No team members yet.</div>
+        <% } else { %>
+          <% topLevel.forEach(u => { renderNode(u, 0); }); %>
+          <% var unlinked = users.filter(u => u.manager_id && !users.find(m => m.id === u.manager_id)); %>
+          <% if (unlinked.length > 0) { %>
+            <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">
+              <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;">Other Team Members</div>
+              <% unlinked.forEach(u => { renderNode(u, 0); }); %>
+            </div>
+          <% } %>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

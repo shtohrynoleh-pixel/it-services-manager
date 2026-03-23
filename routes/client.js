@@ -45,12 +45,21 @@ module.exports = function(db) {
     const contacts = safeAll('SELECT * FROM contacts WHERE company_id = ? ORDER BY is_primary DESC', [cid]);
     const tasks = safeAll("SELECT * FROM tasks WHERE company_id = ? ORDER BY CASE status WHEN 'todo' THEN 1 WHEN 'in-progress' THEN 2 ELSE 3 END, created_at DESC", [cid]);
     const software = safeAll('SELECT us.*, cu.name as user_name FROM user_software us LEFT JOIN company_users cu ON us.user_id = cu.id WHERE us.company_id = ?', [cid]);
-    const emailCount = users.filter(u => u.email_account).length;
+    const emailCount = users.filter(u => u.email || u.email_account).length;
     const phoneCount = users.filter(u => u.phone).length;
     const roles = safeAll('SELECT * FROM roles ORDER BY sort_order');
     const depts = safeAll('SELECT * FROM departments ORDER BY sort_order');
     const tab = req.query.tab || 'dashboard';
-    res.render('client/portal', { user: req.session.user, company, users, servers, subs, assets, inventory, invoices, unpaid, contacts, tasks, software, emailCount, phoneCount, roles, depts, tab, settings: getSettings(), page: 'client' });
+    const search = req.query.q || '';
+    // Files
+    const folders = safeAll('SELECT * FROM file_folders WHERE company_id = ? ORDER BY name', [cid]);
+    const folderId = req.query.folder || '';
+    const files = folderId
+      ? safeAll('SELECT * FROM company_files WHERE company_id = ? AND folder_id = ? ORDER BY created_at DESC', [cid, folderId])
+      : safeAll('SELECT * FROM company_files WHERE company_id = ? ORDER BY created_at DESC LIMIT 50', [cid]);
+    // Divisions
+    const divisions = safeAll('SELECT * FROM divisions WHERE company_id = ? AND is_active = 1 ORDER BY name', [cid]);
+    res.render('client/portal', { user: req.session.user, company, users, servers, subs, assets, inventory, invoices, unpaid, contacts, tasks, software, emailCount, phoneCount, roles, depts, tab, search, folders, files, folderId, divisions, settings: getSettings(), page: 'client' });
   });
 
   // === ADD RECORDS (client can add, not delete) ===
@@ -272,6 +281,31 @@ module.exports = function(db) {
     if (!verified) return res.redirect('/client/account/2fa-setup?error=Invalid+code');
     db.prepare('UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?').run(req.session.user.id);
     res.redirect('/client/account');
+  });
+
+  // Org chart (client view)
+  router.get('/org-chart', (req, res) => {
+    const cid = req.session.user.company_id;
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(cid);
+    if (!company) return res.redirect('/client');
+    const users = safeAll('SELECT * FROM company_users WHERE company_id = ? AND is_active = 1 ORDER BY name', [cid]);
+    const depts = safeAll('SELECT * FROM departments ORDER BY sort_order');
+    res.render('client/org-chart', { user: req.session.user, company, users, depts, settings: getSettings(), page: 'client' });
+  });
+
+  // User profile (client view)
+  router.get('/users/:uid', (req, res) => {
+    const cid = req.session.user.company_id;
+    const company = db.prepare('SELECT * FROM companies WHERE id = ?').get(cid);
+    if (!company) return res.redirect('/client');
+    const usr = safeGet('SELECT * FROM company_users WHERE id = ? AND company_id = ?', [req.params.uid, cid]);
+    if (!usr) return res.redirect('/client?tab=users');
+    const manager = usr.manager_id ? safeGet('SELECT id, name, title FROM company_users WHERE id = ?', [usr.manager_id]) : null;
+    const directReports = safeAll('SELECT id, name, title, role, department FROM company_users WHERE manager_id = ? AND company_id = ?', [usr.id, cid]);
+    const userEmails = safeAll('SELECT * FROM user_emails WHERE user_id = ? AND company_id = ? ORDER BY is_primary DESC', [usr.id, cid]);
+    const userPhones = safeAll('SELECT * FROM user_phones WHERE user_id = ? AND company_id = ? ORDER BY is_primary DESC', [usr.id, cid]);
+    const userDivisions = safeAll('SELECT uda.*, d.name as division_name, d.code as division_code FROM user_division_assignments uda JOIN divisions d ON uda.division_id = d.id WHERE uda.user_id = ? AND uda.company_id = ?', [usr.id, cid]);
+    res.render('client/user-profile', { user: req.session.user, company, usr, manager, directReports, userEmails, userPhones, userDivisions, settings: getSettings(), page: 'client' });
   });
 
   // === CSV EXPORT (client can export their own data) ===

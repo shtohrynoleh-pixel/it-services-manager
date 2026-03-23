@@ -105,6 +105,40 @@
         </div>
         <% } %>
 
+      <% } else if (tab === 'files') { %>
+        <!-- Files tab -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h3 style="margin:0;"><i class="ti ti-folder"></i> Files</h3>
+        </div>
+        <% if (folders.length > 0) { %>
+          <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+            <a href="/client?tab=files" class="btn btn-sm <%= !folderId ? 'btn-primary' : '' %>">All Files</a>
+            <% folders.forEach(f => { %>
+              <a href="/client?tab=files&folder=<%= f.id %>" class="btn btn-sm <%= String(folderId) === String(f.id) ? 'btn-primary' : '' %>"><i class="ti ti-folder"></i> <%= f.name %></a>
+            <% }) %>
+          </div>
+        <% } %>
+        <% if (files.length === 0) { %>
+          <div class="empty"><span class="e-icon"><i class="ti ti-folder-off"></i></span><div class="e-text">No files</div></div>
+        <% } else { %>
+          <div class="card" style="overflow-x:auto;">
+            <table class="tbl">
+              <thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Uploaded</th><th></th></tr></thead>
+              <tbody>
+              <% files.forEach(f => { %>
+                <tr>
+                  <td><strong><%= f.original_name || f.filename %></strong></td>
+                  <td style="font-size:11px;"><%= f.size ? (f.size > 1048576 ? (f.size/1048576).toFixed(1)+'MB' : (f.size/1024).toFixed(0)+'KB') : '—' %></td>
+                  <td style="font-size:11px;"><%= f.mime_type || '—' %></td>
+                  <td style="font-size:11px;"><%= fmt.date(f.created_at) %></td>
+                  <td><a href="/admin/companies/<%= company.id %>/files/<%= f.id %>/download" class="btn btn-sm"><i class="ti ti-download"></i></a></td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
       <% } else { %>
         <%
           const dataMap = {
@@ -140,26 +174,52 @@
             </div>
           <% } %>
         <% } else if (cfg) { %>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
-            <h3 style="margin:0;"><%= cfg.title %></h3>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <h3 style="margin:0;"><%= cfg.title %> (<%= cfg.items.length %>)</h3>
             <div style="display:flex;gap:6px;">
-              <a href="/client/export/<%= tab %>" class="btn btn-sm"><i class="ti ti-download"></i> Export CSV</a>
+              <% if (tab === 'users') { %><a href="/client/org-chart" class="btn btn-sm"><i class="ti ti-hierarchy-3"></i> Org Chart</a><% } %>
+              <a href="/client/export/<%= tab %>" class="btn btn-sm"><i class="ti ti-download"></i> Export</a>
               <button class="btn btn-primary btn-sm" onclick="document.getElementById('clientAddModal').classList.add('open')">+ Add</button>
             </div>
           </div>
+
+          <!-- Search -->
+          <div style="margin-bottom:12px;">
+            <input type="text" id="clientSearch" placeholder="Search <%= tab %>..." oninput="filterClientTable()" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;width:100%;max-width:400px;">
+          </div>
+
           <% if (cfg.items.length === 0) { %>
             <div class="empty"><span class="e-icon">📭</span><div class="e-text">No <%= tab %> recorded</div><button class="btn btn-primary btn-sm" onclick="document.getElementById('clientAddModal').classList.add('open')">+ Add First</button></div>
           <% } else { %>
             <div class="card" style="overflow-x:auto;">
-              <table class="tbl">
+              <table class="tbl" id="clientDataTable">
                 <thead><tr><% cfg.cols.forEach(c => { %><th><%= c %></th><% }) %></tr></thead>
                 <tbody>
                 <% cfg.items.forEach(it => { %>
-                  <tr><% cfg.fields.forEach(f => { %><td><% if (f === 'cost') { %><%= (it[f]||0) > 0 ? '$' + (it[f]||0).toFixed(2) : '—' %><% } else if (f === 'condition') { %><span class="badge <%= it[f]==='New'||it[f]==='Good'?'active':it[f]==='Needs Repair'?'overdue':it[f]==='Retired'?'inactive':'draft' %>"><%= it[f] || '—' %></span><% } else { %><%= it[f] || '—' %><% } %></td><% }) %></tr>
+                  <tr data-search="<%= cfg.fields.map(f => (it[f]||'')).join(' ').toLowerCase() %>">
+                    <% cfg.fields.forEach((f, fi) => { %>
+                      <td>
+                        <% if (f === 'name' && tab === 'users') { %>
+                          <a href="/client/users/<%= it.id %>" style="font-weight:700;"><%= it[f] || '—' %></a>
+                          <% if (it.title) { %><div style="font-size:10px;color:var(--muted);"><%= it.title %></div><% } %>
+                        <% } else if (f === 'cost') { %><%= (it[f]||0) > 0 ? '$' + (it[f]||0).toFixed(2) : '—' %>
+                        <% } else if (f === 'condition') { %><span class="badge <%= it[f]==='New'||it[f]==='Good'?'active':it[f]==='Needs Repair'?'overdue':it[f]==='Retired'?'inactive':'draft' %>"><%= it[f] || '—' %></span>
+                        <% } else { %><%= it[f] || '—' %><% } %>
+                      </td>
+                    <% }) %>
+                  </tr>
                 <% }) %>
                 </tbody>
               </table>
             </div>
+            <script>
+            function filterClientTable(){
+              var q=document.getElementById('clientSearch').value.toLowerCase();
+              document.querySelectorAll('#clientDataTable tbody tr').forEach(function(tr){
+                tr.style.display=!q||tr.getAttribute('data-search').includes(q)?'':'none';
+              });
+            }
+            </script>
           <% } %>
 
           <!-- Client Add Modal -->
