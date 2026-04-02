@@ -118,6 +118,7 @@ function initDB() {
       hire_date TEXT,
       photo_url TEXT,
       is_active INTEGER DEFAULT 1,
+      terminated_at TEXT,
       notes TEXT,
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
       FOREIGN KEY (manager_id) REFERENCES company_users(id) ON DELETE SET NULL

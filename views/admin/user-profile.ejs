@@ -4,7 +4,7 @@
   <div class="main">
     <div class="topbar">
       <div style="display:flex;align-items:center;gap:12px;"><button class="mob-toggle" onclick="openSidebar()">☰</button><h2><a href="/admin/companies/<%= company.id %>?tab=users" style="opacity:0.4;text-decoration:none;">👥</a> → <%= usr.name %></h2></div>
-      <div style="display:flex;align-items:center;gap:8px;"><span class="badge <%= usr.is_active ? 'active' : 'inactive' %>"><%= usr.is_active ? 'Active' : 'Inactive' %></span><%- include('../partials/notif-bell') %></div>
+      <div style="display:flex;align-items:center;gap:8px;"><span class="badge <%= usr.is_active ? 'active' : 'inactive' %>" <% if (usr.terminated_at) { %>style="background:#fef2f2;color:#ef4444;border-color:#fecaca;"<% } %>><%= usr.is_active ? 'Active' : (usr.terminated_at ? 'Terminated' : 'Inactive') %></span><%- include('../partials/notif-bell') %></div>
     </div>
     <div class="content">
       <!-- Profile header -->
@@ -22,7 +22,14 @@
             <% if (usr.department) { %><span class="badge prospect"><%= usr.department %></span><% } %>
           </div>
         </div>
-        <a href="/admin/companies/<%= company.id %>/users/<%= usr.id %>/edit" class="btn btn-sm">✏️ Edit</a>
+        <div style="display:flex;gap:6px;">
+          <a href="/admin/companies/<%= company.id %>/users/<%= usr.id %>/edit" class="btn btn-sm">✏️ Edit</a>
+          <% if (usr.is_active) { %>
+            <form method="POST" action="/admin/companies/<%= company.id %>/users/<%= usr.id %>/terminate" style="display:inline;" onsubmit="return confirm('Are you sure you want to terminate this employee? This will mark them inactive and create a task to clear all accesses.')">
+              <button type="submit" class="btn btn-sm" style="background:#ef4444;color:#fff;border-color:#ef4444;">Terminate</button>
+            </form>
+          <% } %>
+        </div>
       </div>
 
       <!-- Contact info -->
@@ -33,6 +40,7 @@
         <div class="card-row"><span class="label">Company Email</span><span class="value" style="color:var(--primary);font-weight:700;"><%= usr.email_account || '—' %></span></div>
         <div class="card-row"><span class="label">Primary Phone</span><span class="value"><%= usr.phone || '—' %></span></div>
         <div class="card-row"><span class="label">Hire Date</span><span class="value"><%= usr.hire_date || '—' %></span></div>
+        <% if (usr.terminated_at) { %><div class="card-row"><span class="label">Terminated</span><span class="value" style="color:#ef4444;font-weight:700;"><%= usr.terminated_at %></span></div><% } %>
         <% if (manager) { %><div class="card-row"><span class="label">Reports To</span><span class="value"><a href="/admin/companies/<%= company.id %>/users/<%= manager.id %>/profile"><%= manager.name %></a><% if (manager.title) { %> (<%= manager.title %>)<% } %></span></div><% } %>
       </div>
 

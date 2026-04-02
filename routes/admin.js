@@ -2331,6 +2331,60 @@ module.exports = function(db) {
     res.redirect('/admin/companies/' + req.params.cid + '/users/' + req.params.uid + '/profile');
   });
 
+  // === TERMINATE USER ===
+  router.post('/companies/:cid/users/:uid/terminate', (req, res) => {
+    const { cid, uid } = req.params;
+    const usr = safeGet('SELECT * FROM company_users WHERE id = ? AND company_id = ?', [uid, cid]);
+    if (!usr) return res.redirect('/admin/companies/' + cid + '?tab=users');
+    const company = safeGet('SELECT name FROM companies WHERE id = ?', [cid]);
+
+    // Mark user as terminated
+    const now = new Date().toISOString().slice(0, 10);
+    try { db.prepare('UPDATE company_users SET is_active = 0, terminated_at = ? WHERE id = ? AND company_id = ?').run(now, uid, cid); } catch(e) { console.error('Terminate user:', e.message); }
+
+    // Gather all current accesses for the task description
+    const software = safeAll('SELECT name FROM user_software WHERE user_id = ? AND company_id = ?', [uid, cid]);
+    const equipment = safeAll('SELECT name, serial_number FROM inventory WHERE assigned_to = ? AND company_id = ?', [usr.name, cid]);
+    const emails = safeAll('SELECT email FROM user_emails WHERE user_id = ? AND company_id = ?', [uid, cid]);
+    const folders = safeAll('SELECT fa.permission, ff.name as folder_name FROM folder_access fa JOIN file_folders ff ON fa.folder_id = ff.id WHERE fa.user_name = ?', [usr.name]);
+    const chatChannels = safeAll('SELECT cm.id, cc.name as channel_name FROM chat_members cm JOIN chat_channels cc ON cm.channel_id = cc.id WHERE cm.user_name = ?', [usr.name]);
+    const divisions = safeAll('SELECT d.name FROM user_division_assignments uda JOIN divisions d ON uda.division_id = d.id WHERE uda.user_id = ? AND uda.company_id = ?', [uid, cid]);
+
+    // Build checklist for the task
+    let checklist = 'Employee "' + usr.name + '" from ' + (company ? company.name : 'Unknown') + ' has been terminated on ' + now + '.\n\nPlease clear all accesses:\n\n';
+
+    if (usr.email_account) checklist += '[ ] Disable company email: ' + usr.email_account + '\n';
+    if (emails.length > 0) checklist += '[ ] Remove additional emails: ' + emails.map(e => e.email).join(', ') + '\n';
+    if (software.length > 0) checklist += '[ ] Revoke software licenses: ' + software.map(s => s.name).join(', ') + '\n';
+    if (equipment.length > 0) checklist += '[ ] Collect equipment: ' + equipment.map(e => e.name + (e.serial_number ? ' (SN: ' + e.serial_number + ')' : '')).join(', ') + '\n';
+    if (folders.length > 0) checklist += '[ ] Remove folder access: ' + folders.map(f => f.folder_name + ' (' + f.permission + ')').join(', ') + '\n';
+    if (chatChannels.length > 0) checklist += '[ ] Remove from chat channels: ' + chatChannels.map(c => c.channel_name).join(', ') + '\n';
+    if (divisions.length > 0) checklist += '[ ] Remove from divisions: ' + divisions.map(d => d.name).join(', ') + '\n';
+    if (usr.access_level && usr.access_level !== 'none') checklist += '[ ] Revoke access level: ' + usr.access_level + '\n';
+
+    checklist += '[ ] Disable any VPN / RDP access\n';
+    checklist += '[ ] Remove from any shared password vaults\n';
+    checklist += '[ ] Notify manager and HR\n';
+
+    // Create automated task
+    try {
+      db.prepare('INSERT INTO tasks (title, description, company_id, related_table, related_id, priority, status, assigned_to, created_by) VALUES (?,?,?,?,?,?,?,?,?)').run(
+        'Clear all accesses for terminated employee: ' + usr.name,
+        checklist,
+        cid,
+        'company_users',
+        uid,
+        'urgent',
+        'todo',
+        'admin',
+        xpUser(req)
+      );
+    } catch(e) { console.error('Create termination task:', e.message); }
+
+    awardXP(db, xpUser(req), 'create_task', null, req);
+    res.redirect('/admin/companies/' + cid + '/users/' + uid + '/profile');
+  });
+
   // === USER EMAILS ===
   router.post('/companies/:cid/users/:uid/emails', (req, res) => {
     const { email, type, is_primary, notes } = req.body;
